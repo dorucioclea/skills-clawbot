@@ -1,0 +1,11 @@
+{
+  "owner": "cclank",
+  "slug": "news-aggregator-skill",
+  "displayName": "News Aggregator Skill",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1769420683107,
+    "commit": null
+  },
+  "history": []
+}
