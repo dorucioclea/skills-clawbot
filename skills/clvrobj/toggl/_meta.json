@@ -1,0 +1,11 @@
+{
+  "owner": "clvrobj",
+  "slug": "toggl",
+  "displayName": "Toggl",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1769854199350,
+    "commit": null
+  },
+  "history": []
+}
