@@ -1,6 +1,6 @@
 ---
 name: web-search-plus
-version: 2.2.2
+version: 2.2.5
 description: Unified search skill with Intelligent Auto-Routing. Uses multi-signal analysis to automatically select between Serper (Google), Tavily (Research), and Exa (Neural) with confidence scoring.
 tags: [search, web-search, serper, tavily, exa, google, research, semantic-search, auto-routing, multi-provider, shopping, free-tier]
 ---
@@ -8,6 +8,8 @@ tags: [search, web-search, serper, tavily, exa, google, research, semantic-searc
 # Web Search Plus
 
 Multi-provider web search with **Intelligent Auto-Routing**: Serper (Google), Tavily (Research), Exa (Neural).
+
+**NEW in v2.2.5**: Automatic error fallback — if one provider fails (rate limit, timeout, etc.), automatically tries the next provider in priority order!
 
 **NEW in v2.1.0**: Intelligent multi-signal analysis with confidence scoring!
 
@@ -60,18 +62,18 @@ python3 scripts/search.py -q "your query"
 
 ---
 
-## ⚠️ Don't Modify Core Moltbot Config
+## ⚠️ Don't Modify Core OpenClaw Config
 
-**Tavily, Serper, and Exa are NOT core Moltbot providers.**
+**Tavily, Serper, and Exa are NOT core OpenClaw providers.**
 
-❌ **DON'T** add to `~/.moltbot/moltbot.json`:
+❌ **DON'T** add to `~/.openclaw/openclaw.json`:
 ```json
 "tools": { "web": { "search": { "provider": "tavily" }}}  // WRONG!
 ```
 
 ✅ **DO** use this skill's scripts — keys auto-load from `.env`
 
-Core Moltbot only supports `brave` as the built-in web search provider. This skill adds Serper, Tavily, and Exa as **additional** options via its own scripts.
+Core OpenClaw only supports `brave` as the built-in web search provider. This skill adds Serper, Tavily, and Exa as **additional** options via its own scripts.
 
 ---
 
@@ -335,12 +337,14 @@ python3 scripts/search.py -p exa --similar-url "https://stripe.com" --category c
 > 3. Some queries have no results (very niche topics)
 
 **Q: Rate limited?**
-> Each provider has limits. Spread queries across providers or wait. Serper: 2,500 free total, Tavily: 1,000/month free.
+> **NEW in v2.2.5**: Automatic fallback! If one provider hits rate limits, the script automatically tries the next provider in priority order (serper → tavily → exa). You'll see fallback info in stderr and the response will include `routing.fallback_used: true`.
+> 
+> Provider limits: Serper 2,500 free total, Tavily 1,000/month free, Exa 1,000/month free.
 
-### For Moltbot Users
+### For OpenClaw Users
 
 **Q: How do I use this in chat?**
-> Just ask! Moltbot auto-detects search intent. Or explicitly: "search with web-search-plus for..."
+> Just ask! OpenClaw auto-detects search intent. Or explicitly: "search with web-search-plus for..."
 
 **Q: Does it replace built-in Brave Search?**
 > No, it's complementary. Use Brave for quick lookups, web-search-plus for research/shopping/discovery.
