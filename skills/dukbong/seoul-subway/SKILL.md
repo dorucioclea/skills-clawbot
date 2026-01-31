@@ -1,14 +1,14 @@
 ---
 name: seoul-subway
 description: Seoul Subway assistant for real-time arrivals, route planning, and service alerts (Korean/English)
-metadata: {"moltbot":{"emoji":"🚇","requires":{"bins":["curl","jq"]}}}
+metadata: {"moltbot":{"emoji":"🚇","requires":{"bins":["curl","jq"],"env":["SEOUL_OPENAPI_KEY","DATA_GO_KR_KEY"]},"primaryEnv":"SEOUL_OPENAPI_KEY"}}
 homepage: https://github.com/dukbong/seoul-subway
 user-invocable: true
 ---
 
 # Seoul Subway Skill
 
-Query real-time Seoul Subway information. **No API key required** - uses proxy server.
+Query real-time Seoul Subway information.
 
 ## Features
 
@@ -19,44 +19,27 @@ Query real-time Seoul Subway information. **No API key required** - uses proxy s
 | Route Search | Shortest path with time/fare | "신도림에서 서울역" | "Sindorim to Seoul Station" |
 | Service Alerts | Delays, incidents, non-stops | "지하철 지연 있어?" | "Any subway delays?" |
 
+## Environment Variables
+
+| Variable | Usage | Provider |
+|----------|-------|----------|
+| `SEOUL_OPENAPI_KEY` | Arrival info, station search | data.seoul.go.kr |
+| `DATA_GO_KR_KEY` | Route search, alerts | data.go.kr |
+
+**How to get API keys:**
+1. **SEOUL_OPENAPI_KEY**: Sign up at [data.seoul.go.kr](https://data.seoul.go.kr), go to "My Page" > "API Key Management"
+2. **DATA_GO_KR_KEY**: Sign up at [data.go.kr](https://www.data.go.kr), search for the API service, and request access
+
 ---
 
-## First Time Setup / 첫 사용 안내
-
-When you first use this skill, you'll see a permission prompt for the proxy domain.
-
-처음 사용 시 프록시 도메인 접근 확인 창이 뜹니다.
-
-**Select / 선택:** `Yes, and don't ask again for vercel-proxy-henna-eight.vercel.app`
-
-This only needs to be done once. / 한 번만 하면 됩니다.
-
----
-
-## Proxy API Reference
-
-All API calls go through the proxy server. No API keys needed for users.
-
-### Base URL
-
-```
-https://vercel-proxy-henna-eight.vercel.app
-```
+## API Reference
 
 ### 1. Real-time Arrival Info
 
 **Endpoint**
 ```
-GET /api/realtime/{station}?start=0&end=10
+http://swopenAPI.seoul.go.kr/api/subway/{KEY}/json/realtimeStationArrival/{start}/{end}/{station}
 ```
-
-**Parameters**
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| station | Yes | Station name (Korean, URL-encoded) |
-| start | No | Start index (default: 0) |
-| end | No | End index (default: 10) |
 
 **Response Fields**
 
@@ -69,27 +52,14 @@ GET /api/realtime/{station}?start=0&end=10
 | `btrainSttus` | Train type (일반/급행) |
 | `lstcarAt` | Last train (0=No, 1=Yes) |
 
-**Example**
-```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/realtime/강남"
-```
-
 ---
 
 ### 2. Station Search
 
 **Endpoint**
 ```
-GET /api/stations?station={name}&start=1&end=10
+http://openapi.seoul.go.kr:8088/{KEY}/json/SearchInfoBySubwayNameService/{start}/{end}/{station}
 ```
-
-**Parameters**
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| station | Yes | Station name to search |
-| start | No | Start index (default: 1) |
-| end | No | End index (default: 10) |
 
 **Response Fields**
 
@@ -100,28 +70,25 @@ GET /api/stations?station={name}&start=1&end=10
 | `LINE_NUM` | Line name (e.g., "02호선") |
 | `FR_CODE` | External station code |
 
-**Example**
-```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/stations?station=강남"
-```
-
 ---
 
 ### 3. Route Search
 
 **Endpoint**
 ```
-GET /api/route?dptreStnNm={departure}&arvlStnNm={arrival}
+https://apis.data.go.kr/B553766/path/getShtrmPath
 ```
 
 **Parameters**
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| dptreStnNm | Yes | Departure station |
-| arvlStnNm | Yes | Arrival station |
-| searchDt | No | Datetime (yyyy-MM-dd HH:mm:ss) |
-| searchType | No | duration / distance / transfer |
+| `serviceKey` | Yes | DATA_GO_KR_KEY |
+| `dptreStnNm` | Yes | Departure station |
+| `arvlStnNm` | Yes | Arrival station |
+| `searchDt` | Yes | Datetime (yyyy-MM-dd HH:mm:ss) |
+| `dataType` | Yes | JSON |
+| `searchType` | No | duration / distance / transfer |
 
 **Response Fields**
 
@@ -135,27 +102,24 @@ GET /api/route?dptreStnNm={departure}&arvlStnNm={arrival}
 | `paths[].trainArvlTm` | Arrival time |
 | `paths[].trsitYn` | Transfer flag |
 
-**Example**
-```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/route?dptreStnNm=신도림&arvlStnNm=서울역"
-```
-
 ---
 
 ### 4. Service Alerts
 
 **Endpoint**
 ```
-GET /api/alerts?pageNo=1&numOfRows=10
+https://apis.data.go.kr/B553766/ntce/getNtceList
 ```
 
 **Parameters**
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| pageNo | No | Page number (default: 1) |
-| numOfRows | No | Results per page (default: 10) |
-| lineNm | No | Filter by line |
+| `serviceKey` | Yes | DATA_GO_KR_KEY |
+| `dataType` | Yes | JSON |
+| `pageNo` | No | Page number |
+| `numOfRows` | No | Results per page |
+| `lineNm` | No | Filter by line |
 
 **Response Fields**
 
@@ -168,28 +132,6 @@ GET /api/alerts?pageNo=1&numOfRows=10
 | `nonstopYn` | Non-stop flag |
 | `xcseSitnBgngDt` | Incident start |
 | `xcseSitnEndDt` | Incident end |
-
-**Example**
-```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/alerts"
-```
-
----
-
-## Static Data (GitHub Raw)
-
-For static data like station lists and line mappings, use GitHub raw URLs:
-
-```bash
-# Station list
-curl "https://raw.githubusercontent.com/dukbong/seoul-subway/main/data/stations.json"
-
-# Line ID mappings
-curl "https://raw.githubusercontent.com/dukbong/seoul-subway/main/data/lines.json"
-
-# Station name translations
-curl "https://raw.githubusercontent.com/dukbong/seoul-subway/main/data/station-names.json"
-```
 
 ---
 
@@ -349,22 +291,25 @@ curl "https://raw.githubusercontent.com/dukbong/seoul-subway/main/data/station-n
 
 **Real-time Arrival**
 ```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/realtime/강남"
+curl "http://swopenAPI.seoul.go.kr/api/subway/${SEOUL_OPENAPI_KEY}/json/realtimeStationArrival/0/10/강남"
 ```
 
 **Station Search**
 ```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/stations?station=강남"
+curl "http://openapi.seoul.go.kr:8088/${SEOUL_OPENAPI_KEY}/json/SearchInfoBySubwayNameService/1/10/강남"
 ```
 
 **Route Search**
 ```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/route?dptreStnNm=신도림&arvlStnNm=서울역"
+curl -G "https://apis.data.go.kr/B553766/path/getShtrmPath?serviceKey=${DATA_GO_KR_KEY}&dataType=JSON" \
+  --data-urlencode "dptreStnNm=신도림" \
+  --data-urlencode "arvlStnNm=서울역" \
+  --data-urlencode "searchDt=$(date '+%Y-%m-%d %H:%M:%S')"
 ```
 
 **Service Alerts**
 ```bash
-curl "https://vercel-proxy-henna-eight.vercel.app/api/alerts"
+curl "https://apis.data.go.kr/B553766/ntce/getNtceList?serviceKey=${DATA_GO_KR_KEY}&dataType=JSON&pageNo=1&numOfRows=10"
 ```
 
 ---
@@ -469,4 +414,38 @@ Time: 38 min | Distance: 22.1 km | Fare: 1,650 KRW | Transfers: 1
 ```
 Error: Station not found.
 Try searching with "Gangnam" (station name only).
+```
+
+### API Key Errors
+
+**Korean:**
+```
+오류: API 인증키가 설정되지 않았습니다.
+환경 변수를 설정해주세요: SEOUL_OPENAPI_KEY
+
+발급 안내:
+- 서울열린데이터광장: https://data.seoul.go.kr
+- 공공데이터포털: https://www.data.go.kr
+```
+
+**English:**
+```
+Error: API key is not configured.
+Please set environment variable: SEOUL_OPENAPI_KEY
+
+Get your API key:
+- Seoul Open Data Plaza: https://data.seoul.go.kr
+- Korea Public Data Portal: https://www.data.go.kr
+```
+
+**Korean:**
+```
+오류: API 인증키가 유효하지 않습니다.
+인증키를 확인해주세요.
+```
+
+**English:**
+```
+Error: Invalid API key.
+Please verify your API key.
 ```
