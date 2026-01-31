@@ -1,5 +1,6 @@
 ---
 name: clawflows
+version: 1.0.0
 description: Search, install, and run multi-skill automations from clawflows.com. Combine multiple skills into powerful workflows with logic, conditions, and data flow between steps.
 metadata:
   clawdbot:
