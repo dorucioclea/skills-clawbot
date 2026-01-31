@@ -1,4 +1,11 @@
-# Skill: stranger-danger
+---
+name: stranger-danger
+description: Give your AI agent a safe word. Challenge-response identity verification for Clawdbot — adds a human verification layer before sensitive operations like revealing API keys, deleting data, or handling secrets. Answer is bcrypt-hashed and stored in macOS Keychain.
+---
+
+# Stranger-Danger 🚨
+
+**Source:** https://github.com/jamesalmeida/stranger-danger
 
 Challenge-response identity verification for Clawdbot.
 
