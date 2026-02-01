@@ -1,73 +1,105 @@
 ---
-name: type-gen
-description: Generate TypeScript interfaces from JSON. Use when typing API responses.
+name: JSON to TypeScript - Interface Generator
+description: Generate TypeScript interfaces from JSON data or API responses. Auto-type your APIs instantly. Free CLI tool for TypeScript developers.
 ---
 
-# Type Generator
+# JSON to TypeScript
 
-You have a JSON response and need TypeScript types. Paste in a JSON file and get clean interfaces back.
+Generate TypeScript interfaces from JSON. Stop writing types by hand.
 
-**One command. Zero config. Just works.**
-
-## Quick Start
+## Installation
 
 ```bash
-npx ai-type-gen response.json --name UserResponse
+npm install -g @lxgicstudios/json-to-ts
 ```
 
-## What It Does
+## Commands
 
-- Reads JSON files and generates TypeScript
-- Handles nested objects and arrays
-- Infers optional fields
-- Adds JSDoc comments
-
-## Usage Examples
+### From File
 
 ```bash
-# Generate from JSON
-npx ai-type-gen response.json --name UserResponse
-
-# Save to file
-npx ai-type-gen data.json --name Product --output types/product.ts
+npx @lxgicstudios/json-to-ts data.json
+npx @lxgicstudios/json-to-ts response.json -n User
 ```
 
-## Best Practices
-
-- **Name interfaces clearly** - UserResponse, not Data
-- **Check optional fields** - JSON can be misleading
-- **Handle nulls** - undefined vs null matters
-- **Group related types** - keep them together
-
-## When to Use This
-
-- Typing API responses
-- Working with external data
-- Reverse engineering APIs
-- Learning from real data
-
-## Part of the LXGIC Dev Toolkit
-
-This is one of 110+ free developer tools built by LXGIC Studios. No paywalls, no sign-ups, no API keys on free tiers. Just tools that work.
-
-**Find more:**
-- GitHub: https://github.com/LXGIC-Studios
-- Twitter: https://x.com/lxgicstudios
-- Substack: https://lxgicstudios.substack.com
-- Website: https://lxgic.dev
-
-## Requirements
-
-No install needed. Just run with npx. Node.js 18+ recommended. Needs OPENAI_API_KEY environment variable.
+### From URL
 
 ```bash
-npx ai-type-gen --help
+npx @lxgicstudios/json-to-ts https://api.example.com/users -n User
 ```
 
-## How It Works
+### From Pipe
 
-Parses your JSON file, analyzes the structure including nested objects and arrays, and generates TypeScript interfaces with proper types and optional fields.
+```bash
+curl https://api.example.com/data | npx @lxgicstudios/json-to-ts -n ApiResponse
+```
 
-## License
+### Output to File
 
-MIT. Free forever. Use it however you want.
+```bash
+npx @lxgicstudios/json-to-ts api.json -o src/types/api.ts
+```
+
+## Example
+
+Input JSON:
+```json
+{
+  "id": 1,
+  "name": "John",
+  "email": "john@example.com",
+  "address": { "city": "NYC" },
+  "tags": ["dev", "ts"]
+}
+```
+
+Output:
+```typescript
+export interface Address {
+  city: string;
+}
+
+export interface Root {
+  id: number;
+  name: string;
+  email: string;
+  address: Address;
+  tags: string[];
+}
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-n, --name` | Root interface name (default: Root) |
+| `-o, --output` | Write to file |
+| `-t, --type` | Use `type` instead of `interface` |
+| `--optional` | Make all properties optional |
+| `--no-export` | Don't add export keyword |
+
+## Features
+
+- Nested objects become separate interfaces
+- Arrays properly typed
+- Mixed arrays become union types
+- Fetches directly from URLs
+- Handles empty arrays as `unknown[]`
+
+## Common Use Cases
+
+**Type an API response:**
+```bash
+curl https://api.github.com/users/octocat | npx @lxgicstudios/json-to-ts -n GitHubUser
+```
+
+**Generate types for project:**
+```bash
+npx @lxgicstudios/json-to-ts sample-response.json -o src/types/api.ts -n ApiResponse
+```
+
+---
+
+**Built by [LXGIC Studios](https://lxgicstudios.com)**
+
+🔗 [GitHub](https://github.com/lxgicstudios/json-to-ts) · [Twitter](https://x.com/lxgicstudios)
