@@ -67,9 +67,16 @@ Edit `config/agent-registry.json` and set your GitHub username:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
+| `decomposition_model` | AI model for task decomposition (null = auto-select best) | `null` |
 | `cost_tracking_enabled` | Track API costs | `true` |
 | `prefer_free_when_equal` | Prefer free models when capabilities equal | `true` |
 | `default_complexity_if_unknown` | Default task complexity (1-5) | `3` |
+
+**About `decomposition_model`:**
+- Set to `null` (recommended): Automatically selects the highest-rated model from your registry
+- Set to specific model ID (e.g., `"mistral-devstral-2512"`): Forces that model for decomposition
+- Auto-selection scores models based on code-generation, codebase-exploration, and documentation capabilities
+- Falls back to second-best model on failure
 
 ### Fallback Configuration
 

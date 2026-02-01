@@ -3,6 +3,7 @@
   "last_updated": null,
   "user_config": {
     "github_user": "YOUR_GITHUB_USERNAME",
+    "decomposition_model": null,
     "cost_tracking_enabled": true,
     "prefer_free_when_equal": true,
     "max_parallel_tasks": 5,
@@ -68,6 +69,7 @@
     "step_1": "Run: ./scripts/setup.sh",
     "step_2": "Or manually add models from config/defaults/",
     "step_3": "Or create custom agents following the schema below",
+    "decomposition_model_info": "Set to null (auto-select best model) or specific model ID. Auto-selection picks the highest-rated model from your registry and falls back to second-best on failure.",
     "agent_schema": {
       "model_id": "provider/model-name",
       "provider": "mistral|openai|google|openrouter|perplexity",

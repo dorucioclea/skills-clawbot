@@ -1,11 +1,11 @@
-# 🎼 Claw Conductor v2.0
+# 🎼 Claw Conductor v2.1
 
 **Build Complete Projects with a Single Request**
 
 Transform complex development requests into working software through intelligent multi-model orchestration. Claw Conductor decomposes your request, routes subtasks to optimal AI models, executes in parallel, and delivers a complete project.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/johnsonfarmsus/claw-conductor/releases)
+[![Version](https://img.shields.io/badge/version-2.1.0-green.svg)](https://github.com/johnsonfarmsus/claw-conductor/releases)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-Compatible-blue)](https://openclaw.ai)
 
 ## 🚀 What is This?
@@ -45,8 +45,9 @@ Manually coordinating these models is tedious and error-prone.
 
 ---
 
-## ✨ What's New in v2.0
+## ✨ What's New in v2.1
 
+🤖 **AI-Powered Decomposition**: Uses your best AI model to intelligently break down complex requests (auto-selects or manual override)
 🎯 **Full Orchestration**: Decomposes → Routes → Executes → Consolidates
 ⚡ **Parallel Execution**: Up to 5 concurrent tasks across multiple projects
 📁 **Project Management**: Auto-creates workspace, git repo, GitHub repo
@@ -61,7 +62,8 @@ Manually coordinating these models is tedious and error-prone.
 ```
 Discord Request: "Build a calculator app"
     ↓
-1. Task Decomposition
+1. AI-Powered Task Decomposition
+   ├─ Uses best-rated model (auto-selected or configured)
    ├─ Task 1: Calculator logic (backend-development, complexity: 2)
    ├─ Task 2: UI components (frontend-development, complexity: 2)
    └─ Task 3: Unit tests (unit-test-generation, complexity: 2)
@@ -94,6 +96,13 @@ Discord Request: "Build a calculator app"
 ---
 
 ## 🎯 Key Features
+
+### AI-Powered Task Decomposition
+
+- **Intelligent Analysis**: Uses AI models to analyze complex requests and break them into structured tasks
+- **Auto-Selection**: Automatically picks the best model from your registry (or manual override)
+- **Fallback Strategy**: Falls back to second-best model on failure
+- **Structured Output**: Generates tasks with categories, complexity ratings, dependencies, and file targets
 
 ### Intelligent Multi-Model Routing
 

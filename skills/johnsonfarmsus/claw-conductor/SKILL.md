@@ -1,10 +1,10 @@
 ---
 name: claw-conductor
-description: Full autonomous development orchestrator. Decomposes complex requests into subtasks, routes to optimal AI models based on capability ratings, executes in parallel, and consolidates results into complete projects.
-version: 2.0.0
+description: Full autonomous development orchestrator with AI-powered task decomposition. Decomposes complex requests into subtasks, routes to optimal AI models based on capability ratings, executes in parallel, and consolidates results into complete projects.
+version: 2.1.0
 ---
 
-# Claw Conductor v2.0
+# Claw Conductor v2.1
 
 **Build complete projects with a single request.**
 
@@ -68,8 +68,9 @@ You execute:
 
 ---
 
-## What's New in v2.0
+## What's New in v2.1
 
+🤖 **AI-Powered Decomposition**: Intelligently analyzes complex requests using your best AI model (auto-selected or configured)
 🎯 **Full Orchestration**: Decomposes complex requests → Routes subtasks → Executes in parallel → Consolidates results
 ⚡ **Parallel Execution**: Up to 5 tasks running concurrently across multiple projects
 📁 **Project Management**: Automatic workspace creation, git initialization, and GitHub integration

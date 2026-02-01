@@ -1,8 +1,8 @@
-# Claw Conductor v2.0 - Deployment Status
+# Claw Conductor v2.1 - Deployment Status
 
 **Status:** ✅ Deployed to Production
-**Version:** 2.0.0
-**Date:** 2026-01-31
+**Version:** 2.1.0
+**Date:** 2026-02-01
 
 ---
 
@@ -23,14 +23,15 @@
 - [x] Cost tracking and optimization
 
 ### Documentation
-- [x] README.md updated for v2.0
-- [x] SKILL.md with integration instructions
+- [x] README.md updated for v2.1
+- [x] SKILL.md with AI decomposition details
+- [x] SETUP.md with decomposition_model configuration
 - [x] Orchestration design documentation
 - [x] Example workflows and use cases
 
 ### Git & GitHub
 - [x] All changes committed to main branch
-- [x] v2.0.0 release tag created and pushed
+- [x] v2.1.0 changes pushed to main
 - [x] GitHub repository: [johnsonfarmsus/claw-conductor](https://github.com/johnsonfarmsus/claw-conductor)
 
 ### VPS Deployment
@@ -40,7 +41,8 @@
 - [x] Config files in place and ready
 
 ### Testing
-- [x] Task decomposition tested locally
+- [x] AI-powered decomposition tested locally (all tests passing)
+- [x] Model selection algorithm verified
 - [x] Routing system tested locally
 - [x] Decomposition + routing tested on VPS
 - [ ] Full orchestration end-to-end test (pending OpenClaw Task integration)
@@ -79,8 +81,8 @@
 
 Claw Conductor is registered as an OpenClaw skill with:
 - **Name:** `claw-conductor`
-- **Version:** `2.0.0`
-- **Type:** Full autonomous orchestrator
+- **Version:** `2.1.0`
+- **Type:** Full autonomous orchestrator with AI-powered decomposition
 - **Invocation:** `@OpenClaw use claw-conductor to [request]`
 
 ### Model Configuration
@@ -153,7 +155,7 @@ Result: 8 tasks, ~45 minutes, full application on GitHub
 ## 📊 Current Status
 
 ### Production Ready ✅
-- Task decomposition engine
+- AI-powered task decomposition (v2.1)
 - Intelligent routing
 - Model capability scoring
 - Dependency tracking
@@ -166,10 +168,10 @@ Result: 8 tasks, ~45 minutes, full application on GitHub
 - Waiting for first production invocation
 
 ### Future Enhancements (Planned)
-- AI-powered task decomposition (v2.1)
-- Discord progress updates (v2.1)
+- ✅ AI-powered task decomposition (v2.1) - COMPLETE
+- Discord progress updates (v2.2)
 - AI conflict resolution (v2.2)
-- Real-time task streaming (v2.2)
+- Real-time task streaming (v2.3)
 - Web dashboard (v3.0)
 
 ---
@@ -177,7 +179,7 @@ Result: 8 tasks, ~45 minutes, full application on GitHub
 ## 🔗 Links
 
 - **GitHub:** [github.com/johnsonfarmsus/claw-conductor](https://github.com/johnsonfarmsus/claw-conductor)
-- **Release:** [v2.0.0](https://github.com/johnsonfarmsus/claw-conductor/releases/tag/v2.0.0)
+- **Latest Release:** v2.1.0 (AI-powered decomposition)
 - **ClawHub:** [clawhub.ai/skills/claw-conductor](https://www.clawhub.ai/skills/claw-conductor)
 - **VPS:** `~/.openclaw/skills/claw-conductor/`
 
@@ -193,5 +195,5 @@ Result: 8 tasks, ~45 minutes, full application on GitHub
 
 ---
 
-**Deployment completed:** 2026-01-31 07:16 UTC
+**v2.1.0 Deployment completed:** 2026-02-01
 **Ready for production use** ✨
