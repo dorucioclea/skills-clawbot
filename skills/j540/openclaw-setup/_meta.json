@@ -1,0 +1,11 @@
+{
+  "owner": "j540",
+  "slug": "openclaw-setup",
+  "displayName": "OpenClaw Setup on AWS (Free Tier) - Memory Upgrade",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1769921616264,
+    "commit": null
+  },
+  "history": []
+}
