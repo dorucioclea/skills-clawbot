@@ -1,6 +1,6 @@
 # Logs & Caches Index
 
-This file exists as a **thin index** so OpenClaw can load only the log it needs without pulling the entire history into context.
+This file is a **thin index** so OpenClaw can load only the log it needs without pulling the entire history into context.
 
 ## Log Files (Separated)
 - `LOG_PROJECTS.md` — Project registry and active focus

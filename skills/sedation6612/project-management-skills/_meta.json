@@ -3,11 +3,16 @@
   "slug": "project-management-skills",
   "displayName": "Project Managment Skills",
   "latest": {
-    "version": "1.2.0",
-    "publishedAt": 1769900710301,
-    "commit": "https://github.com/clawdbot/skills/commit/3ff408da4e94fdc4b4767a6df50996dbb631c185"
+    "version": "1.3.0",
+    "publishedAt": 1769919067325,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.0",
+      "publishedAt": 1769900710301,
+      "commit": "https://github.com/clawdbot/skills/commit/3ff408da4e94fdc4b4767a6df50996dbb631c185"
+    },
     {
       "version": "1.1.0",
       "publishedAt": 1769897425826,

@@ -1,11 +1,18 @@
 # Templates (Copy/Paste)
 
+## Prompt Frame (Use for Intake or Clarifications)
+- context:
+- goal:
+- constraints:
+- assumptions_to_confirm:
+- desired_output_format: (bullets, table, checklist, etc.)
+
 ## New Project Intake (Minimum Required)
 - summary:
 - proposed_outcome:
 - uncertain_fields_to_clarify:
 
-Optional (infer if possible):
+Optional (infer only when evidence is clear):
 - constraints:
 - required_deadlines:
 - initial_risks:

@@ -1,6 +1,6 @@
 # Conflicts (Cache)
 
-Conflict records must be **verbose and detailed**, capturing evidence, impact, and resolution criteria in full.
+Conflict records must be **clear and detailed**, capturing evidence, impact, and resolution criteria.
 
 ### INBOX (open)
 - _No open conflicts._

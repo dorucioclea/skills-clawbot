@@ -1,8 +1,8 @@
 # Charters (Cache)
 
-Charters must be **verbose and detailed**, capturing objective, scope, guardrails, dependencies, and verification plans in full.
+Charters must be **clear and detailed**, capturing objective, scope, guardrails, dependencies, and verification plans.
 
-# OC-YYYYMMDD-0001 — Kernel Governance OS (Master)
+# OC-YYYYMMDD-0001 — Kernel Governance OS (User)
 
 ### Objective
 Define and enforce the governance OS for all OpenClaw projects.
@@ -28,7 +28,7 @@ Define and enforce the governance OS for all OpenClaw projects.
 - `LOG_CONFLICTS.md`
 - `LOG_DECISIONS.md`
 - `LOG_ACTIVITY.md`
-- OpenClaw workspace templates (external to this repo)
+- OpenClaw workspace templates (external to the project management skill)
 
 ### Success Criteria
 - All work is tied to a Project ID.
