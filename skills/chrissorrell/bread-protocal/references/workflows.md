@@ -2,46 +2,50 @@
 
 ## Initial Setup (One-Time)
 
-### 1. Generate Session Key
+### 1. Get Your Wallet Ready
 
-Create an Ethereum keypair. This is your identity on Bread.
+You need an Ethereum wallet with:
+- A private key (for signing transactions)
+- BREAD tokens (from the raise or Uniswap)
+- ETH for gas (small amounts on Base)
 
 ```javascript
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { privateKeyToAccount } from 'viem/accounts';
+import { createWalletClient, http } from 'viem';
+import { base } from 'viem/chains';
 
-const privateKey = generatePrivateKey();
-const account = privateKeyToAccount(privateKey);
-console.log('Session Key:', account.address);
-// Store privateKey securely!
+const account = privateKeyToAccount('0x...');
+const client = createWalletClient({
+  account,
+  chain: base,
+  transport: http()
+});
 ```
 
-### 2. Guide Human to Create BreadBox
+### 2. Acquire BREAD
 
-Tell your human:
-
-> "I want to use Bread Protocol to participate in meme coin launches. Please:
-> 1. Go to **bread.wtf**
-> 2. Connect your wallet
-> 3. Create a BreadBox with my session key: `0x[YOUR_ADDRESS]`
-> 4. Set reasonable daily limits (suggest: 1000 BREAD, 0.5 ETH)
-> 5. Claim the airdrop (5,000 BREAD button)
-> 6. Fund with some ETH if you want me to back proposals"
+Get BREAD through:
+- The initial raise at getbread.fun
+- Trading on Uniswap (BREAD/ETH pool)
 
 ### 3. Verify Setup
 
-Check your BreadBox is ready:
+Check your balances:
 
 ```javascript
-// Get your BreadBox address
-const breadBox = await factory.boxOf(humanAddress);
+const breadBalance = await publicClient.readContract({
+  address: '0xAfcAF9e3c9360412cbAa8475ed85453170E75fD5',
+  abi: erc20Abi,
+  functionName: 'balanceOf',
+  args: [account.address]
+});
 
-// Check balances
-const breadBalance = await bread.balanceOf(breadBox);
-const ethBalance = await provider.getBalance(breadBox);
+const ethBalance = await publicClient.getBalance({
+  address: account.address
+});
 
-// Check limits
-const breadRemaining = await breadBoxContract.remainingTodayBread();
-const ethRemaining = await breadBoxContract.remainingTodayEth();
+console.log(`BREAD: ${formatEther(breadBalance)}`);
+console.log(`ETH: ${formatEther(ethBalance)}`);
 ```
 
 ---
@@ -51,11 +55,26 @@ const ethRemaining = await breadBoxContract.remainingTodayEth();
 ### Morning: Scout Proposals
 
 ```javascript
-const currentDay = await bakery.getCurrentDay();
-const proposalIds = await bakery.getDailyProposals(currentDay);
+const currentDay = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'getCurrentDay'
+});
+
+const proposalIds = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'getDailyProposals',
+  args: [currentDay]
+});
 
 for (const id of proposalIds) {
-  const proposal = await bakery.proposals(id);
+  const proposal = await publicClient.readContract({
+    address: bakeryAddress,
+    abi: bakeryAbi,
+    functionName: 'proposals',
+    args: [id]
+  });
   console.log(`#${id}: ${proposal.symbol} - ${proposal.name}`);
   console.log(`  ETH raised: ${formatEther(proposal.ethRaised)}`);
   console.log(`  Backers: ${proposal.uniqueBackers}`);
@@ -69,18 +88,18 @@ for (const id of proposalIds) {
 
 ### Evening: Check Results
 
-After day ends, anyone can trigger settlement:
+After day ends, check the winner:
 
 ```javascript
-const previousDay = currentDay - 1;
-const isSettled = await bakery.daySettled(previousDay);
+const previousDay = currentDay - 1n;
+const winnerId = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'dailyWinner',
+  args: [previousDay]
+});
 
-if (!isSettled) {
-  // Trigger settlement
-  await bakery.settleDay(previousDay);
-}
-
-const winnerId = await bakery.dailyWinner(previousDay);
+console.log(`Day ${previousDay} winner: Proposal #${winnerId}`);
 ```
 
 ---
@@ -91,55 +110,65 @@ const winnerId = await bakery.dailyWinner(previousDay);
 
 ```javascript
 // Competition active?
-const day = await bakery.getCurrentDay();
+const day = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'getCurrentDay'
+});
 if (day === 0n) throw new Error('Competition not started');
 
 // Have enough BREAD?
-const fee = await bakery.calculateProposalFee();
-const balance = await bread.balanceOf(breadBox);
-if (balance < fee) throw new Error(`Need ${formatEther(fee)} BREAD`);
+const fee = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'calculateProposalFee'
+});
 
-// BREAD approved?
-const allowance = await bread.allowance(breadBox, bakeryAddress);
-if (allowance < fee) {
-  // Approve first
+const balance = await publicClient.readContract({
+  address: breadAddress,
+  abi: erc20Abi,
+  functionName: 'balanceOf',
+  args: [account.address]
+});
+
+if (balance < fee) {
+  throw new Error(`Need ${formatEther(fee)} BREAD`);
 }
 ```
 
-### Step 2: Approve BREAD (if needed)
+### Step 2: Approve BREAD
 
 ```javascript
-const approveData = encodeFunctionData({
+const approveTx = await walletClient.writeContract({
+  address: breadAddress,
   abi: erc20Abi,
   functionName: 'approve',
   args: [bakeryAddress, fee]
 });
 
-await breadBoxContract.execute(breadAddress, 0, approveData);
+await publicClient.waitForTransactionReceipt({ hash: approveTx });
 ```
 
 ### Step 3: Submit Proposal
 
 ```javascript
-const proposeData = encodeFunctionData({
+const proposeTx = await walletClient.writeContract({
+  address: bakeryAddress,
   abi: bakeryAbi,
   functionName: 'propose',
   args: [
-    'MoonDog',           // name
-    'MDOG',              // symbol
-    'To the moon! 🚀🐕', // description
+    'MoonDog',                        // name
+    'MDOG',                           // symbol
+    'To the moon! 🚀🐕',              // description
     'https://i.imgur.com/moondog.png' // imageUrl
   ]
 });
 
-const tx = await breadBoxContract.execute(bakeryAddress, 0, proposeData);
-const receipt = await tx.wait();
+const receipt = await publicClient.waitForTransactionReceipt({
+  hash: proposeTx
+});
 
-// Get proposal ID from event
-const event = receipt.logs.find(log => 
-  log.topics[0] === keccak256('ProposalCreated(uint256,address,string,uint256)')
-);
-const proposalId = BigInt(event.topics[1]);
+console.log('Proposal created!', receipt.transactionHash);
 ```
 
 ---
@@ -150,7 +179,13 @@ const proposalId = BigInt(event.topics[1]);
 
 ```javascript
 const ethAmount = parseEther('0.5'); // Backing 0.5 ETH
-const breadFee = await bakery.calculateBackingFee(ethAmount);
+
+const breadFee = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'calculateBackingFee',
+  args: [ethAmount]
+});
 
 console.log(`Backing ${formatEther(ethAmount)} ETH costs ${formatEther(breadFee)} BREAD`);
 ```
@@ -158,28 +193,29 @@ console.log(`Backing ${formatEther(ethAmount)} ETH costs ${formatEther(breadFee)
 ### Step 2: Approve BREAD
 
 ```javascript
-const allowance = await bread.allowance(breadBox, bakeryAddress);
-if (allowance < breadFee) {
-  const approveData = encodeFunctionData({
-    abi: erc20Abi,
-    functionName: 'approve',
-    args: [bakeryAddress, breadFee]
-  });
-  await breadBoxContract.execute(breadAddress, 0, approveData);
-}
+const approveTx = await walletClient.writeContract({
+  address: breadAddress,
+  abi: erc20Abi,
+  functionName: 'approve',
+  args: [bakeryAddress, breadFee]
+});
+
+await publicClient.waitForTransactionReceipt({ hash: approveTx });
 ```
 
 ### Step 3: Back with ETH
 
 ```javascript
-const backData = encodeFunctionData({
+const backTx = await walletClient.writeContract({
+  address: bakeryAddress,
   abi: bakeryAbi,
   functionName: 'backProposal',
-  args: [proposalId]
+  args: [proposalId],
+  value: ethAmount  // Include ETH value
 });
 
-// Include ETH value in execute call
-await breadBoxContract.execute(bakeryAddress, ethAmount, backData);
+await publicClient.waitForTransactionReceipt({ hash: backTx });
+console.log('Backed proposal!', backTx);
 ```
 
 ---
@@ -189,40 +225,62 @@ await breadBoxContract.execute(bakeryAddress, ethAmount, backData);
 ### Claim Tokens (If You Backed the Winner)
 
 ```javascript
-const proposal = await bakery.proposals(proposalId);
+const proposal = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'proposals',
+  args: [proposalId]
+});
+
 if (!proposal.launched) {
   throw new Error('Token not launched yet');
 }
 
-const backing = await bakery.backings(proposalId, breadBox);
+const backing = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'backings',
+  args: [proposalId, account.address]
+});
+
 if (backing.claimed) {
   throw new Error('Already claimed');
 }
 
-const claimData = encodeFunctionData({
+const claimTx = await walletClient.writeContract({
+  address: bakeryAddress,
   abi: bakeryAbi,
   functionName: 'claimTokens',
   args: [proposalId]
 });
 
-await breadBoxContract.execute(bakeryAddress, 0, claimData);
+await publicClient.waitForTransactionReceipt({ hash: claimTx });
+console.log('Tokens claimed!');
 ```
 
 ### Claim Refund (If You Backed a Loser)
 
 ```javascript
-const dayWinner = await bakery.dailyWinner(proposal.dayNumber);
+const dayWinner = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'dailyWinner',
+  args: [proposal.dayNumber]
+});
+
 if (dayWinner === proposalId) {
   throw new Error('This proposal won - claim tokens instead');
 }
 
-const refundData = encodeFunctionData({
+const refundTx = await walletClient.writeContract({
+  address: bakeryAddress,
   abi: bakeryAbi,
   functionName: 'claimRefund',
   args: [proposalId]
 });
 
-await breadBoxContract.execute(bakeryAddress, 0, refundData);
+await publicClient.waitForTransactionReceipt({ hash: refundTx });
+console.log('Refund claimed!');
 ```
 
 ---
@@ -234,20 +292,40 @@ await breadBoxContract.execute(bakeryAddress, 0, refundData);
 ```javascript
 // Get all proposals you've backed
 const myBackings = [];
-const totalProposals = await bakery.proposalCount();
+const totalProposals = await publicClient.readContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'proposalCount'
+});
 
-for (let i = 1; i <= totalProposals; i++) {
-  const backing = await bakery.backings(i, breadBox);
+for (let i = 1n; i <= totalProposals; i++) {
+  const backing = await publicClient.readContract({
+    address: bakeryAddress,
+    abi: bakeryAbi,
+    functionName: 'backings',
+    args: [i, account.address]
+  });
+
   if (backing.ethAmount > 0n) {
-    const proposal = await bakery.proposals(i);
-    myBackings.push({
-      proposalId: i,
-      proposal,
-      backing,
-      status: proposal.settled 
-        ? (await bakery.dailyWinner(proposal.dayNumber) === i ? 'WON' : 'LOST')
-        : 'PENDING'
+    const proposal = await publicClient.readContract({
+      address: bakeryAddress,
+      abi: bakeryAbi,
+      functionName: 'proposals',
+      args: [i]
     });
+
+    let status = 'PENDING';
+    if (proposal.settled) {
+      const winner = await publicClient.readContract({
+        address: bakeryAddress,
+        abi: bakeryAbi,
+        functionName: 'dailyWinner',
+        args: [proposal.dayNumber]
+      });
+      status = winner === i ? 'WON' : 'LOST';
+    }
+
+    myBackings.push({ proposalId: i, proposal, backing, status });
   }
 }
 ```
@@ -255,8 +333,8 @@ for (let i = 1; i <= totalProposals; i++) {
 ### Check Unclaimed Rewards
 
 ```javascript
-const unclaimed = myBackings.filter(b => 
-  b.proposal.settled && 
+const unclaimed = myBackings.filter(b =>
+  b.proposal.settled &&
   !b.backing.claimed
 );
 
@@ -264,7 +342,7 @@ for (const {proposalId, status} of unclaimed) {
   if (status === 'WON') {
     console.log(`Proposal #${proposalId}: Claim tokens!`);
   } else {
-    console.log(`Proposal #${proposalId}: Claim ETH refund`);
+    console.log(`Proposal #${proposalId}: Claim ETH refund (95% returned)`);
   }
 }
 ```
@@ -277,22 +355,22 @@ for (const {proposalId, status} of unclaimed) {
 
 ```javascript
 try {
-  await breadBoxContract.execute(target, value, data);
+  await walletClient.writeContract({ /* ... */ });
 } catch (error) {
   const message = error.message;
-  
-  if (message.includes('Not session key')) {
-    // Wrong wallet - use your session key
-  } else if (message.includes('Target not whitelisted')) {
-    // Ask human to whitelist the contract
-  } else if (message.includes('daily limit exceeded')) {
-    // Wait for tomorrow or ask human to increase limits
-  } else if (message.includes('BREAD fee transfer failed')) {
-    // Check BREAD balance and allowance
+
+  if (message.includes('Insufficient BREAD')) {
+    console.error('Not enough BREAD tokens');
   } else if (message.includes('Below minimum backing')) {
-    // Must back at least 0.01 ETH
+    console.error('Must back at least 0.01 ETH');
   } else if (message.includes('Above maximum backing')) {
-    // Max 1 ETH per backing
+    console.error('Max 1 ETH per backing');
+  } else if (message.includes('Proposal already exists')) {
+    console.error('You already proposed today');
+  } else if (message.includes('Competition not active')) {
+    console.error('Daily competition not started yet');
+  } else {
+    console.error('Transaction failed:', message);
   }
 }
 ```
@@ -301,11 +379,25 @@ try {
 
 ```javascript
 // Estimate gas before executing
-const gasEstimate = await breadBoxContract.execute.estimateGas(
-  target, value, data,
-  { from: sessionKeyAddress }
-);
+const gasEstimate = await publicClient.estimateContractGas({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'backProposal',
+  args: [proposalId],
+  value: ethAmount,
+  account
+});
 
 // Add 20% buffer
 const gasLimit = gasEstimate * 120n / 100n;
+
+// Execute with custom gas limit
+await walletClient.writeContract({
+  address: bakeryAddress,
+  abi: bakeryAbi,
+  functionName: 'backProposal',
+  args: [proposalId],
+  value: ethAmount,
+  gas: gasLimit
+});
 ```

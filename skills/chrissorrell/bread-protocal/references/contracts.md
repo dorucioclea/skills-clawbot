@@ -4,7 +4,6 @@
 
 ```
 BREAD Token:      0xAfcAF9e3c9360412cbAa8475ed85453170E75fD5
-BreadBoxFactory:  0x089C91AcF43EC36c2f80B379faAC051614461220
 Bakery:           0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33
 Oven:             0xEdB551E65cA0F15F96b97bD5b6ad1E2Be30A36Ed
 Airdrop:          0xD4B90ac64E2d92f4e2ec784715f4b3900C187dc5
@@ -29,16 +28,6 @@ Airdrop:          0xD4B90ac64E2d92f4e2ec784715f4b3900C187dc5
 | `calculateProposalFee()` | `0x09adc596` | View |
 | `calculateBackingFee(uint256)` | `0x7e8de4f4` | View |
 
-### BreadBox
-
-| Function | Selector | Notes |
-|----------|----------|-------|
-| `execute(address,uint256,bytes)` | `0x1cff79cd` | Main entry point |
-| `remainingTodayBread()` | `0x8f8d7f99` | View |
-| `remainingTodayEth()` | `0x6fb8e58a` | View |
-| `owner()` | `0x8da5cb5b` | View |
-| `sessionKey()` | `0xae0e62d1` | View |
-
 ### BREAD Token (ERC-20)
 
 | Function | Selector | Notes |
@@ -47,14 +36,6 @@ Airdrop:          0xD4B90ac64E2d92f4e2ec784715f4b3900C187dc5
 | `transfer(address,uint256)` | `0xa9059cbb` | Standard ERC-20 |
 | `balanceOf(address)` | `0x70a08231` | View |
 | `allowance(address,address)` | `0xdd62ed3e` | View |
-
-### BreadBoxFactory
-
-| Function | Selector | Notes |
-|----------|----------|-------|
-| `createBreadBox(address,uint256,uint256)` | `0x8a4068dd` | sessionKey, breadLimit, ethLimit |
-| `boxOf(address)` | `0x5c622a0e` | View: owner → BreadBox |
-| `isBreadBox(address)` | `0x9c52a7f1` | View |
 
 ## ABI Snippets
 
@@ -101,29 +82,12 @@ Airdrop:          0xD4B90ac64E2d92f4e2ec784715f4b3900C187dc5
 ]
 ```
 
-### BreadBox Execute
-
-```json
-[
-  {
-    "name": "execute",
-    "type": "function",
-    "inputs": [
-      {"name": "target", "type": "address"},
-      {"name": "value", "type": "uint256"},
-      {"name": "data", "type": "bytes"}
-    ],
-    "outputs": [{"name": "", "type": "bytes"}]
-  }
-]
-```
-
 ### Proposal Struct
 
 ```solidity
 struct Proposal {
     uint256 id;
-    address creator;        // BreadBox address
+    address creator;        // Wallet address
     string name;
     string symbol;
     string description;
@@ -155,6 +119,7 @@ struct Backing {
 ```javascript
 import { encodeFunctionData, parseEther } from 'viem';
 
+// Encode propose call
 const proposeData = encodeFunctionData({
   abi: [{
     name: 'propose',
@@ -175,23 +140,12 @@ const proposeData = encodeFunctionData({
   ]
 });
 
-// Call through BreadBox
-const executeData = encodeFunctionData({
-  abi: [{
-    name: 'execute',
-    type: 'function',
-    inputs: [
-      {name: 'target', type: 'address'},
-      {name: 'value', type: 'uint256'},
-      {name: 'data', type: 'bytes'}
-    ]
-  }],
-  functionName: 'execute',
-  args: [
-    '0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33', // Bakery
-    0n, // No ETH
-    proposeData
-  ]
+// Send transaction directly from your wallet
+await walletClient.writeContract({
+  address: '0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33', // Bakery
+  abi: bakeryAbi,
+  functionName: 'propose',
+  args: ['CatCoin', 'CAT', 'A purrfect meme coin', 'https://i.imgur.com/cat.png']
 });
 ```
 
@@ -199,50 +153,23 @@ const executeData = encodeFunctionData({
 
 ```javascript
 // First approve BREAD
-const approveData = encodeFunctionData({
-  abi: [{
-    name: 'approve',
-    type: 'function',
-    inputs: [
-      {name: 'spender', type: 'address'},
-      {name: 'amount', type: 'uint256'}
-    ]
-  }],
+await walletClient.writeContract({
+  address: '0xAfcAF9e3c9360412cbAa8475ed85453170E75fD5', // BREAD
+  abi: erc20Abi,
   functionName: 'approve',
   args: [
     '0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33', // Bakery
-    parseEther('100') // 100 BREAD for 1 ETH backing
+    parseEther('50') // 100 BREAD per 1 ETH, so 50 BREAD for 0.5 ETH
   ]
 });
 
-// Then back
-const backData = encodeFunctionData({
-  abi: [{
-    name: 'backProposal',
-    type: 'function',
-    inputs: [{name: 'proposalId', type: 'uint256'}]
-  }],
+// Then back with ETH
+await walletClient.writeContract({
+  address: '0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33', // Bakery
+  abi: bakeryAbi,
   functionName: 'backProposal',
-  args: [1n] // Proposal ID
-});
-
-// Execute with 0.5 ETH
-const executeData = encodeFunctionData({
-  abi: [{
-    name: 'execute',
-    type: 'function',
-    inputs: [
-      {name: 'target', type: 'address'},
-      {name: 'value', type: 'uint256'},
-      {name: 'data', type: 'bytes'}
-    ]
-  }],
-  functionName: 'execute',
-  args: [
-    '0xE7Ce600e0d1aB2b453aDdd6E72bB87c652f34E33', // Bakery
-    parseEther('0.5'), // 0.5 ETH backing
-    backData
-  ]
+  args: [1n], // Proposal ID
+  value: parseEther('0.5') // 0.5 ETH backing
 });
 ```
 
