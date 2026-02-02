@@ -4,7 +4,7 @@ description: "Reward and motivation system for AI agents. Dopamine-like wanting,
 metadata:
   openclaw:
     emoji: "⭐"
-    version: "1.1.0"
+    version: "1.2.1"
     author: "ImpKind"
     requires:
       os: ["darwin", "linux"]
@@ -95,6 +95,30 @@ This will:
 | `resolve-anticipation.sh` | Mark anticipation as fulfilled |
 | `update-watermark.sh` | Update processing watermark |
 | `preprocess-rewards.sh` | Extract reward signals from transcript |
+| `generate-dashboard.sh` | Generate unified brain dashboard HTML |
+
+## Brain Dashboard
+
+Visual dashboard showing all installed brain skills:
+
+```bash
+./scripts/generate-dashboard.sh
+open ~/.openclaw/workspace/brain-dashboard.html
+```
+
+- **Auto-detects** other brain skills (hippocampus, amygdala)
+- Shows install prompts for missing skills
+- Regenerates on install and cron runs
+- Reads avatar/name from `IDENTITY.md`
+
+### After Installation (for agents)
+
+When you install this skill, **notify the user** about the dashboard:
+
+> ⭐ **VTA installed!**
+>
+> View your agent's drive level in the Brain Dashboard:
+> `~/.openclaw/workspace/brain-dashboard.html`
 
 ## Reward Types
 
