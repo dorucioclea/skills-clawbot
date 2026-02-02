@@ -11,8 +11,8 @@ Make AI-powered phone calls with native phone tree navigation.
 
 ## Prerequisites
 
-- Enterprise subscription (required for API access)
-- API key from your Enterprise account
+- API subscription (required for API access)
+- API key from your developer account
 - Node.js 18+ (for JS/React) or Python 3.8+ (for Python)
 
 ## Installation
@@ -37,17 +37,10 @@ npm install @thisispamela/react @thisispamela/sdk
 npm install -g @thisispamela/cli
 ```
 
-**MCP (for MCP-based agents):**
-```bash
-npm install @thisispamela/mcp
-```
-
-Latest versions: SDK / CLI / Python `1.1.2`, React `1.1.3`, MCP `1.1.2`.
-
 ## Getting Your API Key
 
-1. Sign up for an Enterprise subscription at [app.thisispamela.com](https://app.thisispamela.com)
-2. Navigate to Settings → Enterprise Access
+1. Sign up for an API subscription at [developer.thisispamela.com](https://developer.thisispamela.com)
+2. Navigate to the API settings panel
 3. Set up billing through Stripe
 4. Click "Create API Key"
 5. Save immediately - the full key (starts with `pk_live_`) is only shown once
@@ -126,9 +119,7 @@ For detailed SDK documentation:
 
 - **[JavaScript SDK](../../../sdk/javascript.md)** - Full JS/TS reference
 - **[Python SDK](../../../sdk/python.md)** - Full Python reference
-- **[React Components](../../../sdk/react.md)** - Component library guide (v1.1.3)
-- **[MCP Server](../../../sdk/mcp.md)** - MCP tools for AI assistants
-- **[CLI](../../../sdk/cli.md)** - Command-line reference
+- **[React Components](../../../sdk/react.md)** - Component library guide
 
 ## Webhooks
 
@@ -147,17 +138,17 @@ Verify webhook signatures with the `X-Pamela-Signature` header.
 - **$0.10/minute** for API usage
 - **Minimum 1 minute** per call
 - **Only connected calls** are billed
-- Enterprise subscription required
+- API subscription required
 
 ## Troubleshooting
 
 **"Invalid API key"**
 - Verify key starts with `pk_live_`
-- Check key is active in Enterprise panel
+- Check key is active in the API settings panel
 
 **"403 Forbidden"**
-- Enterprise subscription required
-- Check subscription status at app.thisispamela.com
+- API subscription required
+- Check subscription status at developer.thisispamela.com
 
 **"Invalid phone number"**
 - Use E.164 format with country code: `+1234567890`
