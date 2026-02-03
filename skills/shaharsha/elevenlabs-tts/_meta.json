@@ -1,0 +1,11 @@
+{
+  "owner": "shaharsha",
+  "slug": "elevenlabs-tts",
+  "displayName": "ElevenLabs TTS (Text-to-Speech)",
+  "latest": {
+    "version": "1.2.3",
+    "publishedAt": 1770142089438,
+    "commit": null
+  },
+  "history": []
+}
