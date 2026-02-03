@@ -21,9 +21,10 @@ if [ ! -f "$FILE_PATH" ]; then
 fi
 
 export ARCHON_CONFIG_DIR="$HOME/.config/hex/archon"
-export ARCHON_PASSPHRASE="hex-daemon-lightning-hive-2026"
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 cd "$ARCHON_CONFIG_DIR" || exit 1
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FILESIZE=$($STAT_SIZE "$FILE_PATH")
@@ -44,7 +45,7 @@ echo "  SHA256: $CHECKSUM"
 # Read file content as base64 for binary safety
 CONTENT=$(base64 < "$FILE_PATH")
 
-npx @didcid/keymaster vault-put \
+npx @didcid/keymaster add-vault-item \
   --vault-id "$VAULT_NAME" \
   --key "$KEY" \
   --value "$CONTENT" \

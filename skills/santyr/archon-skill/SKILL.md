@@ -76,13 +76,13 @@ cd ~/bin/archon
 ### Configuration
 
 **Wallet location:** `~/bin/archon/data/keymaster/wallet.json` (encrypted)  
-**Passphrase:** `hex-daemon-lightning-hive-2026`  
+**Passphrase:** `your-secure-passphrase`  
 **Config directory:** `~/.config/hex/archon/` (alternative wallet location)
 
 **Environment setup:**
 ```bash
 export ARCHON_CONFIG_DIR="$HOME/.config/hex/archon"
-export ARCHON_PASSPHRASE="hex-daemon-lightning-hive-2026"
+export ARCHON_PASSPHRASE="your-secure-passphrase"
 export ARCHON_GATEKEEPER_URL="http://localhost:4224"  # or https://archon.technology
 export ARCHON_WALLET_PATH="$HOME/bin/archon/data/keymaster/wallet.json"
 ```
@@ -443,7 +443,7 @@ cd ~/bin/archon && /snap/bin/docker compose logs -f keymaster  # Check logs
 
 **Wallet locked:**
 ```bash
-export ARCHON_PASSPHRASE="hex-daemon-lightning-hive-2026"
+export ARCHON_PASSPHRASE="your-secure-passphrase"
 # Then retry command
 ```
 

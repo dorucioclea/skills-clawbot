@@ -10,9 +10,10 @@ TYPE="${3:?}"
 CLAIMS="${4:?}"
 
 export ARCHON_CONFIG_DIR="$HOME/.config/hex/archon"
-export ARCHON_PASSPHRASE="hex-daemon-lightning-hive-2026"
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 cd "$ARCHON_CONFIG_DIR" || exit 1
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 echo "Issuing credential:"
 echo "  Issuer: $ISSUER_DID"

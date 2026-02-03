@@ -13,15 +13,16 @@ KEY="${2:?}"
 OUTPUT_PATH="${3:?}"
 
 export ARCHON_CONFIG_DIR="$HOME/.config/hex/archon"
-export ARCHON_PASSPHRASE="hex-daemon-lightning-hive-2026"
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 cd "$ARCHON_CONFIG_DIR" || exit 1
+: "${ARCHON_PASSPHRASE:?Set ARCHON_PASSPHRASE in environment}"
 
 echo "Restoring from vault: $VAULT_NAME"
 echo "  Key: $KEY"
 echo "  Output: $OUTPUT_PATH"
 
-npx @didcid/keymaster vault-get \
+npx @didcid/keymaster get-vault-item \
   --vault-id "$VAULT_NAME" \
   --key "$KEY" \
   --output "$OUTPUT_PATH"
