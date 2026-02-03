@@ -64,6 +64,7 @@ Get from: Habitica → Settings → Site Data → Show API Token
 ### Quest
 ```bash
 ./scripts/habitica.sh quest         # Current quest status
+./scripts/habitica.sh quest-accept  # Check and accept pending quest invitations
 ```
 
 ### Other

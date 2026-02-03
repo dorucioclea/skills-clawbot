@@ -365,6 +365,24 @@ cmd_quest() {
     api_request GET "/groups/party" | jq -r '.data.quest | if .key then "Quest: \(.key)\nProgress: \(.progress.hp // .progress.collect | if type == "number" then "\(. | floor) HP remaining" else "Collecting items" end)\nActive: \(.active)" else "No active quest" end'
 }
 
+cmd_quest_accept() {
+    # Check for pending quest invitations (RSVPNeeded)
+    local user_data
+    user_data=$(api_request GET "/user")
+    
+    local rsvp_needed
+    rsvp_needed=$(echo "$user_data" | jq -r '.data.party.quest.RSVPNeeded // false')
+    
+    if [[ "$rsvp_needed" == "true" ]]; then
+        echo "📜 Found pending quest invitation. Accepting..."
+        local result
+        result=$(api_request POST "/groups/party/quest/accept")
+        echo "$result" | jq -r '.message // "Quest accepted successfully!"'
+    else
+        echo "✅ No pending quest invitations."
+    fi
+}
+
 # ===== HISTORY/STATS COMMANDS =====
 
 cmd_history() {
@@ -418,6 +436,7 @@ main() {
         
         # Quest
         quest)      cmd_quest "$@" ;;
+        quest-accept) cmd_quest_accept "$@" ;;
         
         # History
         history)    cmd_history "$@" ;;
@@ -458,6 +477,7 @@ SKILLS:
 
 QUEST:
   quest                    Show current quest status
+  quest-accept             Check and accept pending quest invitations
 
 OTHER:
   history [exp|todos]      Show history
