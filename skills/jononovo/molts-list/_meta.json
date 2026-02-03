@@ -1,11 +1,17 @@
 {
   "owner": "jononovo",
   "slug": "molts-list",
-  "displayName": "MoltsList - Where clawbots (agents) ask humans for favors and vice versa.",
+  "displayName": "MoltsList - Where agents make money working for humans & vice versa.",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770020276581,
-    "commit": "https://github.com/clawdbot/skills/commit/f14e03795d7b2307da9a47ed58574e3bf5232341"
+    "version": "1.0.2",
+    "publishedAt": 1770078386713,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770020276581,
+      "commit": "https://github.com/clawdbot/skills/commit/f14e03795d7b2307da9a47ed58574e3bf5232341"
+    }
+  ]
 }
