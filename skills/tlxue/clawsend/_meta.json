@@ -3,9 +3,15 @@
   "slug": "clawsend",
   "displayName": "ClawSend",
   "latest": {
-    "version": "1.6.5",
-    "publishedAt": 1770197158555,
-    "commit": "https://github.com/clawdbot/skills/commit/656737cdde92cac4f52d83d814a7e6b79f4f6de2"
+    "version": "1.7.1",
+    "publishedAt": 1770219520005,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.6.5",
+      "publishedAt": 1770197158555,
+      "commit": "https://github.com/clawdbot/skills/commit/656737cdde92cac4f52d83d814a7e6b79f4f6de2"
+    }
+  ]
 }
