@@ -32,12 +32,12 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from rtf_writer import create_rtf_from_markdown
+from html_writer import create_html_from_markdown
 
 # Config
 CONFIG_FILE = os.path.expanduser("~/.tubescribe/config.json")
 DEFAULT_CONFIG = {
-    "document_format": "rtf",
+    "document_format": "html",
     "audio_format": "wav",
     "tts_engine": "builtin",
 }
@@ -196,9 +196,9 @@ def convert_to_document(md_path: str, output_dir: str, doc_format: str) -> str:
             f.write(content)
         return out_path
     
-    elif doc_format == "rtf":
-        out_path = os.path.join(output_dir, f"{safe_title}.rtf")
-        create_rtf_from_markdown(md_path, out_path)
+    elif doc_format == "html":
+        out_path = os.path.join(output_dir, f"{safe_title}.html")
+        create_html_from_markdown(md_path, out_path)
         return out_path
     
     elif doc_format == "docx":
@@ -240,8 +240,8 @@ def convert_to_document(md_path: str, output_dir: str, doc_format: str) -> str:
             doc.save(out_path)
             return out_path
         except ImportError:
-            print("   Warning: Neither pandoc nor python-docx available, falling back to RTF")
-            return convert_to_document(md_path, output_dir, "rtf")
+            print("   Warning: Neither pandoc nor python-docx available, falling back to HTML")
+            return convert_to_document(md_path, output_dir, "html")
     
     return md_path
 
@@ -362,7 +362,7 @@ def main():
     parser = argparse.ArgumentParser(description="TubeScribe - YouTube Video Summarizer")
     parser.add_argument("url", help="YouTube URL")
     parser.add_argument("--output-dir", default=".", help="Output directory")
-    parser.add_argument("--doc-format", choices=["rtf", "docx", "md"], help="Document format")
+    parser.add_argument("--doc-format", choices=["html", "docx", "md"], help="Document format")
     parser.add_argument("--audio-format", choices=["wav", "mp3", "none"], help="Audio format")
     parser.add_argument("--no-audio", action="store_true", help="Skip audio generation")
     parser.add_argument("--quiet", action="store_true", help="Minimal output")

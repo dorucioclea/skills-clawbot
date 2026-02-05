@@ -24,7 +24,7 @@ Drop a YouTube link → get a beautiful transcript with speaker labels, key quot
 
 - **🎯 Smart Speaker Detection** — Automatically identifies who's talking in interviews, podcasts, and conversations
 - **📝 Clickable Timestamps** — Every quote links directly to that moment in the video
-- **📄 Clean Documents** — Export as DOCX, HTML, or Markdown
+- **📄 Clean Documents** — Export as HTML, DOCX, or Markdown
 - **🔊 Audio Summaries** — Listen to the key points (MP3/WAV)
 - **🚀 Zero Config** — Works out of the box, upgrades available for power users
 
@@ -105,11 +105,14 @@ sessions_spawn(
 Convert markdown to final format:
 
 ```bash
-# RTF (no dependencies)
-python skills/tubescribe/scripts/rtf_writer.py /tmp/tubescribe_{video_id}_output.md output.rtf
+# HTML (no dependencies beyond Python)
+python skills/tubescribe/scripts/html_writer.py /tmp/tubescribe_{video_id}_output.md output.html
 
-# Or with pandoc for DOCX
+# DOCX with pandoc (best formatting)
 pandoc /tmp/tubescribe_{video_id}_output.md -o output.docx
+
+# Markdown (just copy the file)
+cp /tmp/tubescribe_{video_id}_output.md output.md
 ```
 
 ### Step 4: Generate Audio Summary (Optional)
@@ -125,7 +128,7 @@ Extract summary section and generate TTS:
 ### Step 5: Open Results
 
 ```bash
-open output.rtf  # or .docx
+open output.html  # or .docx or .md
 open -a "QuickTime Player" output_summary.wav
 ```
 
@@ -135,25 +138,33 @@ Config file: `~/.tubescribe/config.json`
 
 ```json
 {
-  "output_folder": "~/Documents/TubeScribe",
-  "document_format": "docx",
-  "audio_format": "mp3",
-  "tts_engine": "kokoro"
+  "output": {
+    "folder": "~/Documents/TubeScribe",
+    "open_folder_after": true
+  },
+  "document": {
+    "format": "docx"
+  },
+  "audio": {
+    "enabled": true,
+    "format": "mp3",
+    "tts_engine": "kokoro"
+  }
 }
 ```
 
 Options:
-- `output_folder`: Where to save files (default: `~/Documents/TubeScribe`)
-- `document_format`: `html` (default without deps), `docx` (with pandoc), `md`
-- `audio_format`: `mp3` (with ffmpeg), `wav` (default without ffmpeg)
-- `tts_engine`: `builtin` (macOS say), `kokoro` (high quality)
+- `output.folder`: Where to save files (default: `~/Documents/TubeScribe`)
+- `document.format`: `html` (default, no deps), `docx` (with pandoc/python-docx), `md` (raw markdown)
+- `audio.format`: `mp3` (with ffmpeg), `wav` (default without ffmpeg)
+- `audio.tts_engine`: `builtin` (macOS say), `kokoro` (high quality)
 
 ## Output Structure
 
 ```
 ~/Documents/TubeScribe/
-├── {Video Title}.html         # Formatted document (or .docx)
-└── {Video Title}_summary.mp3  # Audio summary
+├── {Video Title}.html         # Formatted document (or .docx / .md)
+└── {Video Title}_summary.mp3  # Audio summary (or .wav)
 ```
 
 After generation, opens the folder (not individual files) so you can access everything.
