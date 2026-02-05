@@ -1,0 +1,11 @@
+{
+  "owner": "instant-picture",
+  "slug": "ddg",
+  "displayName": "Ddg",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770219760478,
+    "commit": null
+  },
+  "history": []
+}
