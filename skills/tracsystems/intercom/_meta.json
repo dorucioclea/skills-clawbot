@@ -1,0 +1,11 @@
+{
+  "owner": "tracsystems",
+  "slug": "intercom",
+  "displayName": "Intercom",
+  "latest": {
+    "version": "0.0.2",
+    "publishedAt": 1770286211159,
+    "commit": null
+  },
+  "history": []
+}
