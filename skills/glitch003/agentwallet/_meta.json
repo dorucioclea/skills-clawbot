@@ -3,11 +3,16 @@
   "slug": "agentwallet",
   "displayName": "Agent Wallet",
   "latest": {
-    "version": "1.0.19",
-    "publishedAt": 1770170357991,
-    "commit": "https://github.com/clawdbot/skills/commit/e132e9d33a3d65f392933b551e57087e2d9eb968"
+    "version": "1.0.27",
+    "publishedAt": 1770259977390,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.19",
+      "publishedAt": 1770170357991,
+      "commit": "https://github.com/clawdbot/skills/commit/e132e9d33a3d65f392933b551e57087e2d9eb968"
+    },
     {
       "version": "1.0.18",
       "publishedAt": 1770079847023,

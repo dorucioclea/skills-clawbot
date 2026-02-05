@@ -1,13 +1,33 @@
 ---
-name: Agent Wallet
-description: The agent's wallet. Use this skill to safely create a wallet the agent can use for transfers, swaps, and any EVM chain transaction.
+name: Vincent - A wallet for agents
+description: Use this skill to safely create a wallet the agent can use for transfers, swaps, and any EVM chain transaction. Also supports raw signing for Ethereum and Solana.
 ---
 
-# Agent Wallet
+# Vincent - A wallet for agents
 
 Use this skill to safely create a wallet the agent can use for transfers, swaps, and any EVM chain transaction without ever exposing private keys to the agent. Create a wallet, set spending policies, and your agent can transfer tokens, do swaps, and interact with smart contracts within the boundaries you define.
 
 **The agent never sees the private key.** All transactions are executed server-side through a smart account. The wallet owner controls what the agent can do via configurable policies.
+
+## Which Secret Type to Use
+
+| Type         | Use Case                                  | Network                 | Gas              |
+| ------------ | ----------------------------------------- | ----------------------- | ---------------- |
+| `EVM_WALLET` | Transfers, swaps, DeFi, contract calls    | Any EVM chain           | Sponsored (free) |
+| `RAW_SIGNER` | Raw message signing for special protocols | Any (Ethereum + Solana) | You pay          |
+
+**Choose `EVM_WALLET`** (default) for:
+
+- Sending ETH or tokens
+- Swapping tokens on DEXs
+- Interacting with smart contracts
+- Any standard EVM transaction
+
+**Choose `RAW_SIGNER`** only when you need:
+
+- Raw ECDSA/Ed25519 signatures for protocols that don't work with smart accounts
+- To sign transaction hashes you'll broadcast yourself
+- Solana signatures
 
 ## Configuration
 
@@ -197,13 +217,7 @@ If a user tells you they have a re-link token, use this endpoint to regain acces
 
 ## Raw Signer (Advanced)
 
-**Only use this if you specifically need raw cryptographic signing.** For transfers, swaps, and regular EVM transactions, use `EVM_WALLET` above -- it's simpler, has gas sponsorship, and doesn't require you to manage transaction construction.
-
-Use `RAW_SIGNER` when you need to:
-
-- Sign arbitrary messages for protocols that require raw ECDSA/Ed25519 signatures
-- Sign transaction hashes that you'll broadcast yourself
-- Interact with protocols that don't work with smart accounts
+For raw ECDSA/Ed25519 signing when smart accounts won't work.
 
 ### Create a Raw Signer
 
@@ -243,12 +257,3 @@ curl -X POST "https://heyvincent.ai/api/skills/raw-signer/sign" \
 - `curve`: `"ethereum"` for secp256k1 ECDSA, `"solana"` for ed25519
 
 Returns a hex-encoded signature. For Ethereum, this is `r || s || v` (65 bytes). For Solana, it's a 64-byte ed25519 signature.
-
-### Key Differences from EVM_WALLET
-
-|                       | EVM_WALLET                       | RAW_SIGNER                        |
-| --------------------- | -------------------------------- | --------------------------------- |
-| Gas sponsorship       | Yes (paymaster)                  | No -- you pay gas                 |
-| Transaction execution | Server handles it                | You broadcast manually            |
-| Use case              | Transfers, swaps, contract calls | Raw signing for special protocols |
-| Address type          | Smart account                    | EOA (Ethereum) + Solana keypair   |
