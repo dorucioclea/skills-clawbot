@@ -18,18 +18,35 @@ Contents
 - scripts/light_show.py — small light-show controller for sequences (uses python-kasa). Changes include:
   - Default white uses a high color temperature (9000K) to make white appear "whiter"; pass --white-temp to override.
   - Bug fixes: the off-flash between blue→red now ignores transitions to white (saturation==0) to avoid white<->blue ping-pong, and white-temp is only applied to white steps (fixes red being skipped during off-flash). White steps also set brightness even without --double-write.
-- scripts/run_test_light_show.sh — helper to run light_show in the included .venv_kasa virtualenv (or created via bootstrap)
+- scripts/run_test_light_show.sh — helper to run light_show via uv
 
 Notes
-- This repo provides a bootstrap script at scripts/bootstrap_venv.sh that creates a local .venv_kasa and installs python-kasa on first use. We avoid committing a full virtualenv to keep the repo small and portable. The wrapper (scripts/run_control_kasa.sh) will auto-run the bootstrap on first use if .venv_kasa is missing.
-  Example (first-run or when venv exists):
+- This repo is set up for uv (no manual environment activation). Dependencies live in `pyproject.toml` and wrappers prefer `uv run`.
+  Example:
+  uv run --project ./skills/control-ikea-lightbulb python ./skills/control-ikea-lightbulb/scripts/control_kasa_light.py --ip 192.168.4.69 --on --hsv 0 100 80 --brightness 80
+- Install uv:
+  - `brew install uv` (macOS)
+  - `pipx install uv` (cross-platform)
+- The provided wrapper script requires uv:
   ./skills/control-ikea-lightbulb/scripts/run_control_kasa.sh --ip 192.168.4.69 --on --hsv 0 100 80 --brightness 80
-- You can also run the bootstrap manually:
-  ./skills/control-ikea-lightbulb/scripts/bootstrap_venv.sh
-- The existing test helper remains available and will use the venv if present:
+- The test helper also prefers uv:
   ./skills/control-ikea-lightbulb/scripts/run_test_light_show.sh --ip 192.168.4.69 --duration 6 --transition 1 --off-flash --verbose
 - If your device is actually an IKEA TRADFRI device (not Kasa), this script is a starting point; tell me and I will add TRADFRI support.
 - No cloud credentials are required; control happens over LAN to the device's IP.
 
+Quick start
+1. Install uv (macOS):
+   `brew install uv`
+2. Turn the bulb on (replace the IP):
+   `./skills/control-ikea-lightbulb/scripts/run_control_kasa.sh --ip 192.168.4.69 --on`
+3. Set color and brightness:
+   `./skills/control-ikea-lightbulb/scripts/run_control_kasa.sh --ip 192.168.4.69 --hsv 0 100 80 --brightness 80`
+
 Git note
-- Add .venv_kasa to your .gitignore if you plan to create the venv locally. The bootstrap script will recreate the environment when needed.
+- No local environment artifacts are tracked; use uv.
+
+Note about Python requirements and recent change
+- The skill previously declared python-kasa>=0.13.0 which caused dependency resolution failures on this machine. To make the skill runnable locally the project's pyproject.toml was adjusted to:
+  - requires-python = ">=3.11, <4.0"
+  - python-kasa>=0.10.2
+- This allows the resolver to pick a compatible python-kasa on machines with Python 3.11+. If you prefer a different constraint (or want me to revert this change), tell me and I will update the pyproject.toml and README accordingly.

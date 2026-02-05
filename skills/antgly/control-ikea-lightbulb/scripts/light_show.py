@@ -2,7 +2,7 @@
 """
 Light show: cycle specified colors for a duration using python-kasa.
 Saves initial bulb state and restores it at the end, optionally fading over N seconds.
-Usage: python3 light_show.py --ip 192.168.4.69 --duration 15 --off-flash --fade 3
+Usage: uv run --project . python ./scripts/light_show.py --ip 192.168.4.69 --duration 15 --off-flash --fade 3
 """
 import argparse
 import asyncio

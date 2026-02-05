@@ -4,15 +4,13 @@ Updated LAN controller for TP-Link Kasa-compatible smart bulbs using python-kasa
 This version uses Discover.discover_single() and the device/modules API (no deprecated SmartBulb).
 
 Usage examples:
-  # Use system Python (if you have python-kasa installed system-wide):
-  python3 control_kasa_light.py --ip 192.168.4.69 --on
-  # Use the included venv (recommended; python-kasa preinstalled):
-  ./skills/control-ikea-lightbulb/.venv_kasa/bin/python3 skills/control-ikea-lightbulb/scripts/control_kasa_light.py --ip 192.168.4.69 --on --hsv 0 100 80 --brightness 80
-  # Use the provided wrapper script which bootstraps the venv if needed:
+  # Use uv (recommended; manages deps without manual environment activation):
+  uv run --project ./skills/control-ikea-lightbulb python ./skills/control-ikea-lightbulb/scripts/control_kasa_light.py --ip 192.168.4.69 --on
+  # Use the provided wrapper script (requires uv):
   ./skills/control-ikea-lightbulb/scripts/run_control_kasa.sh --ip 192.168.4.69 --on --hsv 0 100 80 --brightness 80
 
 Notes:
-- The repo includes scripts/bootstrap_venv.sh to create a local .venv_kasa and install python-kasa on first run. The wrapper will run the bootstrap automatically if the venv is missing.
+- The wrapper requires uv to run.
 - Run from the same LAN as the bulb. No cloud credentials required.
 """
 import argparse
