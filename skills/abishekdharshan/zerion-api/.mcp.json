@@ -1,9 +1,0 @@
-{
-  "zerion": {
-    "type": "http",
-    "url": "https://developers.zerion.io/mcp",
-    "headers": {
-      "Authorization": "Bearer ${ZERION_API_KEY}"
-    }
-  }
-}

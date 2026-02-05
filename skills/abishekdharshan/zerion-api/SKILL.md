@@ -1,5 +1,13 @@
 ---
 summary: Query crypto wallet portfolios, transactions, DeFi positions, and token prices across EVM chains and Solana using Zerion's MCP server.
+tags:
+  - blockchain
+  - crypto
+  - defi
+  - evm
+  - mcp
+  - solana
+  - wallet
 ---
 
 # Zerion API Skill
@@ -104,13 +112,6 @@ Show portfolio breakdown across all EVM chains
 Which chains have the most DeFi activity?
 ```
 
-## Data Quality Notes
-
-- **Latency**: ~1-2 seconds for most queries
-- **Freshness**: Real-time indexing, typically <30s delay
-- **Coverage**: 50+ EVM chains + Solana, 10,000+ protocols
-- **Accuracy**: Production-grade data powering Coinbase, Uniswap, Rainbow, Robinhood, etc.
-
 ## MCP Server Details
 
 **URL**: `https://developers.zerion.io/mcp`
@@ -150,5 +151,3 @@ Use this skill when:
 - Checking gas prices across EVM chains and Solana
 - Validating customer or competitor data
 - Calculating portfolio PnL
-
-For API integration and product questions, refer to the `zerion-prd` skill or `zerion-api-context.md`.
