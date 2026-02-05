@@ -3,11 +3,16 @@
   "slug": "google-docs",
   "displayName": "Google Docs",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770117772057,
-    "commit": "https://github.com/clawdbot/skills/commit/459a4af32275ec11bbaf548b033a672bc1cee38a"
+    "version": "1.0.2",
+    "publishedAt": 1770255499512,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770117772057,
+      "commit": "https://github.com/clawdbot/skills/commit/459a4af32275ec11bbaf548b033a672bc1cee38a"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770022129235,
