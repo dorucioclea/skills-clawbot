@@ -3,11 +3,16 @@
   "slug": "personas",
   "displayName": "Personas",
   "latest": {
-    "version": "2.1.0",
-    "publishedAt": 1770207598087,
-    "commit": "https://github.com/clawdbot/skills/commit/0b047dbd39d566e7818eb12975d1b86ca696fb61"
+    "version": "2.1.1",
+    "publishedAt": 1770246223196,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.1.0",
+      "publishedAt": 1770207598087,
+      "commit": "https://github.com/clawdbot/skills/commit/0b047dbd39d566e7818eb12975d1b86ca696fb61"
+    },
     {
       "version": "2.0.1",
       "publishedAt": 1770139096071,
