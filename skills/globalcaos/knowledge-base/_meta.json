@@ -1,0 +1,11 @@
+{
+  "owner": "globalcaos",
+  "slug": "knowledge-base",
+  "displayName": "Knowledge Base",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770411787052,
+    "commit": null
+  },
+  "history": []
+}
