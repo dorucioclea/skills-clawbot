@@ -3,11 +3,16 @@
   "slug": "google-forms",
   "displayName": "Google Forms",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770255564003,
-    "commit": "https://github.com/clawdbot/skills/commit/f1c6303046c5a2ce3c49e65c28e63faa05476f29"
+    "version": "1.0.3",
+    "publishedAt": 1770344071928,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770255564003,
+      "commit": "https://github.com/clawdbot/skills/commit/f1c6303046c5a2ce3c49e65c28e63faa05476f29"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770117736121,
