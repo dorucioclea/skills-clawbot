@@ -1,7 +1,7 @@
 ---
 name: fathom
 description: |
-  Fathom API integration with managed OAuth. Access meeting recordings, transcripts, summaries, and manage webhooks. Use this skill when users want to retrieve meeting content, search recordings, or set up webhook notifications for new meetings.
+  Fathom API integration with managed OAuth. Access meeting recordings, transcripts, summaries, and manage webhooks. Use this skill when users want to retrieve meeting content, search recordings, or set up webhook notifications for new meetings. For other third party apps, use the api-gateway skill (https://clawhub.ai/byungkyu/api-gateway).
 compatibility: Requires network access and valid Maton API key
 metadata:
   author: maton
@@ -16,8 +16,12 @@ Access the Fathom API with managed OAuth authentication. Retrieve meeting record
 
 ```bash
 # List recent meetings
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/meetings' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/meetings')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 ## Base URL
@@ -33,7 +37,7 @@ Replace `{native-api-path}` with the actual Fathom API endpoint path. The gatewa
 All requests require the Maton API key in the Authorization header:
 
 ```
-Authorization: Bearer YOUR_API_KEY
+Authorization: Bearer $MATON_API_KEY
 ```
 
 **Environment Variable:** Set your API key as `MATON_API_KEY`:
@@ -55,24 +59,36 @@ Manage your Fathom OAuth connections at `https://ctrl.maton.ai`.
 ### List Connections
 
 ```bash
-curl -s -X GET 'https://ctrl.maton.ai/connections?app=fathom&status=ACTIVE' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://ctrl.maton.ai/connections?app=fathom&status=ACTIVE')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 ### Create Connection
 
 ```bash
-curl -s -X POST 'https://ctrl.maton.ai/connections' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -d '{"app": "fathom"}'
+python <<'EOF'
+import urllib.request, os, json
+data = json.dumps({'app': 'fathom'}).encode()
+req = urllib.request.Request('https://ctrl.maton.ai/connections', data=data, method='POST')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+req.add_header('Content-Type', 'application/json')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 ### Get Connection
 
 ```bash
-curl -s -X GET 'https://ctrl.maton.ai/connections/{connection_id}' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://ctrl.maton.ai/connections/{connection_id}')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -95,8 +111,12 @@ Open the returned `url` in a browser to complete OAuth authorization.
 ### Delete Connection
 
 ```bash
-curl -s -X DELETE 'https://ctrl.maton.ai/connections/{connection_id}' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://ctrl.maton.ai/connections/{connection_id}', method='DELETE')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 ### Specifying Connection
@@ -104,9 +124,13 @@ curl -s -X DELETE 'https://ctrl.maton.ai/connections/{connection_id}' \
 If you have multiple Fathom connections, specify which one to use with the `Maton-Connection` header:
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/meetings' \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -H 'Maton-Connection: 21fd90f9-5935-43cd-b6c8-bde9d915ca80'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/meetings')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+req.add_header('Maton-Connection', '21fd90f9-5935-43cd-b6c8-bde9d915ca80')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 If omitted, the gateway uses the default (oldest) active connection.
@@ -135,8 +159,12 @@ Query parameters:
 **Example with filters:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/meetings?created_after=2025-01-01T00:00:00Z&teams[]=Sales' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/meetings?created_after=2025-01-01T00:00:00Z&teams[]=Sales')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -196,8 +224,12 @@ Query parameters:
 **Synchronous example:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/recordings/123456789/summary' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/recordings/123456789/summary')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -213,8 +245,12 @@ curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/recordings/123456789
 **Async example:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/recordings/123456789/summary?destination_url=https://example.com/webhook' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/recordings/123456789/summary?destination_url=https://example.com/webhook')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 #### Get Transcript
@@ -229,8 +265,12 @@ Query parameters:
 **Synchronous example:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/recordings/123456789/transcript' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/recordings/123456789/transcript')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -263,8 +303,12 @@ Query parameters:
 **Example:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/teams' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/teams')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -296,8 +340,12 @@ Query parameters:
 **Example:**
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/team_members?team=Sales' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/team_members?team=Sales')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -344,14 +392,14 @@ At least one of `include_transcript`, `include_summary`, `include_action_items`,
 **Example:**
 
 ```bash
-curl -s -X POST 'https://gateway.maton.ai/fathom/external/v1/webhooks' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -d '{
-    "destination_url": "https://example.com/webhook",
-    "triggered_for": ["my_recordings"],
-    "include_summary": true
-  }'
+python <<'EOF'
+import urllib.request, os, json
+data = json.dumps({'destination_url': 'https://example.com/webhook', 'triggered_for': ['my_recordings'], 'include_summary': True}).encode()
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/webhooks', data=data, method='POST')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+req.add_header('Content-Type', 'application/json')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 **Response:**
@@ -378,8 +426,12 @@ DELETE /fathom/external/v1/webhooks/{id}
 **Example:**
 
 ```bash
-curl -s -X DELETE 'https://gateway.maton.ai/fathom/external/v1/webhooks/ikEoQ4bVoq4JYUmc' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/webhooks/ikEoQ4bVoq4JYUmc', method='DELETE')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 Returns `204 No Content` on success.
@@ -389,8 +441,12 @@ Returns `204 No Content` on success.
 Use `cursor` for pagination. Response includes `next_cursor` when more results exist:
 
 ```bash
-curl -s -X GET 'https://gateway.maton.ai/fathom/external/v1/meetings?cursor=eyJwYWdlX251bSI6Mn0=' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://gateway.maton.ai/fathom/external/v1/meetings?cursor=eyJwYWdlX251bSI6Mn0=')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
 ```
 
 ## Code Examples
@@ -430,6 +486,8 @@ data = response.json()
 - Transcripts and summaries are in English
 - Webhook secrets are used to verify webhook signatures
 - CRM matches only return data from your or your team's linked CRM
+- IMPORTANT: When using curl commands, use `curl -g` when URLs contain brackets (`fields[]`, `sort[]`, `records[]`) to disable glob parsing
+- IMPORTANT: When piping curl output to `jq` or other commands, environment variables like `$MATON_API_KEY` may not expand correctly in some shell environments. You may get "Invalid API key" errors when piping.
 
 ## Error Handling
 
@@ -440,6 +498,27 @@ data = response.json()
 | 404 | Resource not found |
 | 429 | Rate limited |
 | 4xx/5xx | Passthrough error from Fathom API |
+
+### Troubleshooting: Invalid API Key
+
+**When you receive a "Invalid API key" error, ALWAYS follow these steps before concluding there is an issue:**
+
+1. Check that the `MATON_API_KEY` environment variable is set:
+
+```bash
+echo $MATON_API_KEY
+```
+
+2. Verify the API key is valid by listing connections:
+
+```bash
+python <<'EOF'
+import urllib.request, os, json
+req = urllib.request.Request('https://ctrl.maton.ai/connections')
+req.add_header('Authorization', f'Bearer {os.environ["MATON_API_KEY"]}')
+print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
+EOF
+```
 
 ## Resources
 
