@@ -1,6 +1,6 @@
 ---
 name: clawvault
-version: 1.4.0
+version: 1.4.2
 description: Structured memory system for OpenClaw agents. Context death resilience (checkpoint/recover), structured storage, Obsidian-compatible markdown, and local semantic search.
 author: Versatly
 repository: https://github.com/Versatly/clawvault
@@ -18,12 +18,39 @@ An elephant never forgets. Structured memory for OpenClaw agents.
 npm install -g clawvault
 ```
 
-## Quick Setup (v1.4.0)
+## Quick Setup
 
 ```bash
 # Auto-discover OpenClaw memory folder and configure
 clawvault setup
 ```
+
+## OpenClaw Hook Integration (Recommended)
+
+ClawVault includes an OpenClaw hook for **automatic context death resilience**:
+
+```bash
+# Register the hook from clawvault package
+openclaw hooks install clawvault
+openclaw hooks enable clawvault
+```
+
+**What the hook handles automatically:**
+- **Gateway startup** → Detects if previous session died, injects alert
+- **On /new command** → Creates checkpoint before session reset
+
+**Manual commands still valuable for:**
+- `clawvault wake` — Full recap with projects and handoffs
+- `clawvault sleep` — Detailed handoff with decisions and blockers
+- `clawvault checkpoint` — Explicit save during heavy work
+
+The hook is your safety net. Manual commands give richer context.
+
+## New in v1.4.1
+
+- **OpenClaw hook** — automatic context death resilience
+- **clawvault wake** — all-in-one session start (recover + recap)
+- **clawvault sleep** — all-in-one session end (handoff + git commit)
 
 ## New in v1.4.0
 
@@ -101,6 +128,25 @@ clawvault handoff \
 ```bash
 clawvault recap
 # Shows: recent handoffs, active projects, pending commitments, lessons
+```
+
+### Wake (all-in-one session start)
+
+```bash
+clawvault wake
+# Combines: recover + recap + summary
+# Shows context death status + recent handoffs + what you were working on
+```
+
+### Sleep (all-in-one session end)
+
+```bash
+clawvault sleep "Finished PR review" \
+  --next "merge after CI" \
+  --blocked "waiting for approval" \
+  --decisions "use strict mode" \
+  --feeling "productive"
+# Creates handoff, clears death flag, offers git commit
 ```
 
 ## Auto-linking
