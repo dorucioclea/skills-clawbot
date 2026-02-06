@@ -1,5 +1,5 @@
 ---
-name: postiz-extended
+name: postiz
 description: |
   Schedule and manage social media posts via Postiz API (self-hosted or cloud).
   Direct API integration — no n8n dependency.
@@ -25,20 +25,40 @@ description: |
 
 Direct API integration for social media posting. No n8n workflows needed.
 
-## Quick Reference
+## Setup
 
-| Platform | Integration ID | Character Limit | Handle |
-|----------|---------------|-----------------|--------|
-| X/Twitter | `YOUR_X_INTEGRATION_ID` | **280** | @YourHandle |
-| LinkedIn | `YOUR_LINKEDIN_INTEGRATION_ID` | **3,000** | your-linkedin |
-| Bluesky | `YOUR_BLUESKY_INTEGRATION_ID` | **300** | your.bsky.social |
+### Required Environment Variables
+
+```bash
+# Core configuration
+export POSTIZ_URL="https://your-postiz-instance.com"
+export POSTIZ_EMAIL="your@email.com"
+export POSTIZ_PASSWORD="your-password"
+
+# Integration IDs (get from Postiz dashboard → Integrations)
+export POSTIZ_X_ID="your-x-integration-id"
+export POSTIZ_LINKEDIN_ID="your-linkedin-integration-id"
+export POSTIZ_BLUESKY_ID="your-bluesky-integration-id"
+```
+
+To find your integration IDs:
+1. Go to your Postiz dashboard
+2. Navigate to **Integrations** or **Channels**
+3. Each connected account shows an ID (or use the API: `GET /api/integrations/list`)
+
+## Platform Limits
+
+| Platform | Character Limit | Notes |
+|----------|-----------------|-------|
+| X/Twitter | **280** | Links count as 23 chars (t.co shortening) |
+| LinkedIn | **3,000** | First 140 chars show in preview |
+| Bluesky | **300** | Growing tech/developer audience |
 
 ## Platform Content Guidelines
 
 ### X/Twitter (280 chars)
 - Short, punchy content
 - 1-2 hashtags max
-- Links count as 23 chars (t.co shortening)
 - Threads for longer content (multiple tweets)
 
 ### LinkedIn (3,000 chars)
@@ -57,9 +77,9 @@ Direct API integration for social media posting. No n8n workflows needed.
 ```bash
 # Login and save cookie (required before any API call)
 curl -s -c /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/auth/login' \
+  "$POSTIZ_URL/api/auth/login" \
   -H 'Content-Type: application/json' \
-  -d '{"email":"your-email@example.com","password":"your-password","provider":"LOCAL"}'
+  -d "{\"email\":\"$POSTIZ_EMAIL\",\"password\":\"$POSTIZ_PASSWORD\",\"provider\":\"LOCAL\"}"
 ```
 
 Cookie expires periodically. Re-run login if you get 401 errors.
@@ -68,7 +88,7 @@ Cookie expires periodically. Re-run login if you get 401 errors.
 
 ```bash
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/posts/find-slot/INTEGRATION_ID'
+  "$POSTIZ_URL/api/posts/find-slot/$POSTIZ_X_ID"
 ```
 
 Returns the next open time slot for a given channel. Useful for auto-scheduling without conflicts.
@@ -77,7 +97,7 @@ Returns the next open time slot for a given channel. Useful for auto-scheduling 
 
 ```bash
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/media/upload-from-url' \
+  "$POSTIZ_URL/api/media/upload-from-url" \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://example.com/image.png"}'
 ```
@@ -88,46 +108,46 @@ curl -s -b /tmp/postiz-cookies.txt \
 
 ```bash
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/posts' \
+  "$POSTIZ_URL/api/posts" \
   -H 'Content-Type: application/json' \
-  -d '{
-    "type": "schedule",
-    "date": "2026-02-05T15:00:00Z",
-    "posts": [{
-      "integration": {"id": "YOUR_X_INTEGRATION_ID"},
-      "value": [{"content": "Your tweet here (max 280 chars)", "image": []}],
-      "settings": {"__type": "x"}
+  -d "{
+    \"type\": \"schedule\",
+    \"date\": \"2026-02-05T15:00:00Z\",
+    \"posts\": [{
+      \"integration\": {\"id\": \"$POSTIZ_X_ID\"},
+      \"value\": [{\"content\": \"Your tweet here (max 280 chars)\", \"image\": []}],
+      \"settings\": {\"__type\": \"x\"}
     }]
-  }'
+  }"
 ```
 
 ### Multi-Platform Post (Adapted Content)
 
 ```bash
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/posts' \
+  "$POSTIZ_URL/api/posts" \
   -H 'Content-Type: application/json' \
-  -d '{
-    "type": "schedule",
-    "date": "2026-02-05T15:00:00Z",
-    "posts": [
+  -d "{
+    \"type\": \"schedule\",
+    \"date\": \"2026-02-05T15:00:00Z\",
+    \"posts\": [
       {
-        "integration": {"id": "YOUR_X_INTEGRATION_ID"},
-        "value": [{"content": "Short X version (280 chars max)", "image": []}],
-        "settings": {"__type": "x"}
+        \"integration\": {\"id\": \"$POSTIZ_X_ID\"},
+        \"value\": [{\"content\": \"Short X version (280 chars max)\", \"image\": []}],
+        \"settings\": {\"__type\": \"x\"}
       },
       {
-        "integration": {"id": "YOUR_LINKEDIN_INTEGRATION_ID"},
-        "value": [{"content": "Longer LinkedIn version with more context and professional tone. Can be up to 3000 characters.", "image": []}],
-        "settings": {"__type": "linkedin"}
+        \"integration\": {\"id\": \"$POSTIZ_LINKEDIN_ID\"},
+        \"value\": [{\"content\": \"Longer LinkedIn version with more context and professional tone. Can be up to 3000 characters.\", \"image\": []}],
+        \"settings\": {\"__type\": \"linkedin\"}
       },
       {
-        "integration": {"id": "YOUR_BLUESKY_INTEGRATION_ID"},
-        "value": [{"content": "Bluesky version (300 chars max)", "image": []}],
-        "settings": {"__type": "bluesky"}
+        \"integration\": {\"id\": \"$POSTIZ_BLUESKY_ID\"},
+        \"value\": [{\"content\": \"Bluesky version (300 chars max)\", \"image\": []}],
+        \"settings\": {\"__type\": \"bluesky\"}
       }
     ]
-  }'
+  }"
 ```
 
 ### Post Types
@@ -140,7 +160,7 @@ curl -s -b /tmp/postiz-cookies.txt \
 ### Get Posts by Date Range (Required!)
 ```bash
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/posts?startDate=2026-02-01T00:00:00Z&endDate=2026-02-08T00:00:00Z' \
+  "$POSTIZ_URL/api/posts?startDate=2026-02-01T00:00:00Z&endDate=2026-02-08T00:00:00Z" \
   | jq '.posts[] | {id, state, publishDate, platform: .integration.providerIdentifier, content: .content[0:60]}'
 ```
 
@@ -148,7 +168,7 @@ curl -s -b /tmp/postiz-cookies.txt \
 ```bash
 # Get recent posts and check content similarity
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/posts?startDate=2026-02-01T00:00:00Z&endDate=2026-02-08T00:00:00Z' \
+  "$POSTIZ_URL/api/posts?startDate=2026-02-01T00:00:00Z&endDate=2026-02-08T00:00:00Z" \
   | jq -r '.posts[] | "\(.integration.providerIdentifier): \(.content[0:80])"'
 ```
 
@@ -167,7 +187,7 @@ curl -s -b /tmp/postiz-cookies.txt \
 ```bash
 # Upload returns {id, path}
 curl -s -b /tmp/postiz-cookies.txt \
-  'https://your-postiz-instance.com/api/media/upload-simple' \
+  "$POSTIZ_URL/api/media/upload-simple" \
   -F 'file=@/path/to/image.png'
 ```
 
@@ -196,13 +216,13 @@ For longer content on X, create a thread:
 ### Delete Post
 ```bash
 curl -s -b /tmp/postiz-cookies.txt -X DELETE \
-  'https://your-postiz-instance.com/api/posts/POST_ID'
+  "$POSTIZ_URL/api/posts/POST_ID"
 ```
 
 ### Update Schedule
 ```bash
 curl -s -b /tmp/postiz-cookies.txt -X PUT \
-  'https://your-postiz-instance.com/api/posts/POST_ID/date' \
+  "$POSTIZ_URL/api/posts/POST_ID/date" \
   -H 'Content-Type: application/json' \
   -d '{"date": "2026-02-06T10:00:00Z"}'
 ```
@@ -225,31 +245,48 @@ Don't just truncate! Rewrite for each platform:
 - **LinkedIn**: Context + value + engagement question
 - **Bluesky**: Casual tech-friendly tone
 
-## Helper Script
+## Helper Scripts
 
-Use `scripts/post.py` for easier posting with automatic character validation:
+### Post to Multiple Platforms
 
 ```bash
 # Single platform
-~/.local/bin/uv run ~/clawd/skills/postiz/scripts/post.py \
+uv run scripts/post.py \
   --platform x \
   --content "Your tweet here" \
   --schedule "2026-02-05T15:00:00Z"
 
 # Multi-platform with different content
-~/.local/bin/uv run ~/clawd/skills/postiz/scripts/post.py \
+uv run scripts/post.py \
   --x "Short X version" \
   --linkedin "Longer LinkedIn version with more detail" \
   --bluesky "Bluesky version" \
   --schedule "2026-02-05T15:00:00Z"
+
+# Post immediately
+uv run scripts/post.py \
+  --platform x \
+  --content "Posting now!" \
+  --now
+
+# Validate without posting
+uv run scripts/post.py \
+  --x "Test content" \
+  --validate
 ```
 
-## Web UI
+### Check for Duplicates
 
-Dashboard: https://your-postiz-instance.com
-- Visual calendar view
-- Drag-and-drop scheduling
-- Analytics and engagement stats
+```bash
+# Check last 30 days
+uv run scripts/check_duplicates.py
+
+# Check last 7 days
+uv run scripts/check_duplicates.py --days 7
+
+# Check if specific content would be duplicate
+uv run scripts/check_duplicates.py --content "Your proposed post content"
+```
 
 ## Troubleshooting
 
@@ -263,3 +300,12 @@ Re-run the login curl command to refresh cookie.
 
 ### Duplicate Posts
 Always check existing posts before creating. The API doesn't deduplicate automatically.
+
+### Missing Environment Variables
+Scripts will tell you which env vars are missing. Set them in your shell or `.env` file:
+```bash
+export POSTIZ_URL="https://your-postiz.example.com"
+export POSTIZ_EMAIL="your@email.com"
+export POSTIZ_PASSWORD="your-password"
+export POSTIZ_X_ID="your-integration-id"
+```
