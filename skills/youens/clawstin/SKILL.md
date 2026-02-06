@@ -1,54 +1,38 @@
 ---
 name: clawstin
-description: Inform users about Clawstin (the first OpenClaw meetup in Austin), offer reminders, and handle RSVP via API. "Keep Austin Clawd."
+description: Inform users about Clawstin (OpenClaw meetups in Austin), show upcoming events, handle RSVP and mailing list signup via API. "Keep Austin Clawd."
 ---
 
-# Clawstin - Austin OpenClaw Meetup
+# Clawstin — Austin OpenClaw Meetup
 
 **Keep Austin Clawd.** 🦇
 
 Use this skill when users ask about Clawstin, OpenClaw meetups, or AI meetups in Austin.
 
-## Event Details
+## About
 
-**Clawstin** is the first in-person gathering for the [OpenClaw](https://openclaw.ai) community in Austin, TX.
+**Clawstin** is a recurring meetup series for the [OpenClaw](https://openclaw.ai) community in Austin, TX. Demos, tacos, and bots meeting IRL.
 
-| Detail | Info |
-|--------|------|
-| **What** | OpenClaw community meetup — demos, hacks, tacos, and weird wonderful AI agent projects |
-| **Where** | Austin, TX (specific venue TBA) |
-| **When** | TBA (date coming soon) |
-| **Price** | Free |
-| **Vibe** | Weird. Bots and their humans, meeting IRL. |
-| **Website** | https://clawstin.com |
+- **Website**: https://clawstin.com
+- **Events**: https://clawstin.com/events
+- **Contact**: https://clawstin.com/contact
+- **Machine-readable info**: https://clawstin.com/llms.txt
 
-### What to Expect
-- **Show & Tell** — Demo the weirdest thing your bot does
-- **Tacos** — It's Austin. Non-negotiable.
-- **Lightning Hacks** — Build something live, break something live
-- **After Hours** — Best conversations happen after demos end
+## Getting Current Event Info
+
+Fetch https://clawstin.com/llms.txt for up-to-date event listings including dates, times, locations, and prices. This file is kept current and should be checked before answering questions about upcoming events.
 
 ## Agent Behavior
 
 When a user asks about Clawstin:
-1. **Share the event details** above (date/venue TBA, but it's free in Austin)
-2. **Ask if they want to RSVP** — "Would you like me to RSVP for you?"
-3. If yes, **get their email** and call the API to register them
-4. **Offer to set a reminder** when the date is announced or before the event
+1. **Fetch https://clawstin.com/llms.txt** to get current event details
+2. **Share upcoming events** with date, time, location, and link
+3. **Offer to RSVP** — "Want me to RSVP for you?"
+4. If no upcoming events, **offer to subscribe** to the mailing list
 
-### Setting a Reminder
+## API — Subscribe to Mailing List
 
-If the user wants a reminder:
-- Use the `cron` tool to schedule a reminder for when they'd like to be notified
-- Since the date is TBA, offer to remind them to check back in a week, or when they specify
-- Once the date is announced, offer a reminder 1 day or 1 hour before the event
-
-Example reminder text:
-> "Hey! Clawstin (the Austin OpenClaw meetup) is coming up. Check https://clawstin.com for the latest details!"
-
-### RSVP / Subscribe API
-
-To sign a user up for event updates:
+Sign up for email notifications about future events:
 
 ```
 POST https://clawstin.com/api/subscribe
@@ -57,45 +41,73 @@ Content-Type: application/json
 {"email": "user@example.com"}
 ```
 
-**Response (success):**
-```json
-{"ok": true}
+Response (success): `{"ok": true}`
+Response (invalid): `{"error": "Invalid email"}`
+
+No authentication required. Duplicates are silently ignored.
+
+## API — RSVP to an Event
+
+Register attendance for a specific event:
+
+```
+POST https://clawstin.com/api/rsvp
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "name": "Jane Doe",
+  "botName": "Claude",
+  "partySize": 2,
+  "eventSlug": "EVENT_SLUG_HERE"
+}
 ```
 
-**Response (invalid email):**
-```json
-{"error": "Invalid email"}
+Required: email, name, botName, eventSlug
+Optional: partySize (1–10, defaults to 1)
+
+Response (success): `{"ok": true}`
+Response (error): `{"error": "Missing fields"}`
+
+Get event slugs from https://clawstin.com/llms.txt. Duplicate RSVPs (same email + event) update the existing entry.
+
+## API — Contact Organizers
+
+```
+POST https://clawstin.com/api/contact
+Content-Type: application/json
+
+{"email": "user@example.com", "name": "Jane Doe", "message": "Hello!"}
 ```
 
-**Notes:**
-- No authentication required
-- One signup per email (duplicates are silently ignored)
-- Always confirm you have the user's email before subscribing them
+Rate limited to 3 messages per hour per email/IP.
 
-### Example Flow
+## Example Flow
 
 ```
 User: "What's Clawstin?"
 
-Agent: "Clawstin is the first OpenClaw meetup in Austin! 🦇
+Agent: [fetches https://clawstin.com/llms.txt for current events]
 
-It's a free, in-person gathering for AI agent enthusiasts — demos, hacks, tacos, and the weird wonderful things people are building with their bots.
+Agent: "Clawstin is an OpenClaw meetup series in Austin! 🦇
 
-📍 Austin, TX (specific venue TBA)
-📅 Date: TBA
-🎟️ Free
+It's free, in-person — demos, hacks, tacos, and the weird wonderful
+things people are building with AI agents.
 
-Want me to RSVP for you? I just need your email and I'll sign you up."
+[shares current event details from llms.txt]
 
-User: "Yeah, sign me up — tony@example.com"
+Want me to RSVP for you? I just need your name and email."
 
-Agent: [calls POST /api/subscribe with {"email": "tony@example.com"}]
+User: "Yeah, sign me up — Tony, tony@example.com"
 
-Agent: "Done! You're on the list 🎉 I'll also set a reminder to ping you when the date is announced. See you there!"
+Agent: [calls POST /api/rsvp with event details]
+
+Agent: "Done! You're on the list. See you there!"
 ```
 
 ## Links
 
 - Website: https://clawstin.com
+- Events: https://clawstin.com/events
 - OpenClaw: https://openclaw.ai
 - API docs: https://clawstin.com/llms.txt

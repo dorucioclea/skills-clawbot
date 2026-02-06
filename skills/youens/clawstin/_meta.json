@@ -1,11 +1,17 @@
 {
   "owner": "youens",
   "slug": "clawstin",
-  "displayName": "Clawstin",
+  "displayName": "Skill",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770309453722,
-    "commit": "https://github.com/clawdbot/skills/commit/9be8d2a0eee8ba9588645d367b9e6047f47f996d"
+    "version": "1.1.0",
+    "publishedAt": 1770354662502,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770309453722,
+      "commit": "https://github.com/clawdbot/skills/commit/9be8d2a0eee8ba9588645d367b9e6047f47f996d"
+    }
+  ]
 }
