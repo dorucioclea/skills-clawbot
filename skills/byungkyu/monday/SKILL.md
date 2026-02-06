@@ -471,7 +471,7 @@ data = response.json()
 - Column IDs are alphanumeric strings (e.g., `color_mm09e48w`)
 - Group IDs are alphanumeric strings (e.g., `group_mm0939df`, `topics`)
 - Column values must be passed as JSON strings when creating/updating items
-- The `account` query may require additional OAuth scopes
+- The `account` query may require additional OAuth scopes. If you receive a scope error, contact Maton support at support@maton.ai with the specific operations/APIs you need and your use-case
 - Board kinds: `public`, `private`, `share`
 - Board states: `active`, `archived`, `deleted`, `all`
 - Each cursor is valid for 60 minutes after the initial request
