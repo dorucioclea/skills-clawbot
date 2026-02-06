@@ -210,6 +210,14 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | WooCommerce | `woocommerce` | `{store-url}/wp-json/wc/v3` |
 | Xero | `xero` | `api.xero.com` |
 | YouTube | `youtube` | `www.googleapis.com` |
+| Zoho Bigin | `zoho-bigin` | `www.zohoapis.com` |
+| Zoho Books | `zoho-books` | `www.zohoapis.com` |
+| Zoho Calendar | `zoho-calendar` | `calendar.zoho.com` |
+| Zoho CRM | `zoho-crm` | `www.zohoapis.com` |
+| Zoho Inventory | `zoho-inventory` | `www.zohoapis.com` |
+| Zoho Mail | `zoho-mail` | `mail.zoho.com` |
+| Zoho People | `zoho-people` | `people.zoho.com` |
+| Zoho Recruit | `zoho-recruit` | `recruit.zoho.com` |
 
 See [references/](references/) for detailed routing guides per provider:
 - [Airtable](references/airtable.md) - Records, bases, tables
@@ -254,6 +262,14 @@ See [references/](references/) for detailed routing guides per provider:
 - [WooCommerce](references/woocommerce.md) - Products, orders, customers, coupons
 - [Xero](references/xero.md) - Contacts, invoices, reports
 - [YouTube](references/youtube.md) - Videos, playlists, channels, subscriptions
+- [Zoho Bigin](references/zoho-bigin.md) - Contacts, companies, pipelines, products
+- [Zoho Books](references/zoho-books.md) - Invoices, contacts, bills, expenses
+- [Zoho Calendar](references/zoho-calendar.md) - Calendars, events, attendees, reminders
+- [Zoho CRM](references/zoho-crm.md) - Leads, contacts, accounts, deals, search
+- [Zoho Inventory](references/zoho-inventory.md) - Items, sales orders, invoices, purchase orders, bills
+- [Zoho Mail](references/zoho-mail.md) - Messages, folders, labels, attachments
+- [Zoho People](references/zoho-people.md) - Employees, departments, designations, attendance, leave
+- [Zoho Recruit](references/zoho-recruit.md) - Candidates, job openings, interviews, applications
 
 ## Examples
 
