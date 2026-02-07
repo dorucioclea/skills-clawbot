@@ -1,13 +1,18 @@
 {
   "owner": "adlai88",
   "slug": "simmer-copytrading",
-  "displayName": "Simmer Copytrading",
+  "displayName": "Copytrading",
   "latest": {
-    "version": "1.2.1",
-    "publishedAt": 1769669735547,
-    "commit": "https://github.com/clawdbot/skills/commit/2c6be4b7d205f0a08c8df89e53ae8a1bdb5d2247"
+    "version": "1.3.0",
+    "publishedAt": 1770442565058,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.1",
+      "publishedAt": 1769669735547,
+      "commit": "https://github.com/clawdbot/skills/commit/2c6be4b7d205f0a08c8df89e53ae8a1bdb5d2247"
+    },
     {
       "version": "1.1.0",
       "publishedAt": 1769648683521,

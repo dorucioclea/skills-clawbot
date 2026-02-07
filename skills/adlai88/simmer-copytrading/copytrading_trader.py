@@ -14,8 +14,8 @@ Exit handling:
 - SDK Risk Management: Stop-loss/take-profit (generic safety net) - coming soon
 
 Usage:
-    python copytrading_trader.py              # Run copytrading scan (buy only)
-    python copytrading_trader.py --dry-run    # Show what would trade
+    python copytrading_trader.py              # Dry run (show what would trade)
+    python copytrading_trader.py --live       # Execute real trades
     python copytrading_trader.py --positions  # Show current positions
     python copytrading_trader.py --config     # Show configuration
     python copytrading_trader.py --wallets 0x... # Override wallets for this run
@@ -32,12 +32,92 @@ from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
+# Optional: Trade Journal integration for tracking
+try:
+    from tradejournal import log_trade
+    JOURNAL_AVAILABLE = True
+except ImportError:
+    try:
+        # Try relative import within skills package
+        from skills.tradejournal import log_trade
+        JOURNAL_AVAILABLE = True
+    except ImportError:
+        JOURNAL_AVAILABLE = False
+        def log_trade(*args, **kwargs):
+            pass  # No-op if tradejournal not installed
+
+# Source tag for tracking
+TRADE_SOURCE = "sdk:copytrading"
+
 
 # =============================================================================
-# Configuration
+# Configuration (config.json > env vars > defaults)
 # =============================================================================
 
-# Environment variables
+def _load_config(schema, skill_file, config_filename="config.json"):
+    """Load config with priority: config.json > env vars > defaults."""
+    from pathlib import Path
+    config_path = Path(skill_file).parent / config_filename
+    file_cfg = {}
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                file_cfg = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    result = {}
+    for key, spec in schema.items():
+        if key in file_cfg:
+            result[key] = file_cfg[key]
+        elif spec.get("env") and os.environ.get(spec["env"]):
+            val = os.environ.get(spec["env"])
+            type_fn = spec.get("type", str)
+            try:
+                result[key] = type_fn(val) if type_fn != str else val
+            except (ValueError, TypeError):
+                result[key] = spec.get("default")
+        else:
+            result[key] = spec.get("default")
+    return result
+
+def _get_config_path(skill_file, config_filename="config.json"):
+    """Get path to config file."""
+    from pathlib import Path
+    return Path(skill_file).parent / config_filename
+
+def _update_config(updates, skill_file, config_filename="config.json"):
+    """Update config values and save to file."""
+    from pathlib import Path
+    config_path = Path(skill_file).parent / config_filename
+    existing = {}
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    existing.update(updates)
+    with open(config_path, "w") as f:
+        json.dump(existing, f, indent=2)
+    return existing
+
+# Aliases for compatibility
+load_config = _load_config
+get_config_path = _get_config_path
+update_config = _update_config
+
+# Configuration schema
+CONFIG_SCHEMA = {
+    "wallets": {"env": "SIMMER_COPYTRADING_WALLETS", "default": "", "type": str},
+    "top_n": {"env": "SIMMER_COPYTRADING_TOP_N", "default": "", "type": str},  # Empty = auto
+    "max_usd": {"env": "SIMMER_COPYTRADING_MAX_USD", "default": 50.0, "type": float},
+    "max_trades_per_run": {"env": "SIMMER_COPYTRADING_MAX_TRADES", "default": 10, "type": int},
+}
+
+# Load configuration
+_config = load_config(CONFIG_SCHEMA, __file__)
+
+# Environment variables (API key still from env for security)
 SIMMER_API_KEY = os.environ.get("SIMMER_API_KEY", "")
 SIMMER_API_URL = os.environ.get("SIMMER_API_URL", "https://api.simmer.markets")
 
@@ -45,11 +125,11 @@ SIMMER_API_URL = os.environ.get("SIMMER_API_URL", "https://api.simmer.markets")
 MIN_SHARES_PER_ORDER = 5.0  # Polymarket requires minimum 5 shares
 MIN_TICK_SIZE = 0.01        # Minimum price increment
 
-# Copytrading settings
-COPYTRADING_WALLETS = os.environ.get("SIMMER_COPYTRADING_WALLETS", "")
-COPYTRADING_TOP_N = os.environ.get("SIMMER_COPYTRADING_TOP_N", "")  # Empty = auto
-COPYTRADING_MAX_USD = float(os.environ.get("SIMMER_COPYTRADING_MAX_USD", "50"))
-MAX_TRADES_PER_RUN = int(os.environ.get("SIMMER_COPYTRADING_MAX_TRADES", "10"))  # Max trades per scan cycle
+# Copytrading settings - from config
+COPYTRADING_WALLETS = _config["wallets"]
+COPYTRADING_TOP_N = _config["top_n"]
+COPYTRADING_MAX_USD = _config["max_usd"]
+MAX_TRADES_PER_RUN = _config["max_trades_per_run"]
 
 
 def get_config() -> dict:
@@ -70,6 +150,7 @@ def get_config() -> dict:
 def print_config():
     """Print current configuration."""
     config = get_config()
+    config_path = get_config_path(__file__)
 
     print("\n🐋 Simmer Copytrading Configuration")
     print("=" * 40)
@@ -84,6 +165,12 @@ def print_config():
     print(f"\nSettings:")
     print(f"  Top N: {config['top_n'] if config['top_n'] else 'auto (based on balance)'}")
     print(f"  Max per position: ${config['max_position_usd']:.2f}")
+    print(f"\nConfig file: {config_path}")
+    print(f"Config exists: {'Yes' if config_path.exists() else 'No'}")
+    print("\nTo change settings:")
+    print("  --set wallets=0x123...,0x456...")
+    print("  --set max_usd=100")
+    print("  --set top_n=10")
     print()
 
 
@@ -207,7 +294,7 @@ def fetch_wallet_positions(wallet: str) -> list:
     return []
 
 
-def execute_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry_run: bool = False, buy_only: bool = True, detect_whale_exits: bool = False, max_trades: int = None) -> dict:
+def execute_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry_run: bool = True, buy_only: bool = True, detect_whale_exits: bool = False, max_trades: int = None) -> dict:
     """
     Execute copytrading via Simmer SDK.
 
@@ -239,7 +326,7 @@ def execute_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0,
     return api_request("POST", "/api/sdk/copytrading/execute", data)
 
 
-def run_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry_run: bool = False, buy_only: bool = True, detect_whale_exits: bool = False):
+def run_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry_run: bool = True, buy_only: bool = True, detect_whale_exits: bool = False):
     """
     Run copytrading scan and execute trades.
 
@@ -276,7 +363,7 @@ def run_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry
     print(f"  Whale exits: {'Enabled (sell when whale exits)' if detect_whale_exits else 'Disabled'}")
 
     if dry_run:
-        print("\n🔒 DRY RUN MODE - No trades will be executed")
+        print("\n  [DRY RUN] No trades will be executed. Use --live to enable trading.")
 
     # Execute copytrading via SDK
     print("\n📡 Calling Simmer API...")
@@ -339,26 +426,27 @@ def run_copytrading(wallets: list, top_n: int = None, max_usd: float = 50.0, dry
         print("\n💡 Remove --dry-run to execute trades")
     elif trades_executed > 0:
         print(f"\n✅ Successfully mirrored positions!")
-        
-        # Set risk monitors for executed BUY trades
-        risk_monitors_set = 0
-        risk_monitor_errors = 0
-        for t in trades:
-            if t.get('success') and t.get('action') == 'buy':
-                market_id = t.get('market_id')
-                side = t.get('side', 'yes')
-                if market_id:
-                    risk_result = set_risk_monitor(market_id, side,
-                                                   stop_loss_pct=0.25, take_profit_pct=0.50)
-                    if risk_result and risk_result.get('error'):
-                        risk_monitor_errors += 1
-                    elif risk_result and risk_result.get('success'):
-                        risk_monitors_set += 1
 
-        if risk_monitors_set > 0:
-            print(f"🛡️  Risk monitors set: {risk_monitors_set} positions (SL -25% / TP +50%)")
-        if risk_monitor_errors > 0:
-            print(f"⚠️  Risk monitor errors: {risk_monitor_errors} (check API key/permissions)")
+        # Log successful trades to journal
+        # Risk monitors are now auto-set via SDK settings (dashboard)
+        for t in trades:
+            if t.get('success'):
+                trade_id = t.get('trade_id')
+                action = t.get('action', 'buy')
+                side = t.get('side', 'yes')
+                shares = t.get('shares', 0)
+                price = t.get('estimated_price', 0)
+
+                # Log trade context for journal
+                if trade_id and JOURNAL_AVAILABLE:
+                    log_trade(
+                        trade_id=trade_id,
+                        source=TRADE_SOURCE,
+                        thesis=f"Copytrading: {action.upper()} {shares:.1f} {side.upper()} "
+                               f"@ ${price:.3f} to mirror whale positions",
+                        action=action,
+                        wallets_count=len(wallets),
+                    )
     else:
         print("\n✅ Scan complete")
 
@@ -426,9 +514,14 @@ def main():
         description="Simmer Copytrading - Mirror positions from Polymarket whales"
     )
     parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Execute real trades (default is dry-run)"
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would trade without executing"
+        help="(Default) Show what would trade without executing"
     )
     parser.add_argument(
         "--positions",
@@ -465,8 +558,38 @@ def main():
         action="store_true",
         help="Sell positions when whales exit (only affects copytrading-opened positions)"
     )
+    parser.add_argument(
+        "--set",
+        action="append",
+        metavar="KEY=VALUE",
+        help="Set config value (e.g., --set wallets=0x123,0x456 --set max_usd=100)"
+    )
 
     args = parser.parse_args()
+
+    # Handle --set config updates
+    if args.set:
+        updates = {}
+        for item in args.set:
+            if "=" in item:
+                key, value = item.split("=", 1)
+                if key in CONFIG_SCHEMA:
+                    type_fn = CONFIG_SCHEMA[key].get("type", str)
+                    try:
+                        value = type_fn(value)
+                    except (ValueError, TypeError):
+                        pass
+                updates[key] = value
+        if updates:
+            updated = update_config(updates, __file__)
+            print(f"✅ Config updated: {updates}")
+            print(f"   Saved to: {get_config_path(__file__)}")
+            # Reload config
+            _config = load_config(CONFIG_SCHEMA, __file__)
+            globals()["COPYTRADING_WALLETS"] = _config["wallets"]
+            globals()["COPYTRADING_TOP_N"] = _config["top_n"]
+            globals()["COPYTRADING_MAX_USD"] = _config["max_usd"]
+            globals()["MAX_TRADES_PER_RUN"] = _config["max_trades_per_run"]
 
     # Show config
     if args.config:
@@ -502,12 +625,15 @@ def main():
     # Get max_usd (from args or env)
     max_usd = args.max_usd if args.max_usd else COPYTRADING_MAX_USD
 
+    # Default to dry-run unless --live is explicitly passed
+    dry_run = not args.live
+
     # Run copytrading
     run_copytrading(
         wallets=wallets,
         top_n=top_n,
         max_usd=max_usd,
-        dry_run=args.dry_run,
+        dry_run=dry_run,
         buy_only=not args.rebalance,  # Default buy_only=True, --rebalance sets it to False
         detect_whale_exits=args.whale_exits
     )
