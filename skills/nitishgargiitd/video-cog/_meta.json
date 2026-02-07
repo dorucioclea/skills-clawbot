@@ -3,11 +3,16 @@
   "slug": "video-cog",
   "displayName": "video-cog",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770270333787,
-    "commit": "https://github.com/clawdbot/skills/commit/b6d02a5f2af327594e30c876e36ac44a9f4b8927"
+    "version": "1.0.2",
+    "publishedAt": 1770420071362,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770270333787,
+      "commit": "https://github.com/clawdbot/skills/commit/b6d02a5f2af327594e30c876e36ac44a9f4b8927"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770176494040,
