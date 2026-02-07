@@ -1,0 +1,11 @@
+{
+  "owner": "pes0",
+  "slug": "exchange-2010-ews",
+  "displayName": "Full access to all Exchange 2010 EWS functions, should work with other EWS Open Source",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1770486850479,
+    "commit": null
+  },
+  "history": []
+}
