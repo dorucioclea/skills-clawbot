@@ -16,20 +16,21 @@ Complete guide to building ContextUI workflows. Read this when you're ready to b
 
 ## Core Concepts
 
-### No Imports
-ContextUI dynamically loads your TSX. All dependencies are injected globally. Never write `import React from 'react'` — it will break.
+### No Imports (except local files)
+ContextUI dynamically loads your TSX. React and hooks are injected globally. You CAN import from local `./ui/` sub-components. You CANNOT import from npm packages.
 
 ### Available Globals
 These are available without importing:
-- `React` — Full React library (useState, useEffect, useRef, useMemo, useCallback, etc.)
+- `React` — Full React library
+- `useState`, `useEffect`, `useRef`, `useMemo`, `useCallback`, `useReducer`, `useContext` — Available as bare globals
 - `ReactDOM` — For portals if needed
 - Tailwind CSS — All utility classes available in className
 - `fetch` — For calling Python backends or external APIs
 
 ### File Naming Convention
-- Main component: `WorkflowNameWindow.tsx`
-- Must match folder name: `MyTool/MyToolWindow.tsx`
-- Export default: `export default MyToolWindow`
+- Main component: `WorkflowName.tsx` or `WorkflowNameWindow.tsx` — both work
+- Must match folder name: `MyTool/MyTool.tsx` or `MyTool/MyToolWindow.tsx`
+- Use named export: `export const MyToolWindow: React.FC = () => { ... }`
 
 ---
 
@@ -82,7 +83,7 @@ For ML models, API calls, heavy data processing, or anything that shouldn't run 
 
 ### Quick Summary
 
-1. Copy `ui/ServerLauncher/` (2 files) from the CowsayDemo example into your workflow
+1. Copy `ui/ServerLauncher/` (2 files) from the `examples/KokoroTTS/` example (canonical source) into your workflow
 2. Call `useServerLauncher()` with a simple config
 3. Render `<ServerLauncher server={server} />` for the setup UI
 4. Write your FastAPI backend
@@ -157,36 +158,124 @@ mcporter call contextui.python_list_venvs
 
 ## Multi-File Workflows
 
-For complex workflows, split into multiple components.
+For complex workflows, split into multiple components in a `ui/` folder.
 
 ### Structure
 ```
 MyWorkflow/
-├── MyWorkflowWindow.tsx        # Main entry point
+├── MyWorkflowWindow.tsx        # Main entry — imports from ./ui/
 ├── MyWorkflow.meta.json
 ├── description.txt
-└── components/
-    ├── Header.tsx
-    ├── DataTable.tsx
-    └── Chart.tsx
+├── my_server.py                # Optional Python backend
+└── ui/
+    ├── MyFeatureTab.tsx         # Feature UI (imported by main)
+    ├── SettingsPanel.tsx
+    └── ServerLauncher/          # Copy from examples/KokoroTTS/ui/ServerLauncher/
+        ├── useServerLauncher.ts
+        └── ServerLauncher.tsx
 ```
 
 ### Sub-components
-Sub-components are also loaded without imports. They're available as globals when placed in the same workflow directory.
+Sub-components use the same globals (React, hooks, etc.) and are imported by the main window:
 
 ```tsx
-// components/Header.tsx
-const Header: React.FC<{ title: string }> = ({ title }) => (
-  <div className="p-4 border-b border-slate-700">
-    <h1 className="text-xl font-bold">{title}</h1>
-  </div>
-);
-export default Header;
+// ui/MyFeatureTab.tsx — exported as named export, imported by main window
+
+interface MyFeatureTabProps {
+  serverUrl: string;
+  connected: boolean;
+  addLog?: (msg: string) => void;
+}
+
+export const MyFeatureTab: React.FC<MyFeatureTabProps> = ({ serverUrl, connected, addLog }) => {
+  const [result, setResult] = useState<string>('');
+
+  const doWork = async () => {
+    const res = await fetch(`${serverUrl}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: 'test' }),
+    });
+    const data = await res.json();
+    setResult(data.result);
+    addLog?.(`Got result: ${data.result}`);
+  };
+
+  return (
+    <div className="flex-1 p-4">
+      <button onClick={doWork} className="px-4 py-2 bg-blue-600 text-white rounded">
+        Process
+      </button>
+      {result && <pre className="mt-4 text-sm text-slate-300">{result}</pre>}
+    </div>
+  );
+};
+```
+
+### Main window imports sub-components:
+```tsx
+// MyWorkflowWindow.tsx
+import { useServerLauncher } from './ui/ServerLauncher/useServerLauncher';
+import { ServerLauncher } from './ui/ServerLauncher/ServerLauncher';
+import { MyFeatureTab } from './ui/MyFeatureTab';
 ```
 
 ---
 
 ## Common Patterns
+
+### TypeScript Interfaces
+Define interfaces for your data structures at the top of the file:
+```tsx
+interface ServerStatus {
+  model_ready: boolean;
+  model_loading: boolean;
+  error: string | null;
+}
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+```
+
+### Style Constants
+For consistent styling, define a style object:
+```tsx
+const S = {
+  section: 'bg-slate-900 p-3 rounded-md mb-2.5',
+  btn: 'py-2 px-4 border-none rounded cursor-pointer bg-blue-500 text-white text-[13px]',
+  btnDisabled: 'py-2 px-4 border-none rounded cursor-not-allowed bg-slate-600 text-white text-[13px] opacity-50',
+  input: 'py-1.5 px-2.5 border border-slate-600 rounded bg-[#2a2a2a] text-white text-[13px] w-full',
+};
+```
+
+### Platform Detection
+For cross-platform package compatibility:
+```tsx
+const _isWindows = typeof navigator !== 'undefined'
+  && (navigator.platform?.toLowerCase().includes('win') ?? false);
+
+const IS_MAC = (typeof process !== 'undefined' && process.platform === 'darwin') ||
+  (typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent));
+
+// Use in packages array:
+packages: [
+  'fastapi',
+  _isWindows ? 'uvicorn' : 'uvicorn[standard]',
+  'torch',
+  ...(IS_MAC ? ['mlx-lm'] : []),
+]
+```
+
+### Connection Status Indicator
+```tsx
+<div className={`px-4 py-2 text-xs ${server.connected ? 'text-green-400' : 'text-slate-500'}`}>
+  {server.connected ? '● Connected' : '○ Disconnected'}
+</div>
+```
 
 ### Data Fetching
 ```tsx

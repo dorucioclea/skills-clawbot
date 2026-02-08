@@ -52,6 +52,22 @@ Launch a workflow in the ContextUI app (opens as a docked tab).
 mcporter call contextui.launch_workflow path="/path/to/WorkflowWindow.tsx"
 ```
 
+### close_workflow
+
+Close a workflow tab in the ContextUI app. If no path is provided, closes the currently active tab.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `path` | string | No | Absolute path to the `.tsx` or `.jsx` file to close. Omit to close the active tab. |
+
+```bash
+# Close a specific workflow
+mcporter call contextui.close_workflow path="/path/to/WorkflowWindow.tsx"
+
+# Close the active tab
+mcporter call contextui.close_workflow
+```
+
 ---
 
 ## Python Backend Management
