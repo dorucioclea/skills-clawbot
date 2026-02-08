@@ -1,0 +1,11 @@
+{
+  "owner": "swaylq",
+  "slug": "lambda-lang",
+  "displayName": "Lambda Language",
+  "latest": {
+    "version": "1.5.0",
+    "publishedAt": 1770570436813,
+    "commit": null
+  },
+  "history": []
+}

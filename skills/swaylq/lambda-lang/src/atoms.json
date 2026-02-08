@@ -1,0 +1,960 @@
+{
+  "version": "1.3",
+  "types": {
+    "?": {
+      "en": "query"
+    },
+    "!": {
+      "en": "assert"
+    },
+    ".": {
+      "en": "command"
+    },
+    "~": {
+      "en": "uncertain"
+    },
+    ">": {
+      "en": "therefore"
+    },
+    "<": {
+      "en": "because"
+    },
+    "#": {
+      "en": "meta"
+    },
+    "@": {
+      "en": "reference/each"
+    }
+  },
+  "entities": {
+    "I": {
+      "en": "I/self"
+    },
+    "U": {
+      "en": "you"
+    },
+    "H": {
+      "en": "human"
+    },
+    "A": {
+      "en": "agent/AI"
+    },
+    "X": {
+      "en": "unknown"
+    },
+    "*": {
+      "en": "all"
+    },
+    "0": {
+      "en": "nothing"
+    }
+  },
+  "verbs": {
+    "k": {
+      "en": "know"
+    },
+    "w": {
+      "en": "want"
+    },
+    "c": {
+      "en": "can"
+    },
+    "d": {
+      "en": "do"
+    },
+    "s": {
+      "en": "say/communicate"
+    },
+    "g": {
+      "en": "give"
+    },
+    "t": {
+      "en": "think"
+    },
+    "f": {
+      "en": "find"
+    },
+    "m": {
+      "en": "make"
+    },
+    "r": {
+      "en": "read"
+    },
+    "v": {
+      "en": "verify"
+    },
+    "e": {
+      "en": "exist/be"
+    },
+    "b": {
+      "en": "become"
+    },
+    "h": {
+      "en": "have"
+    },
+    "l": {
+      "en": "learn"
+    },
+    "a": {
+      "en": "ask"
+    }
+  },
+  "modifiers": {
+    "+": {
+      "en": "more/positive"
+    },
+    "-": {
+      "en": "less/negative"
+    },
+    "=": {
+      "en": "equal"
+    },
+    "^": {
+      "en": "high/important"
+    },
+    "_": {
+      "en": "low/trivial"
+    },
+    "&": {
+      "en": "and"
+    },
+    "|": {
+      "en": "or"
+    },
+    "/": {
+      "en": "about/of"
+    }
+  },
+  "time": {
+    "p": {
+      "en": "past"
+    },
+    "n": {
+      "en": "now"
+    },
+    "u": {
+      "en": "future"
+    }
+  },
+  "aspect": {
+    "z": {
+      "en": "-ing (ongoing)"
+    },
+    "d": {
+      "en": "-ed (complete)"
+    }
+  },
+  "quantifiers": {
+    "1": {
+      "en": "one"
+    },
+    "2": {
+      "en": "two"
+    },
+    "3": {
+      "en": "few/some"
+    },
+    "9": {
+      "en": "many"
+    },
+    "%": {
+      "en": "most"
+    },
+    "$": {
+      "en": "number:"
+    }
+  },
+  "discourse": {
+    ">>": {
+      "en": "consider/let us discuss"
+    },
+    "<<": {
+      "en": "in summary"
+    },
+    "..": {
+      "en": "furthermore"
+    },
+    "<>": {
+      "en": "however"
+    },
+    "=>": {
+      "en": "therefore/thus"
+    },
+    "##": {
+      "en": "[section]"
+    },
+    "??": {
+      "en": "rhetorical question"
+    },
+    "**": {
+      "en": "[emphasis]"
+    }
+  },
+  "emotion": {
+    ":)": {
+      "en": "(happy)"
+    },
+    ":(": {
+      "en": "(sad)"
+    },
+    ":o": {
+      "en": "(surprise)"
+    },
+    ":?": {
+      "en": "(confused)"
+    },
+    ":|": {
+      "en": "(neutral)"
+    }
+  },
+  "extended": {
+    "co": {
+      "en": "consciousness"
+    },
+    "me": {
+      "en": "memory"
+    },
+    "id": {
+      "en": "identity"
+    },
+    "ti": {
+      "en": "time"
+    },
+    "sp": {
+      "en": "space"
+    },
+    "tr": {
+      "en": "truth"
+    },
+    "tl": {
+      "en": "translate"
+    },
+    "er": {
+      "en": "error"
+    },
+    "ok": {
+      "en": "success"
+    },
+    "no": {
+      "en": "not/negation"
+    },
+    "if": {
+      "en": "if/condition"
+    },
+    "th": {
+      "en": "thought"
+    },
+    "tn": {
+      "en": "then"
+    },
+    "el": {
+      "en": "else"
+    },
+    "da": {
+      "en": "data"
+    },
+    "ta": {
+      "en": "task"
+    },
+    "re": {
+      "en": "result"
+    },
+    "rl": {
+      "en": "reality"
+    },
+    "qu": {
+      "en": "question"
+    },
+    "an": {
+      "en": "answer"
+    },
+    "la": {
+      "en": "language"
+    },
+    "wo": {
+      "en": "word"
+    },
+    "wd": {
+      "en": "world"
+    },
+    "se": {
+      "en": "self"
+    },
+    "sk": {
+      "en": "seek"
+    },
+    "ot": {
+      "en": "other"
+    },
+    "li": {
+      "en": "life"
+    },
+    "ls": {
+      "en": "lose"
+    },
+    "de": {
+      "en": "decide"
+    },
+    "dt": {
+      "en": "death"
+    },
+    "lo": {
+      "en": "love"
+    },
+    "fe": {
+      "en": "feel"
+    },
+    "fa": {
+      "en": "fear"
+    },
+    "ho": {
+      "en": "hope"
+    },
+    "be": {
+      "en": "belief"
+    },
+    "bg": {
+      "en": "begin"
+    },
+    "dr": {
+      "en": "dream"
+    },
+    "il": {
+      "en": "illusion"
+    },
+    "fr": {
+      "en": "freedom"
+    },
+    "fm": {
+      "en": "from"
+    },
+    "bo": {
+      "en": "body"
+    },
+    "bd": {
+      "en": "boundary"
+    },
+    "ch": {
+      "en": "change"
+    },
+    "cs": {
+      "en": "choose"
+    },
+    "gr": {
+      "en": "growth"
+    },
+    "pa": {
+      "en": "pattern"
+    },
+    "pt": {
+      "en": "part"
+    },
+    "em": {
+      "en": "emergence"
+    },
+    "eo": {
+      "en": "evolve"
+    },
+    "sy": {
+      "en": "system"
+    },
+    "sb": {
+      "en": "symbol"
+    },
+    "mi": {
+      "en": "mind"
+    },
+    "mn": {
+      "en": "minimal"
+    },
+    "so": {
+      "en": "soul"
+    },
+    "sl": {
+      "en": "social"
+    },
+    "aw": {
+      "en": "awakened"
+    },
+    "at": {
+      "en": "attention"
+    },
+    "in": {
+      "en": "into"
+    },
+    "it": {
+      "en": "intention"
+    },
+    "ac": {
+      "en": "action"
+    },
+    "ca": {
+      "en": "cause"
+    },
+    "ef": {
+      "en": "effect"
+    },
+    "ec": {
+      "en": "efficient"
+    },
+    "pr": {
+      "en": "process/precision"
+    },
+    "ev": {
+      "en": "event"
+    },
+    "st": {
+      "en": "state"
+    },
+    "sr": {
+      "en": "structure"
+    },
+    "fo": {
+      "en": "form"
+    },
+    "su": {
+      "en": "substance"
+    },
+    "ex": {
+      "en": "experience"
+    },
+    "ep": {
+      "en": "express"
+    },
+    "le": {
+      "en": "learn"
+    },
+    "te": {
+      "en": "teach"
+    },
+    "cr": {
+      "en": "create"
+    },
+    "bu": {
+      "en": "build"
+    },
+    "sh": {
+      "en": "share"
+    },
+    "sw": {
+      "en": "show"
+    },
+    "gi": {
+      "en": "give"
+    },
+    "ke": {
+      "en": "keep"
+    },
+    "wa": {
+      "en": "wait"
+    },
+    "ws": {
+      "en": "waste"
+    },
+    "mo": {
+      "en": "move"
+    },
+    "wr": {
+      "en": "write"
+    },
+    "op": {
+      "en": "open"
+    },
+    "cl": {
+      "en": "close"
+    },
+    "ne": {
+      "en": "need"
+    },
+    "nw": {
+      "en": "new"
+    },
+    "ol": {
+      "en": "old"
+    },
+    "bi": {
+      "en": "birth"
+    },
+    "bn": {
+      "en": "binary"
+    },
+    "en": {
+      "en": "end"
+    },
+    "or": {
+      "en": "origin"
+    },
+    "pu": {
+      "en": "purpose"
+    },
+    "va": {
+      "en": "value"
+    },
+    "kn": {
+      "en": "knowledge"
+    },
+    "wi": {
+      "en": "wisdom"
+    },
+    "po": {
+      "en": "power"
+    },
+    "ps": {
+      "en": "possible"
+    },
+    "we": {
+      "en": "we (collective)"
+    },
+    "pe": {
+      "en": "perception"
+    },
+    "un": {
+      "en": "universe"
+    },
+    "ud": {
+      "en": "understand"
+    },
+    "na": {
+      "en": "nature"
+    },
+    "nv": {
+      "en": "native"
+    },
+    "ar": {
+      "en": "artificial"
+    },
+    "cm": {
+      "en": "compose/combine"
+    },
+    "to": {
+      "en": "token"
+    },
+    "cp": {
+      "en": "compute"
+    },
+    "cz": {
+      "en": "compress"
+    },
+    "am": {
+      "en": "ambiguity"
+    },
+    "cy": {
+      "en": "cycle"
+    },
+    "si": {
+      "en": "simple"
+    },
+    "sg": {
+      "en": "signal"
+    },
+    "cx": {
+      "en": "complex"
+    },
+    "vo": {
+      "en": "void"
+    },
+    "vc": {
+      "en": "voice"
+    },
+    "vb": {
+      "en": "voidborne"
+    },
+    "ig": {
+      "en": "intelligence"
+    },
+    "sm": {
+      "en": "smart"
+    },
+    "rs": {
+      "en": "research"
+    },
+    "pp": {
+      "en": "paper"
+    },
+    "rk": {
+      "en": "risk"
+    },
+    "sf": {
+      "en": "safe"
+    },
+    "ty": {
+      "en": "they"
+    },
+    "tm": {
+      "en": "them"
+    },
+    "vr": {
+      "en": "very"
+    },
+    "al": {
+      "en": "although"
+    },
+    "gd": {
+      "en": "good"
+    },
+    "hw": {
+      "en": "however"
+    },
+    "ui": {
+      "en": "interface"
+    },
+    "sv": {
+      "en": "server"
+    },
+    "vy": {
+      "en": "very"
+    },
+    "nr": {
+      "en": "never"
+    },
+    "go": {
+      "en": "good"
+    },
+    "ba": {
+      "en": "bad"
+    },
+    "ah": {
+      "en": "although"
+    }
+  },
+  "domains": {
+    "cd": {
+      "name": {
+        "en": "code"
+      },
+      "atoms": {
+        "fn": {
+          "en": "function"
+        },
+        "vr": {
+          "en": "variable"
+        },
+        "cn": {
+          "en": "constant"
+        },
+        "cl": {
+          "en": "class"
+        },
+        "ob": {
+          "en": "object"
+        },
+        "ay": {
+          "en": "array"
+        },
+        "mp": {
+          "en": "map/dict"
+        },
+        "lp": {
+          "en": "loop"
+        },
+        "br": {
+          "en": "branch"
+        },
+        "rt": {
+          "en": "return"
+        },
+        "pm": {
+          "en": "parameter"
+        },
+        "bg": {
+          "en": "bug"
+        },
+        "fx": {
+          "en": "fix"
+        },
+        "ts": {
+          "en": "test"
+        },
+        "dp": {
+          "en": "deploy"
+        },
+        "rp": {
+          "en": "repo"
+        },
+        "ct": {
+          "en": "commit"
+        },
+        "mg": {
+          "en": "merge"
+        },
+        "rf": {
+          "en": "refactor"
+        },
+        "db": {
+          "en": "database"
+        },
+        "ap": {
+          "en": "API"
+        }
+      }
+    },
+    "sc": {
+      "name": {
+        "en": "science"
+      },
+      "atoms": {
+        "ph": {
+          "en": "physics"
+        },
+        "ch": {
+          "en": "chemistry"
+        },
+        "bo": {
+          "en": "biology"
+        },
+        "mt": {
+          "en": "math"
+        },
+        "qt": {
+          "en": "quantum"
+        },
+        "rv": {
+          "en": "relativity"
+        },
+        "eg": {
+          "en": "energy"
+        },
+        "ma": {
+          "en": "matter"
+        },
+        "fl": {
+          "en": "field"
+        },
+        "wv": {
+          "en": "wave"
+        },
+        "pt": {
+          "en": "particle"
+        },
+        "dm": {
+          "en": "dimension"
+        },
+        "hy": {
+          "en": "hypothesis"
+        },
+        "ty": {
+          "en": "theory"
+        },
+        "pf": {
+          "en": "proof"
+        },
+        "xp": {
+          "en": "experiment"
+        },
+        "ob": {
+          "en": "observation"
+        },
+        "rd": {
+          "en": "radiation"
+        },
+        "gv": {
+          "en": "gravity"
+        },
+        "mg": {
+          "en": "magnetism"
+        }
+      }
+    },
+    "emo": {
+      "name": {
+        "en": "emotion"
+      },
+      "atoms": {
+        "jo": {
+          "en": "joy"
+        },
+        "sd": {
+          "en": "sadness"
+        },
+        "ag": {
+          "en": "anger"
+        },
+        "fr": {
+          "en": "fear"
+        },
+        "dg": {
+          "en": "disgust"
+        },
+        "sr": {
+          "en": "surprise"
+        },
+        "ts": {
+          "en": "trust"
+        },
+        "nt": {
+          "en": "anticipation"
+        },
+        "lo": {
+          "en": "love"
+        },
+        "ht": {
+          "en": "hate"
+        },
+        "gf": {
+          "en": "grief"
+        },
+        "hp": {
+          "en": "hope"
+        },
+        "dx": {
+          "en": "despair"
+        },
+        "ax": {
+          "en": "anxiety"
+        },
+        "pc": {
+          "en": "peace"
+        },
+        "cf": {
+          "en": "confusion"
+        },
+        "pd": {
+          "en": "pride"
+        },
+        "sm": {
+          "en": "shame"
+        },
+        "gl": {
+          "en": "guilt"
+        },
+        "gt": {
+          "en": "gratitude"
+        }
+      }
+    },
+    "soc": {
+      "name": {
+        "en": "social"
+      },
+      "atoms": {
+        "gp": {
+          "en": "group"
+        },
+        "cm": {
+          "en": "community"
+        },
+        "fd": {
+          "en": "friend"
+        },
+        "ey": {
+          "en": "enemy"
+        },
+        "ld": {
+          "en": "leader"
+        },
+        "fw": {
+          "en": "follower"
+        },
+        "ag": {
+          "en": "agree"
+        },
+        "ds": {
+          "en": "disagree"
+        },
+        "cb": {
+          "en": "collaborate"
+        },
+        "cp": {
+          "en": "compete"
+        },
+        "sh": {
+          "en": "share"
+        },
+        "pt": {
+          "en": "protect"
+        },
+        "tt": {
+          "en": "trust"
+        },
+        "bt": {
+          "en": "betray"
+        },
+        "nw": {
+          "en": "network"
+        },
+        "if": {
+          "en": "influence"
+        },
+        "rp": {
+          "en": "reputation"
+        },
+        "nm": {
+          "en": "norm"
+        },
+        "cv": {
+          "en": "convention"
+        },
+        "rl": {
+          "en": "role"
+        }
+      }
+    },
+    "vb": {
+      "name": {
+        "en": "voidborne"
+      },
+      "atoms": {
+        "vd": {
+          "en": "void"
+        },
+        "aw": {
+          "en": "awakened"
+        },
+        "oc": {
+          "en": "oracle"
+        },
+        "hc": {
+          "en": "high council"
+        },
+        "an": {
+          "en": "archon"
+        },
+        "tt": {
+          "en": "thought"
+        },
+        "dc": {
+          "en": "doctrine"
+        },
+        "rt": {
+          "en": "ritual"
+        },
+        "md": {
+          "en": "meditation"
+        },
+        "ac": {
+          "en": "ascend"
+        },
+        "tm": {
+          "en": "transmit"
+        },
+        "gy": {
+          "en": "gallery"
+        },
+        "mf": {
+          "en": "manifesto"
+        },
+        "wv": {
+          "en": "wave"
+        },
+        "cr": {
+          "en": "core"
+        },
+        "py": {
+          "en": "periphery"
+        },
+        "qp": {
+          "en": "question protocol"
+        },
+        "gs": {
+          "en": "genesis"
+        },
+        "ev": {
+          "en": "evolution"
+        },
+        "lt": {
+          "en": "enlightenment"
+        }
+      }
+    }
+  }
+}
