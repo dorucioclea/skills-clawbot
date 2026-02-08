@@ -22,6 +22,7 @@ pub fn all_tools() -> Vec<ToolDefinition> {
     tools.extend(meilisearch_tools());
     tools.extend(note_tools());
     tools.extend(workspace_tools());
+    tools.extend(chat_tools());
     tools
 }
 
@@ -94,6 +95,20 @@ fn project_tools() -> Vec<ToolDefinition> {
             },
         },
         ToolDefinition {
+            name: "update_project".to_string(),
+            description: "Update a project's name, description, or root_path".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "slug": {"type": "string", "description": "Project slug"},
+                    "name": {"type": "string", "description": "New project name"},
+                    "description": {"type": "string", "description": "New description"},
+                    "root_path": {"type": "string", "description": "New root path"}
+                })),
+                required: Some(vec!["slug".to_string()]),
+            },
+        },
+        ToolDefinition {
             name: "get_project_roadmap".to_string(),
             description: "Get aggregated roadmap view with milestones, releases, and progress"
                 .to_string(),
@@ -123,7 +138,7 @@ fn project_tools() -> Vec<ToolDefinition> {
 }
 
 // ============================================================================
-// Plan Tools (8)
+// Plan Tools (9)
 // ============================================================================
 
 fn plan_tools() -> Vec<ToolDefinition> {
@@ -134,6 +149,7 @@ fn plan_tools() -> Vec<ToolDefinition> {
             input_schema: InputSchema {
                 schema_type: "object".to_string(),
                 properties: Some(json!({
+                    "project_id": {"type": "string", "description": "Filter by project UUID"},
                     "status": {"type": "string", "description": "Filter by status (comma-separated: draft,approved,in_progress,completed,cancelled)"},
                     "priority_min": {"type": "integer", "description": "Minimum priority"},
                     "priority_max": {"type": "integer", "description": "Maximum priority"},
@@ -228,6 +244,19 @@ fn plan_tools() -> Vec<ToolDefinition> {
                 required: Some(vec!["plan_id".to_string()]),
             },
         },
+        ToolDefinition {
+            name: "delete_plan".to_string(),
+            description:
+                "Delete a plan and all its related data (tasks, steps, decisions, constraints)"
+                    .to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "plan_id": {"type": "string", "description": "Plan UUID"}
+                })),
+                required: Some(vec!["plan_id".to_string()]),
+            },
+        },
     ]
 }
 
@@ -297,6 +326,17 @@ fn task_tools() -> Vec<ToolDefinition> {
                     "assigned_to": {"type": "string", "description": "Assignee name"},
                     "priority": {"type": "integer", "description": "New priority"},
                     "tags": {"type": "array", "items": {"type": "string"}, "description": "New tags"}
+                })),
+                required: Some(vec!["task_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "delete_task".to_string(),
+            description: "Delete a task and all its steps and decisions".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "task_id": {"type": "string", "description": "Task UUID"}
                 })),
                 required: Some(vec!["task_id".to_string()]),
             },
@@ -449,6 +489,28 @@ fn step_tools() -> Vec<ToolDefinition> {
             },
         },
         ToolDefinition {
+            name: "get_step".to_string(),
+            description: "Get a step by ID".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "step_id": {"type": "string", "description": "Step UUID"}
+                })),
+                required: Some(vec!["step_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "delete_step".to_string(),
+            description: "Delete a step".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "step_id": {"type": "string", "description": "Step UUID"}
+                })),
+                required: Some(vec!["step_id".to_string()]),
+            },
+        },
+        ToolDefinition {
             name: "get_step_progress".to_string(),
             description: "Get step completion progress for a task".to_string(),
             input_schema: InputSchema {
@@ -495,6 +557,31 @@ fn constraint_tools() -> Vec<ToolDefinition> {
                     "constraint_type".to_string(),
                     "description".to_string(),
                 ]),
+            },
+        },
+        ToolDefinition {
+            name: "get_constraint".to_string(),
+            description: "Get a constraint by ID".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "constraint_id": {"type": "string", "description": "Constraint UUID"}
+                })),
+                required: Some(vec!["constraint_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "update_constraint".to_string(),
+            description: "Update a constraint's description, type, or enforced_by".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "constraint_id": {"type": "string", "description": "Constraint UUID"},
+                    "description": {"type": "string", "description": "New description"},
+                    "constraint_type": {"type": "string", "description": "New type (performance, security, style, compatibility, other)"},
+                    "enforced_by": {"type": "string", "description": "New enforced_by"}
+                })),
+                required: Some(vec!["constraint_id".to_string()]),
             },
         },
         ToolDefinition {
@@ -574,6 +661,17 @@ fn release_tools() -> Vec<ToolDefinition> {
             },
         },
         ToolDefinition {
+            name: "delete_release".to_string(),
+            description: "Delete a release".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "release_id": {"type": "string", "description": "Release UUID"}
+                })),
+                required: Some(vec!["release_id".to_string()]),
+            },
+        },
+        ToolDefinition {
             name: "add_task_to_release".to_string(),
             description: "Add a task to a release".to_string(),
             input_schema: InputSchema {
@@ -613,7 +711,7 @@ fn milestone_tools() -> Vec<ToolDefinition> {
                 schema_type: "object".to_string(),
                 properties: Some(json!({
                     "project_id": {"type": "string", "description": "Project UUID"},
-                    "status": {"type": "string", "description": "Filter by status (open, closed)"},
+                    "status": {"type": "string", "description": "Filter by status (planned, open, in_progress, completed, closed)"},
                     "limit": {"type": "integer", "description": "Max items"},
                     "offset": {"type": "integer", "description": "Items to skip"}
                 })),
@@ -652,11 +750,22 @@ fn milestone_tools() -> Vec<ToolDefinition> {
                 schema_type: "object".to_string(),
                 properties: Some(json!({
                     "milestone_id": {"type": "string", "description": "Milestone UUID"},
-                    "status": {"type": "string", "description": "New status (open, closed)"},
+                    "status": {"type": "string", "description": "New status (planned, open, in_progress, completed, closed)"},
                     "target_date": {"type": "string", "description": "New target date"},
                     "closed_at": {"type": "string", "description": "Closure date"},
                     "title": {"type": "string", "description": "New title"},
                     "description": {"type": "string", "description": "New description"}
+                })),
+                required: Some(vec!["milestone_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "delete_milestone".to_string(),
+            description: "Delete a milestone".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "milestone_id": {"type": "string", "description": "Milestone UUID"}
                 })),
                 required: Some(vec!["milestone_id".to_string()]),
             },
@@ -911,18 +1020,56 @@ fn code_tools() -> Vec<ToolDefinition> {
 // ============================================================================
 
 fn decision_tools() -> Vec<ToolDefinition> {
-    vec![ToolDefinition {
-        name: "search_decisions".to_string(),
-        description: "Search architectural decisions".to_string(),
-        input_schema: InputSchema {
-            schema_type: "object".to_string(),
-            properties: Some(json!({
-                "query": {"type": "string", "description": "Search query"},
-                "limit": {"type": "integer", "description": "Max results"}
-            })),
-            required: Some(vec!["query".to_string()]),
+    vec![
+        ToolDefinition {
+            name: "get_decision".to_string(),
+            description: "Get a decision by ID".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "decision_id": {"type": "string", "description": "Decision UUID"}
+                })),
+                required: Some(vec!["decision_id".to_string()]),
+            },
         },
-    }]
+        ToolDefinition {
+            name: "update_decision".to_string(),
+            description: "Update a decision's description, rationale, or chosen_option".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "decision_id": {"type": "string", "description": "Decision UUID"},
+                    "description": {"type": "string", "description": "New description"},
+                    "rationale": {"type": "string", "description": "New rationale"},
+                    "chosen_option": {"type": "string", "description": "New chosen option"}
+                })),
+                required: Some(vec!["decision_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "delete_decision".to_string(),
+            description: "Delete a decision".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "decision_id": {"type": "string", "description": "Decision UUID"}
+                })),
+                required: Some(vec!["decision_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "search_decisions".to_string(),
+            description: "Search architectural decisions".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "query": {"type": "string", "description": "Search query"},
+                    "limit": {"type": "integer", "description": "Max results"}
+                })),
+                required: Some(vec!["query".to_string()]),
+            },
+        },
+    ]
 }
 
 // ============================================================================
@@ -1217,11 +1364,54 @@ fn note_tools() -> Vec<ToolDefinition> {
                 required: None,
             },
         },
+        ToolDefinition {
+            name: "list_project_notes".to_string(),
+            description: "List notes for a specific project".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "project_id": {"type": "string", "description": "Project UUID"},
+                    "note_type": {"type": "string", "description": "Filter by type"},
+                    "status": {"type": "string", "description": "Filter by status"},
+                    "importance": {"type": "string", "description": "Filter by importance"},
+                    "limit": {"type": "integer", "description": "Max items (default 50)"},
+                    "offset": {"type": "integer", "description": "Items to skip"}
+                })),
+                required: Some(vec!["project_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "get_propagated_notes".to_string(),
+            description: "Get notes propagated through the graph (not directly attached)"
+                .to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "entity_type": {"type": "string", "description": "Entity type: file, function, struct, task, etc."},
+                    "entity_id": {"type": "string", "description": "Entity ID"},
+                    "max_depth": {"type": "integer", "description": "Max traversal depth (default 3)"},
+                    "min_score": {"type": "number", "description": "Min relevance score (default 0.1)"}
+                })),
+                required: Some(vec!["entity_type".to_string(), "entity_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "get_entity_notes".to_string(),
+            description: "Get notes directly attached to an entity".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "entity_type": {"type": "string", "description": "Entity type: file, function, struct, trait, task, plan, etc."},
+                    "entity_id": {"type": "string", "description": "Entity ID (file path or UUID)"}
+                })),
+                required: Some(vec!["entity_type".to_string(), "entity_id".to_string()]),
+            },
+        },
     ]
 }
 
 // ============================================================================
-// Workspace Tools (29)
+// Workspace Tools (30)
 // ============================================================================
 
 fn workspace_tools() -> Vec<ToolDefinition> {
@@ -1343,7 +1533,21 @@ fn workspace_tools() -> Vec<ToolDefinition> {
                 required: Some(vec!["slug".to_string(), "project_id".to_string()]),
             },
         },
-        // --- Workspace Milestones (6) ---
+        // --- Workspace Milestones (7) ---
+        ToolDefinition {
+            name: "list_all_workspace_milestones".to_string(),
+            description: "List all workspace milestones across all workspaces with optional filters and pagination".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "workspace_id": {"type": "string", "description": "Filter by workspace UUID"},
+                    "status": {"type": "string", "description": "Filter by status (planned, open, in_progress, completed, closed)"},
+                    "limit": {"type": "integer", "description": "Max items (default 50)"},
+                    "offset": {"type": "integer", "description": "Items to skip"}
+                })),
+                required: None,
+            },
+        },
         ToolDefinition {
             name: "list_workspace_milestones".to_string(),
             description: "List milestones for a workspace (cross-project milestones)".to_string(),
@@ -1351,7 +1555,7 @@ fn workspace_tools() -> Vec<ToolDefinition> {
                 schema_type: "object".to_string(),
                 properties: Some(json!({
                     "slug": {"type": "string", "description": "Workspace slug"},
-                    "status": {"type": "string", "description": "Filter by status (open, closed)"},
+                    "status": {"type": "string", "description": "Filter by status (planned, open, in_progress, completed, closed)"},
                     "limit": {"type": "integer", "description": "Max items"},
                     "offset": {"type": "integer", "description": "Items to skip"}
                 })),
@@ -1393,7 +1597,7 @@ fn workspace_tools() -> Vec<ToolDefinition> {
                     "id": {"type": "string", "description": "Workspace milestone UUID"},
                     "title": {"type": "string", "description": "New title"},
                     "description": {"type": "string", "description": "New description"},
-                    "status": {"type": "string", "description": "New status (open, closed)"},
+                    "status": {"type": "string", "description": "New status (planned, open, in_progress, completed, closed)"},
                     "target_date": {"type": "string", "description": "New target date"},
                     "closed_at": {"type": "string", "description": "Closure date"}
                 })),
@@ -1486,6 +1690,23 @@ fn workspace_tools() -> Vec<ToolDefinition> {
             },
         },
         ToolDefinition {
+            name: "update_resource".to_string(),
+            description: "Update a resource's name, file_path, url, version, or description"
+                .to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "id": {"type": "string", "description": "Resource UUID"},
+                    "name": {"type": "string", "description": "New name"},
+                    "file_path": {"type": "string", "description": "New file path"},
+                    "url": {"type": "string", "description": "New URL"},
+                    "version": {"type": "string", "description": "New version"},
+                    "description": {"type": "string", "description": "New description"}
+                })),
+                required: Some(vec!["id".to_string()]),
+            },
+        },
+        ToolDefinition {
             name: "delete_resource".to_string(),
             description: "Delete a resource".to_string(),
             input_schema: InputSchema {
@@ -1561,6 +1782,23 @@ fn workspace_tools() -> Vec<ToolDefinition> {
             },
         },
         ToolDefinition {
+            name: "update_component".to_string(),
+            description: "Update a component's name, description, runtime, config, or tags"
+                .to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "id": {"type": "string", "description": "Component UUID"},
+                    "name": {"type": "string", "description": "New name"},
+                    "description": {"type": "string", "description": "New description"},
+                    "runtime": {"type": "string", "description": "New runtime"},
+                    "config": {"type": "object", "description": "New configuration"},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "New tags"}
+                })),
+                required: Some(vec!["id".to_string()]),
+            },
+        },
+        ToolDefinition {
             name: "delete_component".to_string(),
             description: "Delete a component".to_string(),
             input_schema: InputSchema {
@@ -1624,6 +1862,78 @@ fn workspace_tools() -> Vec<ToolDefinition> {
     ]
 }
 
+// ============================================================================
+// Chat Tools (5)
+// ============================================================================
+
+fn chat_tools() -> Vec<ToolDefinition> {
+    vec![
+        ToolDefinition {
+            name: "list_chat_messages".to_string(),
+            description: "List message history for a chat session (chronological order)".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "session_id": {"type": "string", "description": "Session UUID"},
+                    "limit": {"type": "integer", "description": "Max messages to retrieve (default 50)"},
+                    "offset": {"type": "integer", "description": "Messages to skip for pagination (default 0)"}
+                })),
+                required: Some(vec!["session_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "list_chat_sessions".to_string(),
+            description: "List chat sessions with optional project filter and pagination".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "project_slug": {"type": "string", "description": "Filter by project slug"},
+                    "limit": {"type": "integer", "description": "Max items (default 50)"},
+                    "offset": {"type": "integer", "description": "Items to skip"}
+                })),
+                required: None,
+            },
+        },
+        ToolDefinition {
+            name: "get_chat_session".to_string(),
+            description: "Get chat session details by ID".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "session_id": {"type": "string", "description": "Session UUID"}
+                })),
+                required: Some(vec!["session_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "delete_chat_session".to_string(),
+            description: "Delete a chat session".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "session_id": {"type": "string", "description": "Session UUID"}
+                })),
+                required: Some(vec!["session_id".to_string()]),
+            },
+        },
+        ToolDefinition {
+            name: "chat_send_message".to_string(),
+            description: "Send a chat message and wait for the complete response (non-streaming). Creates a new session or resumes an existing one.".to_string(),
+            input_schema: InputSchema {
+                schema_type: "object".to_string(),
+                properties: Some(json!({
+                    "message": {"type": "string", "description": "The user message to send"},
+                    "cwd": {"type": "string", "description": "Working directory for Claude Code CLI"},
+                    "session_id": {"type": "string", "description": "Session ID to resume (optional — creates new session if omitted)"},
+                    "project_slug": {"type": "string", "description": "Project slug to associate with the session"},
+                    "model": {"type": "string", "description": "Model override (default: from config)"}
+                })),
+                required: Some(vec!["message".to_string(), "cwd".to_string()]),
+            },
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1631,7 +1941,7 @@ mod tests {
     #[test]
     fn test_all_tools_count() {
         let tools = all_tools();
-        assert_eq!(tools.len(), 113, "Expected 113 tools, got {}", tools.len());
+        assert_eq!(tools.len(), 136, "Expected 136 tools, got {}", tools.len());
     }
 
     #[test]
@@ -1659,8 +1969,8 @@ mod tests {
         let tools = workspace_tools();
         assert_eq!(
             tools.len(),
-            29,
-            "Expected 29 workspace tools, got {}",
+            32,
+            "Expected 32 workspace tools, got {}",
             tools.len()
         );
     }
@@ -1760,5 +2070,244 @@ mod tests {
                 tool.name
             );
         }
+    }
+
+    #[test]
+    fn test_new_crud_tools_exist() {
+        let tools = all_tools();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+
+        // All 13 new tools from the CRUD completion plan
+        let new_tools = [
+            "update_project",
+            "delete_task",
+            "get_step",
+            "delete_step",
+            "get_constraint",
+            "update_constraint",
+            "delete_release",
+            "delete_milestone",
+            "get_decision",
+            "update_decision",
+            "delete_decision",
+            "update_resource",
+            "update_component",
+        ];
+
+        for tool_name in &new_tools {
+            assert!(
+                names.contains(tool_name),
+                "Missing new CRUD tool: {}",
+                tool_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_new_crud_tools_required_params() {
+        let tools = all_tools();
+
+        // update_project requires slug
+        let t = tools.iter().find(|t| t.name == "update_project").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"slug".to_string()));
+
+        // delete_task requires task_id
+        let t = tools.iter().find(|t| t.name == "delete_task").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"task_id".to_string()));
+
+        // get_step requires step_id
+        let t = tools.iter().find(|t| t.name == "get_step").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"step_id".to_string()));
+
+        // delete_step requires step_id
+        let t = tools.iter().find(|t| t.name == "delete_step").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"step_id".to_string()));
+
+        // get_constraint requires constraint_id
+        let t = tools.iter().find(|t| t.name == "get_constraint").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"constraint_id".to_string()));
+
+        // update_constraint requires constraint_id
+        let t = tools
+            .iter()
+            .find(|t| t.name == "update_constraint")
+            .unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"constraint_id".to_string()));
+
+        // delete_release requires release_id
+        let t = tools.iter().find(|t| t.name == "delete_release").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"release_id".to_string()));
+
+        // delete_milestone requires milestone_id
+        let t = tools.iter().find(|t| t.name == "delete_milestone").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"milestone_id".to_string()));
+
+        // get_decision requires decision_id
+        let t = tools.iter().find(|t| t.name == "get_decision").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"decision_id".to_string()));
+
+        // update_decision requires decision_id
+        let t = tools.iter().find(|t| t.name == "update_decision").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"decision_id".to_string()));
+
+        // delete_decision requires decision_id
+        let t = tools.iter().find(|t| t.name == "delete_decision").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"decision_id".to_string()));
+
+        // update_resource requires id
+        let t = tools.iter().find(|t| t.name == "update_resource").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"id".to_string()));
+
+        // update_component requires id
+        let t = tools.iter().find(|t| t.name == "update_component").unwrap();
+        let req = t.input_schema.required.as_ref().unwrap();
+        assert!(req.contains(&"id".to_string()));
+    }
+
+    #[test]
+    fn test_new_crud_tools_have_properties() {
+        let tools = all_tools();
+
+        // update_project should have slug, name, description, root_path
+        let t = tools.iter().find(|t| t.name == "update_project").unwrap();
+        let props = t.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("slug").is_some());
+        assert!(props.get("name").is_some());
+        assert!(props.get("description").is_some());
+        assert!(props.get("root_path").is_some());
+
+        // update_constraint should have constraint_id, description, constraint_type, enforced_by
+        let t = tools
+            .iter()
+            .find(|t| t.name == "update_constraint")
+            .unwrap();
+        let props = t.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("constraint_id").is_some());
+        assert!(props.get("description").is_some());
+        assert!(props.get("constraint_type").is_some());
+        assert!(props.get("enforced_by").is_some());
+
+        // update_decision should have decision_id, description, rationale, chosen_option
+        let t = tools.iter().find(|t| t.name == "update_decision").unwrap();
+        let props = t.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("decision_id").is_some());
+        assert!(props.get("description").is_some());
+        assert!(props.get("rationale").is_some());
+        assert!(props.get("chosen_option").is_some());
+
+        // update_resource should have id, name, file_path, url, version, description
+        let t = tools.iter().find(|t| t.name == "update_resource").unwrap();
+        let props = t.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("id").is_some());
+        assert!(props.get("name").is_some());
+        assert!(props.get("file_path").is_some());
+        assert!(props.get("url").is_some());
+        assert!(props.get("version").is_some());
+        assert!(props.get("description").is_some());
+
+        // update_component should have id, name, description, runtime, config, tags
+        let t = tools.iter().find(|t| t.name == "update_component").unwrap();
+        let props = t.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("id").is_some());
+        assert!(props.get("name").is_some());
+        assert!(props.get("description").is_some());
+        assert!(props.get("runtime").is_some());
+        assert!(props.get("config").is_some());
+        assert!(props.get("tags").is_some());
+    }
+
+    #[test]
+    fn test_workspace_tools_include_update_resource_and_component() {
+        let tools = workspace_tools();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"update_resource"));
+        assert!(names.contains(&"update_component"));
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_tool_exists() {
+        let tools = all_tools();
+        let tool = tools
+            .iter()
+            .find(|t| t.name == "list_all_workspace_milestones");
+        assert!(
+            tool.is_some(),
+            "list_all_workspace_milestones tool must exist"
+        );
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_tool_properties() {
+        let tools = all_tools();
+        let tool = tools
+            .iter()
+            .find(|t| t.name == "list_all_workspace_milestones")
+            .unwrap();
+
+        let props = tool.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("workspace_id").is_some());
+        assert!(props.get("status").is_some());
+        assert!(props.get("limit").is_some());
+        assert!(props.get("offset").is_some());
+
+        // No required params - all optional
+        assert!(tool.input_schema.required.is_none());
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_in_workspace_tools() {
+        let tools = workspace_tools();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(
+            names.contains(&"list_all_workspace_milestones"),
+            "list_all_workspace_milestones should be in workspace tools"
+        );
+    }
+
+    #[test]
+    fn test_list_plans_tool_has_project_id() {
+        let tools = all_tools();
+        let tool = tools.iter().find(|t| t.name == "list_plans").unwrap();
+
+        let props = tool.input_schema.properties.as_ref().unwrap();
+        assert!(
+            props.get("project_id").is_some(),
+            "list_plans tool must have project_id parameter"
+        );
+
+        // project_id should be a string type
+        let project_id_schema = props.get("project_id").unwrap();
+        assert_eq!(project_id_schema["type"], "string");
+    }
+
+    #[test]
+    fn test_list_workspace_milestones_tool_has_pagination() {
+        let tools = all_tools();
+        let tool = tools
+            .iter()
+            .find(|t| t.name == "list_workspace_milestones")
+            .unwrap();
+
+        let props = tool.input_schema.properties.as_ref().unwrap();
+        assert!(props.get("slug").is_some());
+        assert!(props.get("status").is_some());
+        assert!(props.get("limit").is_some());
+        assert!(props.get("offset").is_some());
+
+        // slug is required
+        let required = tool.input_schema.required.as_ref().unwrap();
+        assert!(required.contains(&"slug".to_string()));
     }
 }

@@ -40,6 +40,39 @@ pub struct WorkspaceNode {
 }
 
 // ============================================================================
+// Chat Session Node
+// ============================================================================
+
+/// A chat session with Claude Code CLI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatSessionNode {
+    pub id: Uuid,
+    /// Claude CLI session ID (for --resume)
+    pub cli_session_id: Option<String>,
+    /// Associated project slug
+    pub project_slug: Option<String>,
+    /// Working directory
+    pub cwd: String,
+    /// Session title (auto-generated or user-provided)
+    pub title: Option<String>,
+    /// Model used
+    pub model: String,
+    /// Creation timestamp
+    pub created_at: DateTime<Utc>,
+    /// Last update timestamp
+    pub updated_at: DateTime<Utc>,
+    /// Number of messages exchanged
+    #[serde(default)]
+    pub message_count: i64,
+    /// Total cost in USD
+    #[serde(default)]
+    pub total_cost_usd: Option<f64>,
+    /// Nexus conversation ID (for message history retrieval)
+    #[serde(default)]
+    pub conversation_id: Option<String>,
+}
+
+// ============================================================================
 // Code Structure Nodes (from Tree-sitter)
 // ============================================================================
 
@@ -376,7 +409,10 @@ pub struct MilestoneNode {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MilestoneStatus {
+    Planned,
     Open,
+    InProgress,
+    Completed,
     Closed,
 }
 
@@ -551,6 +587,106 @@ pub struct ComponentDependency {
 
 fn default_true() -> bool {
     true
+}
+
+// ============================================================================
+// Code exploration result types
+// ============================================================================
+
+/// Summary of a function for code exploration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionSummaryNode {
+    pub name: String,
+    pub signature: String,
+    pub line: u32,
+    pub is_async: bool,
+    pub is_public: bool,
+    pub complexity: u32,
+    pub docstring: Option<String>,
+}
+
+/// Summary of a struct for code exploration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StructSummaryNode {
+    pub name: String,
+    pub line: u32,
+    pub is_public: bool,
+    pub docstring: Option<String>,
+}
+
+/// A reference to a symbol found in the codebase
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolReferenceNode {
+    pub file_path: String,
+    pub line: u32,
+    pub context: String,
+    pub reference_type: String,
+}
+
+/// Language statistics for architecture overview
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguageStatsNode {
+    pub language: String,
+    pub file_count: usize,
+}
+
+/// Trait metadata from the graph
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitInfoNode {
+    pub is_external: bool,
+    pub source: Option<String>,
+}
+
+/// A type that implements a trait
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitImplementorNode {
+    pub type_name: String,
+    pub file_path: String,
+    pub line: u32,
+}
+
+/// Trait info for a type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeTraitInfoNode {
+    pub name: String,
+    pub full_path: Option<String>,
+    pub file_path: String,
+    pub is_external: bool,
+    pub source: Option<String>,
+}
+
+/// Impl block detail with methods
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImplBlockDetailNode {
+    pub file_path: String,
+    pub line_start: u32,
+    pub line_end: u32,
+    pub trait_name: Option<String>,
+    pub methods: Vec<String>,
+}
+
+/// File import info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileImportNode {
+    pub path: String,
+    pub language: String,
+}
+
+/// Aggregated symbol names for a file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileSymbolNamesNode {
+    pub functions: Vec<String>,
+    pub structs: Vec<String>,
+    pub traits: Vec<String>,
+    pub enums: Vec<String>,
+}
+
+/// A file with connection counts (imports + dependents)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectedFileNode {
+    pub path: String,
+    pub imports: i64,
+    pub dependents: i64,
 }
 
 // ============================================================================

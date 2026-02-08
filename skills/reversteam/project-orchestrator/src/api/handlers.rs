@@ -3,6 +3,8 @@
 use crate::api::{
     PaginatedResponse, PaginationParams, PriorityFilter, SearchFilter, StatusFilter, TagsFilter,
 };
+use crate::chat::ChatManager;
+use crate::events::{EventBus, EventEmitter};
 use crate::neo4j::models::{
     CommitNode, ConstraintNode, DecisionNode, MilestoneNode, MilestoneStatus, PlanNode, PlanStatus,
     ReleaseNode, ReleaseStatus, StepNode, TaskNode, TaskWithPlan,
@@ -24,6 +26,8 @@ use uuid::Uuid;
 pub struct ServerState {
     pub orchestrator: Arc<Orchestrator>,
     pub watcher: Arc<RwLock<FileWatcher>>,
+    pub chat_manager: Option<Arc<ChatManager>>,
+    pub event_bus: Arc<EventBus>,
 }
 
 /// Shared orchestrator state
@@ -63,6 +67,8 @@ pub struct PlansListQuery {
     pub priority_filter: PriorityFilter,
     #[serde(flatten)]
     pub search_filter: SearchFilter,
+    /// Filter by project UUID
+    pub project_id: Option<String>,
 }
 
 /// List all plans with optional pagination and filters
@@ -72,10 +78,21 @@ pub async fn list_plans(
 ) -> Result<Json<PaginatedResponse<PlanNode>>, AppError> {
     query.pagination.validate().map_err(AppError::BadRequest)?;
 
+    let project_id = query
+        .project_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            uuid::Uuid::parse_str(s)
+                .map_err(|_| AppError::BadRequest("Invalid project_id UUID".to_string()))
+        })
+        .transpose()?;
+
     let (plans, total) = state
         .orchestrator
         .neo4j()
         .list_plans_filtered(
+            project_id,
             query.status_filter.to_vec(),
             query.priority_filter.priority_min,
             query.priority_filter.priority_max,
@@ -142,7 +159,6 @@ pub async fn link_plan_to_project(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .link_plan_to_project(plan_id, req.project_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -153,11 +169,7 @@ pub async fn unlink_plan_from_project(
     State(state): State<OrchestratorState>,
     Path(plan_id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
-    state
-        .orchestrator
-        .neo4j()
-        .unlink_plan_from_project(plan_id)
-        .await?;
+    state.orchestrator.unlink_plan_from_project(plan_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -170,6 +182,19 @@ pub async fn update_plan_status(
         .orchestrator
         .plan_manager()
         .update_plan_status(plan_id, req.status)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Delete a plan and all its related data
+pub async fn delete_plan(
+    State(state): State<OrchestratorState>,
+    Path(plan_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state
+        .orchestrator
+        .plan_manager()
+        .delete_plan(plan_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -204,6 +229,19 @@ pub async fn get_task(
         .await?
         .ok_or(AppError::NotFound("Task not found".into()))?;
     Ok(Json(details))
+}
+
+/// Delete a task and all its related data
+pub async fn delete_task(
+    State(state): State<OrchestratorState>,
+    Path(task_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state
+        .orchestrator
+        .plan_manager()
+        .delete_task(task_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Update task status
@@ -339,6 +377,55 @@ pub async fn add_decision(
     Ok(Json(decision))
 }
 
+/// Get a single decision by ID
+pub async fn get_decision(
+    State(state): State<OrchestratorState>,
+    Path(decision_id): Path<Uuid>,
+) -> Result<Json<DecisionNode>, AppError> {
+    let decision = state
+        .orchestrator
+        .neo4j()
+        .get_decision(decision_id)
+        .await?
+        .ok_or(AppError::NotFound("Decision not found".into()))?;
+    Ok(Json(decision))
+}
+
+/// Request to update a decision
+#[derive(Deserialize)]
+pub struct UpdateDecisionRequest {
+    pub description: Option<String>,
+    pub rationale: Option<String>,
+    pub chosen_option: Option<String>,
+}
+
+/// Update a decision
+pub async fn update_decision(
+    State(state): State<OrchestratorState>,
+    Path(decision_id): Path<Uuid>,
+    Json(req): Json<UpdateDecisionRequest>,
+) -> Result<StatusCode, AppError> {
+    state
+        .orchestrator
+        .update_decision(
+            decision_id,
+            req.description,
+            req.rationale,
+            req.chosen_option,
+        )
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Delete a decision
+pub async fn delete_decision(
+    State(state): State<OrchestratorState>,
+    Path(decision_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state.orchestrator.delete_decision(decision_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Search decisions
 #[derive(Deserialize)]
 pub struct SearchQuery {
@@ -424,6 +511,25 @@ pub async fn wake(
         .await?;
 
     Ok(Json(WakeResponse { acknowledged: true }))
+}
+
+// ============================================================================
+// Internal Events (MCP → HTTP bridge)
+// ============================================================================
+
+/// POST /internal/events — Receive a CrudEvent from the MCP server and broadcast it
+pub async fn receive_event(
+    State(state): State<OrchestratorState>,
+    Json(event): Json<crate::events::CrudEvent>,
+) -> Result<StatusCode, AppError> {
+    tracing::debug!(
+        entity_type = ?event.entity_type,
+        action = ?event.action,
+        entity_id = %event.entity_id,
+        "Received internal event from MCP"
+    );
+    state.event_bus.emit(event);
+    Ok(StatusCode::OK)
 }
 
 // ============================================================================
@@ -526,6 +632,29 @@ pub async fn get_task_steps(
     Ok(Json(steps))
 }
 
+/// Get a single step by ID
+pub async fn get_step(
+    State(state): State<OrchestratorState>,
+    Path(step_id): Path<Uuid>,
+) -> Result<Json<StepNode>, AppError> {
+    let step = state
+        .orchestrator
+        .neo4j()
+        .get_step(step_id)
+        .await?
+        .ok_or(AppError::NotFound("Step not found".into()))?;
+    Ok(Json(step))
+}
+
+/// Delete a step
+pub async fn delete_step(
+    State(state): State<OrchestratorState>,
+    Path(step_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state.orchestrator.delete_step(step_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Update a step
 pub async fn update_step(
     State(state): State<OrchestratorState>,
@@ -607,16 +736,52 @@ pub async fn get_plan_constraints(
     Ok(Json(constraints))
 }
 
+/// Get a single constraint by ID
+pub async fn get_constraint(
+    State(state): State<OrchestratorState>,
+    Path(constraint_id): Path<Uuid>,
+) -> Result<Json<ConstraintNode>, AppError> {
+    let constraint = state
+        .orchestrator
+        .neo4j()
+        .get_constraint(constraint_id)
+        .await?
+        .ok_or(AppError::NotFound("Constraint not found".into()))?;
+    Ok(Json(constraint))
+}
+
+/// Request to update a constraint
+#[derive(Deserialize)]
+pub struct UpdateConstraintRequest {
+    pub description: Option<String>,
+    pub constraint_type: Option<crate::neo4j::models::ConstraintType>,
+    pub enforced_by: Option<String>,
+}
+
+/// Update a constraint
+pub async fn update_constraint(
+    State(state): State<OrchestratorState>,
+    Path(constraint_id): Path<Uuid>,
+    Json(req): Json<UpdateConstraintRequest>,
+) -> Result<StatusCode, AppError> {
+    state
+        .orchestrator
+        .update_constraint(
+            constraint_id,
+            req.description,
+            req.constraint_type,
+            req.enforced_by,
+        )
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Delete a constraint
 pub async fn delete_constraint(
     State(state): State<OrchestratorState>,
     Path(constraint_id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
-    state
-        .orchestrator
-        .neo4j()
-        .delete_constraint(constraint_id)
-        .await?;
+    state.orchestrator.delete_constraint(constraint_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -691,7 +856,7 @@ pub async fn create_commit(
         timestamp: req.timestamp.unwrap_or_else(chrono::Utc::now),
     };
 
-    state.orchestrator.neo4j().create_commit(&commit).await?;
+    state.orchestrator.create_commit(&commit).await?;
     Ok(Json(commit))
 }
 
@@ -709,7 +874,6 @@ pub async fn link_commit_to_task(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .link_commit_to_task(&req.commit_hash, task_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -732,7 +896,6 @@ pub async fn link_commit_to_plan(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .link_commit_to_plan(&req.commit_hash, plan_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -778,7 +941,7 @@ pub async fn create_release(
         project_id,
     };
 
-    state.orchestrator.neo4j().create_release(&release).await?;
+    state.orchestrator.create_release(&release).await?;
     Ok(Json(release))
 }
 
@@ -838,7 +1001,6 @@ pub async fn update_release(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .update_release(
             release_id,
             req.status,
@@ -848,6 +1010,15 @@ pub async fn update_release(
             req.description,
         )
         .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Delete a release
+pub async fn delete_release(
+    State(state): State<OrchestratorState>,
+    Path(release_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state.orchestrator.delete_release(release_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -865,7 +1036,6 @@ pub async fn add_task_to_release(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .add_task_to_release(release_id, req.task_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -885,7 +1055,6 @@ pub async fn add_commit_to_release(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .add_commit_to_release(release_id, &req.commit_hash)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -947,11 +1116,7 @@ pub async fn create_milestone(
         project_id,
     };
 
-    state
-        .orchestrator
-        .neo4j()
-        .create_milestone(&milestone)
-        .await?;
+    state.orchestrator.create_milestone(&milestone).await?;
     Ok(Json(milestone))
 }
 
@@ -1011,7 +1176,6 @@ pub async fn update_milestone(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .update_milestone(
             milestone_id,
             req.status,
@@ -1021,6 +1185,15 @@ pub async fn update_milestone(
             req.description,
         )
         .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Delete a milestone
+pub async fn delete_milestone(
+    State(state): State<OrchestratorState>,
+    Path(milestone_id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    state.orchestrator.delete_milestone(milestone_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1038,7 +1211,6 @@ pub async fn add_task_to_milestone(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .add_task_to_milestone(milestone_id, req.task_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -1120,7 +1292,6 @@ pub async fn add_task_dependencies(
     for dep_id in req.depends_on {
         state
             .orchestrator
-            .neo4j()
             .add_task_dependency(task_id, dep_id)
             .await?;
     }
@@ -1134,7 +1305,6 @@ pub async fn remove_task_dependency(
 ) -> Result<StatusCode, AppError> {
     state
         .orchestrator
-        .neo4j()
         .remove_task_dependency(task_id, dep_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -1399,5 +1569,146 @@ impl IntoResponse for AppError {
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
         AppError::Internal(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_decision_request_all_fields() {
+        let json = r#"{"description":"new desc","rationale":"new reason","chosen_option":"B"}"#;
+        let req: UpdateDecisionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description, Some("new desc".to_string()));
+        assert_eq!(req.rationale, Some("new reason".to_string()));
+        assert_eq!(req.chosen_option, Some("B".to_string()));
+    }
+
+    #[test]
+    fn test_update_decision_request_partial() {
+        let json = r#"{"description":"only desc"}"#;
+        let req: UpdateDecisionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description, Some("only desc".to_string()));
+        assert_eq!(req.rationale, None);
+        assert_eq!(req.chosen_option, None);
+    }
+
+    #[test]
+    fn test_update_decision_request_empty() {
+        let json = r#"{}"#;
+        let req: UpdateDecisionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description, None);
+        assert_eq!(req.rationale, None);
+        assert_eq!(req.chosen_option, None);
+    }
+
+    #[test]
+    fn test_update_constraint_request_with_enum() {
+        let json = r#"{"constraint_type":"performance","description":"Must be fast"}"#;
+        let req: UpdateConstraintRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            req.constraint_type,
+            Some(crate::neo4j::models::ConstraintType::Performance)
+        );
+        assert_eq!(req.description, Some("Must be fast".to_string()));
+        assert_eq!(req.enforced_by, None);
+    }
+
+    #[test]
+    fn test_update_constraint_request_all_enum_variants() {
+        for variant in ["performance", "security", "style", "compatibility", "other"] {
+            let json = format!(r#"{{"constraint_type":"{}"}}"#, variant);
+            let req: UpdateConstraintRequest = serde_json::from_str(&json).unwrap();
+            assert!(
+                req.constraint_type.is_some(),
+                "Failed to parse constraint_type: {}",
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn test_update_constraint_request_empty() {
+        let json = r#"{}"#;
+        let req: UpdateConstraintRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description, None);
+        assert_eq!(req.constraint_type, None);
+        assert_eq!(req.enforced_by, None);
+    }
+
+    #[test]
+    fn test_plans_list_query_defaults() {
+        let json = r#"{}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        assert!(query.project_id.is_none());
+        assert!(query.status_filter.status.is_none());
+        assert!(query.search_filter.search.is_none());
+    }
+
+    #[test]
+    fn test_plans_list_query_with_project_id() {
+        let json = r#"{"project_id":"e83b0663-9600-450d-9f63-234e857394df"}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            query.project_id,
+            Some("e83b0663-9600-450d-9f63-234e857394df".to_string())
+        );
+    }
+
+    #[test]
+    fn test_plans_list_query_with_all_filters() {
+        let json = r#"{"project_id":"e83b0663-9600-450d-9f63-234e857394df","status":"draft,in_progress","priority_min":"5","search":"auth"}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            query.project_id,
+            Some("e83b0663-9600-450d-9f63-234e857394df".to_string())
+        );
+        assert_eq!(
+            query.status_filter.status,
+            Some("draft,in_progress".to_string())
+        );
+        assert_eq!(query.priority_filter.priority_min, Some(5));
+        assert_eq!(query.search_filter.search, Some("auth".to_string()));
+    }
+
+    #[test]
+    fn test_plans_list_query_project_id_uuid_validation() {
+        // Valid UUID
+        let json = r#"{"project_id":"e83b0663-9600-450d-9f63-234e857394df"}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        let parsed = query
+            .project_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| uuid::Uuid::parse_str(s));
+        assert!(parsed.is_some());
+        assert!(parsed.unwrap().is_ok());
+    }
+
+    #[test]
+    fn test_plans_list_query_project_id_invalid_uuid() {
+        let json = r#"{"project_id":"not-valid"}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        let parsed = query
+            .project_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| uuid::Uuid::parse_str(s));
+        assert!(parsed.is_some());
+        assert!(parsed.unwrap().is_err());
+    }
+
+    #[test]
+    fn test_plans_list_query_project_id_empty_string() {
+        let json = r#"{"project_id":""}"#;
+        let query: PlansListQuery = serde_json::from_str(json).unwrap();
+        // Empty string should be filtered out
+        let parsed = query
+            .project_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| uuid::Uuid::parse_str(s));
+        assert!(parsed.is_none());
     }
 }

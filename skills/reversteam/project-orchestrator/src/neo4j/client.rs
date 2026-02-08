@@ -5,6 +5,7 @@ use crate::notes::{
     EntityType, Note, NoteAnchor, NoteChange, NoteFilters, NoteImportance, NoteScope, NoteStatus,
     NoteType, PropagatedNote,
 };
+use crate::plan::models::TaskDetails;
 use anyhow::{Context, Result};
 use neo4rs::{query, Graph, Query};
 use std::sync::Arc;
@@ -243,8 +244,8 @@ impl Neo4jClient {
         Ok(())
     }
 
-    /// Execute a raw Cypher query
-    pub async fn execute(&self, cypher: &str) -> Result<Vec<neo4rs::Row>> {
+    /// Execute a raw Cypher query (internal use only)
+    pub(crate) async fn execute(&self, cypher: &str) -> Result<Vec<neo4rs::Row>> {
         let mut result = self.graph.execute(query(cypher)).await?;
         let mut rows = Vec::new();
         while let Some(row) = result.next().await? {
@@ -253,8 +254,8 @@ impl Neo4jClient {
         Ok(rows)
     }
 
-    /// Execute a parameterized Cypher query
-    pub async fn execute_with_params(&self, q: Query) -> Result<Vec<neo4rs::Row>> {
+    /// Execute a parameterized Cypher query (internal use only)
+    pub(crate) async fn execute_with_params(&self, q: Query) -> Result<Vec<neo4rs::Row>> {
         let mut result = self.graph.execute(q).await?;
         let mut rows = Vec::new();
         while let Some(row) = result.next().await? {
@@ -352,6 +353,51 @@ impl Neo4jClient {
         }
 
         Ok(projects)
+    }
+
+    /// Update project fields (name, description, root_path)
+    pub async fn update_project(
+        &self,
+        id: Uuid,
+        name: Option<String>,
+        description: Option<Option<String>>,
+        root_path: Option<String>,
+    ) -> Result<()> {
+        let mut set_clauses = vec![];
+
+        if name.is_some() {
+            set_clauses.push("p.name = $name");
+        }
+        if description.is_some() {
+            set_clauses.push("p.description = $description");
+        }
+        if root_path.is_some() {
+            set_clauses.push("p.root_path = $root_path");
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let cypher = format!(
+            "MATCH (p:Project {{id: $id}}) SET {}",
+            set_clauses.join(", ")
+        );
+
+        let mut q = query(&cypher).param("id", id.to_string());
+
+        if let Some(name) = name {
+            q = q.param("name", name);
+        }
+        if let Some(desc) = description {
+            q = q.param("description", desc.unwrap_or_default());
+        }
+        if let Some(root_path) = root_path {
+            q = q.param("root_path", root_path);
+        }
+
+        self.graph.run(q).await?;
+        Ok(())
     }
 
     /// Update project last_synced timestamp
@@ -755,7 +801,14 @@ impl Neo4jClient {
             "description",
             milestone.description.clone().unwrap_or_default(),
         )
-        .param("status", format!("{:?}", milestone.status))
+        .param(
+            "status",
+            serde_json::to_value(&milestone.status)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string(),
+        )
         .param(
             "target_date",
             milestone
@@ -792,7 +845,7 @@ impl Neo4jClient {
         }
     }
 
-    /// List workspace milestones
+    /// List workspace milestones (unpaginated, used internally)
     pub async fn list_workspace_milestones(
         &self,
         workspace_id: Uuid,
@@ -815,6 +868,143 @@ impl Neo4jClient {
         }
 
         Ok(milestones)
+    }
+
+    /// List workspace milestones with pagination and status filter
+    ///
+    /// Returns (milestones, total_count)
+    pub async fn list_workspace_milestones_filtered(
+        &self,
+        workspace_id: Uuid,
+        status: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<WorkspaceMilestoneNode>, usize)> {
+        let status_filter = if let Some(s) = status {
+            format!("WHERE toLower(wm.status) = toLower('{}')", s)
+        } else {
+            String::new()
+        };
+
+        let count_cypher = format!(
+            "MATCH (w:Workspace {{id: $workspace_id}})-[:HAS_WORKSPACE_MILESTONE]->(wm:WorkspaceMilestone) {} RETURN count(wm) AS total",
+            status_filter
+        );
+        let mut count_stream = self
+            .graph
+            .execute(query(&count_cypher).param("workspace_id", workspace_id.to_string()))
+            .await?;
+        let total: i64 = if let Some(row) = count_stream.next().await? {
+            row.get("total")?
+        } else {
+            0
+        };
+
+        let data_cypher = format!(
+            r#"
+            MATCH (w:Workspace {{id: $workspace_id}})-[:HAS_WORKSPACE_MILESTONE]->(wm:WorkspaceMilestone)
+            {}
+            RETURN wm
+            ORDER BY wm.target_date, wm.title
+            SKIP {}
+            LIMIT {}
+            "#,
+            status_filter, offset, limit
+        );
+
+        let mut result = self
+            .graph
+            .execute(query(&data_cypher).param("workspace_id", workspace_id.to_string()))
+            .await?;
+        let mut milestones = Vec::new();
+        while let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("wm")?;
+            milestones.push(self.node_to_workspace_milestone(&node)?);
+        }
+
+        Ok((milestones, total as usize))
+    }
+
+    /// List all workspace milestones across all workspaces with filters and pagination
+    ///
+    /// Returns (milestones_with_workspace_info, total_count)
+    pub async fn list_all_workspace_milestones_filtered(
+        &self,
+        workspace_id: Option<Uuid>,
+        status: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<(WorkspaceMilestoneNode, String, String, String)>> {
+        let mut conditions = Vec::new();
+        if let Some(wid) = workspace_id {
+            conditions.push(format!("w.id = '{}'", wid));
+        }
+        if let Some(s) = status {
+            let pascal = snake_to_pascal_case(s);
+            conditions.push(format!("wm.status = '{}'", pascal));
+        }
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+
+        let cypher = format!(
+            r#"
+            MATCH (w:Workspace)-[:HAS_WORKSPACE_MILESTONE]->(wm:WorkspaceMilestone)
+            {}
+            RETURN wm, w.id AS workspace_id, w.name AS workspace_name, w.slug AS workspace_slug
+            ORDER BY wm.target_date, wm.title
+            SKIP {}
+            LIMIT {}
+            "#,
+            where_clause, offset, limit
+        );
+
+        let mut result = self.graph.execute(query(&cypher)).await?;
+        let mut items = Vec::new();
+        while let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("wm")?;
+            let wid: String = row.get("workspace_id")?;
+            let wname: String = row.get("workspace_name")?;
+            let wslug: String = row.get("workspace_slug")?;
+            items.push((self.node_to_workspace_milestone(&node)?, wid, wname, wslug));
+        }
+
+        Ok(items)
+    }
+
+    /// Count all workspace milestones across workspaces with optional filters
+    pub async fn count_all_workspace_milestones(
+        &self,
+        workspace_id: Option<Uuid>,
+        status: Option<&str>,
+    ) -> Result<usize> {
+        let mut conditions = Vec::new();
+        if let Some(wid) = workspace_id {
+            conditions.push(format!("w.id = '{}'", wid));
+        }
+        if let Some(s) = status {
+            let pascal = snake_to_pascal_case(s);
+            conditions.push(format!("wm.status = '{}'", pascal));
+        }
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+
+        let cypher = format!(
+            "MATCH (w:Workspace)-[:HAS_WORKSPACE_MILESTONE]->(wm:WorkspaceMilestone) {} RETURN count(wm) AS total",
+            where_clause
+        );
+        let count_result = self.execute(&cypher).await?;
+        let total: i64 = count_result
+            .first()
+            .and_then(|r| r.get("total").ok())
+            .unwrap_or(0);
+
+        Ok(total as usize)
     }
 
     /// Update a workspace milestone
@@ -862,7 +1052,14 @@ impl Neo4jClient {
             q = q.param("description", d);
         }
         if let Some(s) = status {
-            q = q.param("status", format!("{:?}", s));
+            q = q.param(
+                "status",
+                serde_json::to_value(&s)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            );
         }
         if let Some(td) = target_date {
             q = q.param("target_date", td.to_rfc3339());
@@ -982,10 +1179,9 @@ impl Neo4jClient {
     /// Helper to convert Neo4j node to WorkspaceMilestoneNode
     fn node_to_workspace_milestone(&self, node: &neo4rs::Node) -> Result<WorkspaceMilestoneNode> {
         let status_str: String = node.get("status").unwrap_or_else(|_| "Open".to_string());
-        let status = match status_str.to_lowercase().as_str() {
-            "closed" => MilestoneStatus::Closed,
-            _ => MilestoneStatus::Open,
-        };
+        let status =
+            serde_json::from_str::<MilestoneStatus>(&format!("\"{}\"", status_str.to_lowercase()))
+                .unwrap_or(MilestoneStatus::Open);
 
         let tags: Vec<String> = node.get("tags").unwrap_or_else(|_| vec![]);
 
@@ -1135,6 +1331,63 @@ impl Neo4jClient {
         }
 
         Ok(resources)
+    }
+
+    /// Update a resource
+    pub async fn update_resource(
+        &self,
+        id: Uuid,
+        name: Option<String>,
+        file_path: Option<String>,
+        url: Option<String>,
+        version: Option<String>,
+        description: Option<String>,
+    ) -> Result<()> {
+        let mut set_clauses = vec![];
+        if name.is_some() {
+            set_clauses.push("r.name = $name");
+        }
+        if file_path.is_some() {
+            set_clauses.push("r.file_path = $file_path");
+        }
+        if url.is_some() {
+            set_clauses.push("r.url = $url");
+        }
+        if version.is_some() {
+            set_clauses.push("r.version = $version");
+        }
+        if description.is_some() {
+            set_clauses.push("r.description = $description");
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let cypher = format!(
+            "MATCH (r:Resource {{id: $id}}) SET {}",
+            set_clauses.join(", ")
+        );
+
+        let mut q = query(&cypher).param("id", id.to_string());
+        if let Some(name) = name {
+            q = q.param("name", name);
+        }
+        if let Some(file_path) = file_path {
+            q = q.param("file_path", file_path);
+        }
+        if let Some(url) = url {
+            q = q.param("url", url);
+        }
+        if let Some(version) = version {
+            q = q.param("version", version);
+        }
+        if let Some(description) = description {
+            q = q.param("description", description);
+        }
+
+        self.graph.run(q).await?;
+        Ok(())
     }
 
     /// Delete a resource
@@ -1364,6 +1617,63 @@ impl Neo4jClient {
         Ok(components)
     }
 
+    /// Update a component
+    pub async fn update_component(
+        &self,
+        id: Uuid,
+        name: Option<String>,
+        description: Option<String>,
+        runtime: Option<String>,
+        config: Option<serde_json::Value>,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        let mut set_clauses = vec![];
+        if name.is_some() {
+            set_clauses.push("c.name = $name");
+        }
+        if description.is_some() {
+            set_clauses.push("c.description = $description");
+        }
+        if runtime.is_some() {
+            set_clauses.push("c.runtime = $runtime");
+        }
+        if config.is_some() {
+            set_clauses.push("c.config = $config");
+        }
+        if tags.is_some() {
+            set_clauses.push("c.tags = $tags");
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let cypher = format!(
+            "MATCH (c:Component {{id: $id}}) SET {}",
+            set_clauses.join(", ")
+        );
+
+        let mut q = query(&cypher).param("id", id.to_string());
+        if let Some(name) = name {
+            q = q.param("name", name);
+        }
+        if let Some(description) = description {
+            q = q.param("description", description);
+        }
+        if let Some(runtime) = runtime {
+            q = q.param("runtime", runtime);
+        }
+        if let Some(config) = config {
+            q = q.param("config", config.to_string());
+        }
+        if let Some(tags) = tags {
+            q = q.param("tags", tags);
+        }
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
     /// Delete a component
     pub async fn delete_component(&self, id: Uuid) -> Result<()> {
         let q = query(
@@ -1558,6 +1868,21 @@ impl Neo4jClient {
         }
 
         Ok(paths)
+    }
+
+    /// Delete a file and all its symbols
+    pub async fn delete_file(&self, path: &str) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})
+            OPTIONAL MATCH (f)-[:CONTAINS]->(symbol)
+            DETACH DELETE symbol, f
+            "#,
+        )
+        .param("path", path);
+
+        self.graph.run(q).await?;
+        Ok(())
     }
 
     /// Delete files that are no longer on the filesystem
@@ -2399,6 +2724,588 @@ impl Neo4jClient {
     }
 
     // ========================================================================
+    // Code exploration queries (encapsulated from handlers)
+    // ========================================================================
+
+    /// Get the language of a file by path
+    pub async fn get_file_language(&self, path: &str) -> Result<Option<String>> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})
+            RETURN f.language AS language
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            Ok(row.get("language").ok())
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get function summaries for a file
+    pub async fn get_file_functions_summary(&self, path: &str) -> Result<Vec<FunctionSummaryNode>> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})-[:CONTAINS]->(func:Function)
+            RETURN func
+            ORDER BY func.line_start
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut functions = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("func")?;
+            let name: String = node.get("name")?;
+            let is_async: bool = node.get("is_async").unwrap_or(false);
+            let visibility: String = node.get("visibility").unwrap_or_default();
+            let is_public = visibility == "public";
+            let line: i64 = node.get("line_start").unwrap_or(0);
+            let complexity: i64 = node.get("complexity").unwrap_or(1);
+            let docstring: Option<String> = node.get("docstring").ok();
+            let params: Vec<String> = node.get("params").unwrap_or_default();
+            let return_type: String = node.get("return_type").unwrap_or_default();
+            let async_prefix = if is_async { "async " } else { "" };
+            let signature = format!(
+                "{}fn {}({}){}",
+                async_prefix,
+                name,
+                params.join(", "),
+                if return_type.is_empty() {
+                    String::new()
+                } else {
+                    format!(" -> {}", return_type)
+                }
+            );
+
+            functions.push(FunctionSummaryNode {
+                name,
+                signature,
+                line: line as u32,
+                is_async,
+                is_public,
+                complexity: complexity as u32,
+                docstring,
+            });
+        }
+
+        Ok(functions)
+    }
+
+    /// Get struct summaries for a file
+    pub async fn get_file_structs_summary(&self, path: &str) -> Result<Vec<StructSummaryNode>> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})-[:CONTAINS]->(s:Struct)
+            RETURN s
+            ORDER BY s.line_start
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut structs = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("s")?;
+            let name: String = node.get("name")?;
+            let visibility: String = node.get("visibility").unwrap_or_default();
+            let is_public = visibility == "public";
+            let line: i64 = node.get("line_start").unwrap_or(0);
+            let docstring: Option<String> = node.get("docstring").ok();
+
+            structs.push(StructSummaryNode {
+                name,
+                line: line as u32,
+                is_public,
+                docstring,
+            });
+        }
+
+        Ok(structs)
+    }
+
+    /// Get import paths for a file
+    pub async fn get_file_import_paths_list(&self, path: &str) -> Result<Vec<String>> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})-[:CONTAINS]->(i:Import)
+            RETURN i.path AS path
+            ORDER BY i.line
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut imports = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(p) = row.get::<String>("path") {
+                imports.push(p);
+            }
+        }
+
+        Ok(imports)
+    }
+
+    /// Find references to a symbol (function callers, struct importers, file importers)
+    pub async fn find_symbol_references(
+        &self,
+        symbol: &str,
+        limit: usize,
+    ) -> Result<Vec<SymbolReferenceNode>> {
+        let mut references = Vec::new();
+        let limit_i64 = limit as i64;
+
+        // Find function callers
+        let q = query(
+            r#"
+            MATCH (f:Function {name: $name})
+            OPTIONAL MATCH (caller:Function)-[:CALLS]->(f)
+            WHERE caller IS NOT NULL
+            RETURN 'call' AS ref_type,
+                   caller.file_path AS file_path,
+                   caller.line_start AS line,
+                   caller.name AS context
+            LIMIT $limit
+            "#,
+        )
+        .param("name", symbol)
+        .param("limit", limit_i64);
+
+        let mut result = self.graph.execute(q).await?;
+        while let Some(row) = result.next().await? {
+            if let (Ok(file_path), Ok(line), Ok(context)) = (
+                row.get::<String>("file_path"),
+                row.get::<i64>("line"),
+                row.get::<String>("context"),
+            ) {
+                references.push(SymbolReferenceNode {
+                    file_path,
+                    line: line as u32,
+                    context: format!("called from {}", context),
+                    reference_type: "call".to_string(),
+                });
+            }
+        }
+
+        // Find struct import usages
+        let q = query(
+            r#"
+            MATCH (s:Struct {name: $name})
+            OPTIONAL MATCH (i:Import)-[:IMPORTS_SYMBOL]->(s)
+            WHERE i IS NOT NULL
+            RETURN 'import' AS ref_type,
+                   i.file_path AS file_path,
+                   i.line AS line,
+                   i.path AS context
+            LIMIT $limit
+            "#,
+        )
+        .param("name", symbol)
+        .param("limit", limit_i64);
+
+        let mut result = self.graph.execute(q).await?;
+        while let Some(row) = result.next().await? {
+            if let (Ok(file_path), Ok(line), Ok(context)) = (
+                row.get::<String>("file_path"),
+                row.get::<i64>("line"),
+                row.get::<String>("context"),
+            ) {
+                references.push(SymbolReferenceNode {
+                    file_path,
+                    line: line as u32,
+                    context: format!("imported via {}", context),
+                    reference_type: "import".to_string(),
+                });
+            }
+        }
+
+        // Find files importing the symbol's module
+        let q = query(
+            r#"
+            MATCH (s {name: $name})
+            WHERE s:Function OR s:Struct OR s:Trait OR s:Enum
+            MATCH (f:File {path: s.file_path})
+            OPTIONAL MATCH (importer:File)-[:IMPORTS]->(f)
+            WHERE importer IS NOT NULL
+            RETURN 'file_import' AS ref_type,
+                   importer.path AS file_path,
+                   0 AS line,
+                   f.path AS context
+            LIMIT $limit
+            "#,
+        )
+        .param("name", symbol)
+        .param("limit", limit_i64);
+
+        let mut result = self.graph.execute(q).await?;
+        while let Some(row) = result.next().await? {
+            if let (Ok(file_path), Ok(context)) =
+                (row.get::<String>("file_path"), row.get::<String>("context"))
+            {
+                references.push(SymbolReferenceNode {
+                    file_path,
+                    line: 0,
+                    context: format!("imports module {}", context),
+                    reference_type: "file_import".to_string(),
+                });
+            }
+        }
+
+        Ok(references)
+    }
+
+    /// Get files directly imported by a file
+    pub async fn get_file_direct_imports(&self, path: &str) -> Result<Vec<FileImportNode>> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})-[:IMPORTS]->(imported:File)
+            RETURN imported.path AS path, imported.language AS language
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut imports = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(p) = row.get::<String>("path") {
+                imports.push(FileImportNode {
+                    path: p,
+                    language: row.get("language").unwrap_or_default(),
+                });
+            }
+        }
+
+        Ok(imports)
+    }
+
+    /// Get callers chain for a function name (by name, variable depth)
+    pub async fn get_function_callers_by_name(
+        &self,
+        function_name: &str,
+        depth: u32,
+    ) -> Result<Vec<String>> {
+        let q = query(&format!(
+            r#"
+            MATCH (f:Function {{name: $name}})
+            MATCH (caller:Function)-[:CALLS*1..{}]->(f)
+            RETURN DISTINCT caller.name AS name, caller.file_path AS file
+            "#,
+            depth
+        ))
+        .param("name", function_name);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut callers = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(name) = row.get::<String>("name") {
+                callers.push(name);
+            }
+        }
+
+        Ok(callers)
+    }
+
+    /// Get callees chain for a function name (by name, variable depth)
+    pub async fn get_function_callees_by_name(
+        &self,
+        function_name: &str,
+        depth: u32,
+    ) -> Result<Vec<String>> {
+        let q = query(&format!(
+            r#"
+            MATCH (f:Function {{name: $name}})
+            MATCH (f)-[:CALLS*1..{}]->(callee:Function)
+            RETURN DISTINCT callee.name AS name, callee.file_path AS file
+            "#,
+            depth
+        ))
+        .param("name", function_name);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut callees = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(name) = row.get::<String>("name") {
+                callees.push(name);
+            }
+        }
+
+        Ok(callees)
+    }
+
+    /// Get language statistics across all files
+    pub async fn get_language_stats(&self) -> Result<Vec<LanguageStatsNode>> {
+        let q = query(
+            r#"
+            MATCH (f:File)
+            RETURN f.language AS language, count(f) AS count
+            ORDER BY count DESC
+            "#,
+        );
+
+        let mut result = self.graph.execute(q).await?;
+        let mut stats = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let (Ok(language), Ok(count)) =
+                (row.get::<String>("language"), row.get::<i64>("count"))
+            {
+                stats.push(LanguageStatsNode {
+                    language,
+                    file_count: count as usize,
+                });
+            }
+        }
+
+        Ok(stats)
+    }
+
+    /// Get most connected files (highest in-degree from imports)
+    pub async fn get_most_connected_files(&self, limit: usize) -> Result<Vec<String>> {
+        let q = query(
+            r#"
+            MATCH (f:File)<-[:IMPORTS]-(importer:File)
+            RETURN f.path AS path, count(importer) AS imports
+            ORDER BY imports DESC
+            LIMIT $limit
+            "#,
+        )
+        .param("limit", limit as i64);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut paths = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(path) = row.get::<String>("path") {
+                paths.push(path);
+            }
+        }
+
+        Ok(paths)
+    }
+
+    /// Get most connected files with import/dependent counts
+    pub async fn get_most_connected_files_detailed(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ConnectedFileNode>> {
+        let q = query(
+            r#"
+            MATCH (f:File)
+            OPTIONAL MATCH (f)-[:IMPORTS]->(imported:File)
+            OPTIONAL MATCH (dependent:File)-[:IMPORTS]->(f)
+            WITH f, count(DISTINCT imported) AS imports, count(DISTINCT dependent) AS dependents
+            RETURN f.path AS path, imports, dependents, imports + dependents AS connections
+            ORDER BY connections DESC
+            LIMIT $limit
+            "#,
+        )
+        .param("limit", limit as i64);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut files = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(path) = row.get::<String>("path") {
+                files.push(ConnectedFileNode {
+                    path,
+                    imports: row.get("imports").unwrap_or(0),
+                    dependents: row.get("dependents").unwrap_or(0),
+                });
+            }
+        }
+
+        Ok(files)
+    }
+
+    /// Get aggregated symbol names for a file (functions, structs, traits, enums)
+    pub async fn get_file_symbol_names(&self, path: &str) -> Result<FileSymbolNamesNode> {
+        let q = query(
+            r#"
+            MATCH (f:File {path: $path})
+            OPTIONAL MATCH (f)-[:CONTAINS]->(func:Function)
+            OPTIONAL MATCH (f)-[:CONTAINS]->(st:Struct)
+            OPTIONAL MATCH (f)-[:CONTAINS]->(tr:Trait)
+            OPTIONAL MATCH (f)-[:CONTAINS]->(en:Enum)
+            RETURN
+                collect(DISTINCT func.name) AS functions,
+                collect(DISTINCT st.name) AS structs,
+                collect(DISTINCT tr.name) AS traits,
+                collect(DISTINCT en.name) AS enums
+            "#,
+        )
+        .param("path", path);
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            Ok(FileSymbolNamesNode {
+                functions: row.get("functions").unwrap_or_default(),
+                structs: row.get("structs").unwrap_or_default(),
+                traits: row.get("traits").unwrap_or_default(),
+                enums: row.get("enums").unwrap_or_default(),
+            })
+        } else {
+            anyhow::bail!("File not found: {}", path)
+        }
+    }
+
+    /// Get the number of callers for a function by name
+    pub async fn get_function_caller_count(&self, function_name: &str) -> Result<i64> {
+        let q = query(
+            r#"
+            MATCH (f:Function {name: $name})
+            OPTIONAL MATCH (caller:Function)-[:CALLS]->(f)
+            RETURN count(caller) AS caller_count
+            "#,
+        )
+        .param("name", function_name);
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            Ok(row.get("caller_count").unwrap_or(0))
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// Get trait info (is_external, source)
+    pub async fn get_trait_info(&self, trait_name: &str) -> Result<Option<TraitInfoNode>> {
+        let q = query(
+            r#"
+            MATCH (t:Trait {name: $trait_name})
+            RETURN t.is_external AS is_external, t.source AS source
+            LIMIT 1
+            "#,
+        )
+        .param("trait_name", trait_name);
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            Ok(Some(TraitInfoNode {
+                is_external: row.get("is_external").unwrap_or(false),
+                source: row.get("source").ok(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get trait implementors with file locations
+    pub async fn get_trait_implementors_detailed(
+        &self,
+        trait_name: &str,
+    ) -> Result<Vec<TraitImplementorNode>> {
+        let q = query(
+            r#"
+            MATCH (i:Impl)-[:IMPLEMENTS_TRAIT]->(t:Trait {name: $trait_name})
+            MATCH (i)-[:IMPLEMENTS_FOR]->(type)
+            RETURN type.name AS type_name, i.file_path AS file_path, i.line_start AS line
+            "#,
+        )
+        .param("trait_name", trait_name);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut implementors = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let (Ok(type_name), Ok(file_path)) = (
+                row.get::<String>("type_name"),
+                row.get::<String>("file_path"),
+            ) {
+                implementors.push(TraitImplementorNode {
+                    type_name,
+                    file_path,
+                    line: row.get::<i64>("line").unwrap_or(0) as u32,
+                });
+            }
+        }
+
+        Ok(implementors)
+    }
+
+    /// Get all traits implemented by a type, with details
+    pub async fn get_type_trait_implementations(
+        &self,
+        type_name: &str,
+    ) -> Result<Vec<TypeTraitInfoNode>> {
+        let q = query(
+            r#"
+            MATCH (type {name: $type_name})<-[:IMPLEMENTS_FOR]-(i:Impl)
+            OPTIONAL MATCH (i)-[:IMPLEMENTS_TRAIT]->(t:Trait)
+            RETURN t.name AS trait_name,
+                   t.full_path AS full_path,
+                   t.file_path AS file_path,
+                   t.is_external AS is_external,
+                   t.source AS source
+            "#,
+        )
+        .param("type_name", type_name);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut traits = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(name) = row.get::<String>("trait_name") {
+                traits.push(TypeTraitInfoNode {
+                    name,
+                    full_path: row.get("full_path").ok(),
+                    file_path: row.get::<String>("file_path").unwrap_or_default(),
+                    is_external: row.get("is_external").unwrap_or(false),
+                    source: row.get("source").ok(),
+                });
+            }
+        }
+
+        Ok(traits)
+    }
+
+    /// Get all impl blocks for a type with methods
+    pub async fn get_type_impl_blocks_detailed(
+        &self,
+        type_name: &str,
+    ) -> Result<Vec<ImplBlockDetailNode>> {
+        let q = query(
+            r#"
+            MATCH (type {name: $type_name})<-[:IMPLEMENTS_FOR]-(i:Impl)
+            OPTIONAL MATCH (i:Impl)-[:IMPLEMENTS_TRAIT]->(t:Trait)
+            OPTIONAL MATCH (f:File {path: i.file_path})-[:CONTAINS]->(func:Function)
+            WHERE func.line_start >= i.line_start AND func.line_end <= i.line_end
+            RETURN i.file_path AS file_path, i.line_start AS line_start, i.line_end AS line_end,
+                   i.trait_name AS trait_name, collect(func.name) AS methods
+            "#,
+        )
+        .param("type_name", type_name);
+
+        let mut result = self.graph.execute(q).await?;
+        let mut blocks = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            if let Ok(file_path) = row.get::<String>("file_path") {
+                let trait_name: Option<String> = row.get("trait_name").ok();
+                let trait_name = trait_name.filter(|s| !s.is_empty());
+                blocks.push(ImplBlockDetailNode {
+                    file_path,
+                    line_start: row.get::<i64>("line_start").unwrap_or(0) as u32,
+                    line_end: row.get::<i64>("line_end").unwrap_or(0) as u32,
+                    trait_name,
+                    methods: row.get("methods").unwrap_or_default(),
+                });
+            }
+        }
+
+        Ok(blocks)
+    }
+
+    // ========================================================================
     // Plan operations
     // ========================================================================
 
@@ -2666,6 +3573,61 @@ impl Neo4jClient {
         Ok(())
     }
 
+    /// Delete a plan and all its related data (tasks, steps, decisions, constraints)
+    pub async fn delete_plan(&self, plan_id: Uuid) -> Result<()> {
+        // Delete all steps belonging to tasks of this plan
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $id})-[:HAS_TASK]->(t:Task)-[:HAS_STEP]->(s:Step)
+            DETACH DELETE s
+            "#,
+        )
+        .param("id", plan_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete all decisions belonging to tasks of this plan
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $id})-[:HAS_TASK]->(t:Task)-[:INFORMED_BY]->(d:Decision)
+            DETACH DELETE d
+            "#,
+        )
+        .param("id", plan_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete all tasks belonging to this plan
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $id})-[:HAS_TASK]->(t:Task)
+            DETACH DELETE t
+            "#,
+        )
+        .param("id", plan_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete all constraints belonging to this plan
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $id})-[:CONSTRAINED_BY]->(c:Constraint)
+            DETACH DELETE c
+            "#,
+        )
+        .param("id", plan_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete the plan itself
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $id})
+            DETACH DELETE p
+            "#,
+        )
+        .param("id", plan_id.to_string());
+        self.graph.run(q).await?;
+
+        Ok(())
+    }
+
     // ========================================================================
     // Task operations
     // ========================================================================
@@ -2777,6 +3739,178 @@ impl Neo4jClient {
                 .ok()
                 .and_then(|s| s.parse().ok()),
         })
+    }
+
+    /// Convert a Neo4j Node to a StepNode
+    fn node_to_step(&self, node: &neo4rs::Node) -> Option<StepNode> {
+        Some(StepNode {
+            id: node.get::<String>("id").ok()?.parse().ok()?,
+            order: node.get::<i64>("order").ok()? as u32,
+            description: node.get::<String>("description").ok()?,
+            status: node
+                .get::<String>("status")
+                .ok()
+                .and_then(|s| serde_json::from_str(&format!("\"{}\"", s.to_lowercase())).ok())
+                .unwrap_or(StepStatus::Pending),
+            verification: node
+                .get::<String>("verification")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            created_at: node
+                .get::<String>("created_at")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_else(chrono::Utc::now),
+            updated_at: node
+                .get::<String>("updated_at")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            completed_at: node
+                .get::<String>("completed_at")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+        })
+    }
+
+    /// Convert a Neo4j Node to a DecisionNode
+    fn node_to_decision(&self, node: &neo4rs::Node) -> Option<DecisionNode> {
+        Some(DecisionNode {
+            id: node.get::<String>("id").ok()?.parse().ok()?,
+            description: node.get::<String>("description").ok()?,
+            rationale: node.get::<String>("rationale").ok()?,
+            alternatives: node.get::<Vec<String>>("alternatives").unwrap_or_default(),
+            chosen_option: node
+                .get::<String>("chosen_option")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            decided_by: node.get::<String>("decided_by").ok().unwrap_or_default(),
+            decided_at: node
+                .get::<String>("decided_at")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_else(chrono::Utc::now),
+        })
+    }
+
+    /// Get full task details including steps, decisions, dependencies, and modified files
+    pub async fn get_task_with_full_details(&self, task_id: Uuid) -> Result<Option<TaskDetails>> {
+        let q = query(
+            r#"
+            MATCH (t:Task {id: $id})
+            OPTIONAL MATCH (t)-[:HAS_STEP]->(s:Step)
+            OPTIONAL MATCH (t)-[:INFORMED_BY]->(d:Decision)
+            OPTIONAL MATCH (t)-[:DEPENDS_ON]->(dep:Task)
+            OPTIONAL MATCH (t)-[:MODIFIES]->(f:File)
+            RETURN t,
+                   collect(DISTINCT s) AS steps,
+                   collect(DISTINCT d) AS decisions,
+                   collect(DISTINCT dep.id) AS depends_on,
+                   collect(DISTINCT f.path) AS files
+            "#,
+        )
+        .param("id", task_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+
+        let row = match result.next().await? {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        let task_node: neo4rs::Node = row.get("t")?;
+        let task = self.node_to_task(&task_node)?;
+
+        // Parse steps
+        let step_nodes: Vec<neo4rs::Node> = row.get("steps").unwrap_or_default();
+        let mut steps: Vec<StepNode> = step_nodes
+            .iter()
+            .filter_map(|n| self.node_to_step(n))
+            .collect();
+        steps.sort_by_key(|s| s.order);
+
+        // Parse decisions
+        let decision_nodes: Vec<neo4rs::Node> = row.get("decisions").unwrap_or_default();
+        let decisions: Vec<DecisionNode> = decision_nodes
+            .iter()
+            .filter_map(|n| self.node_to_decision(n))
+            .collect();
+
+        // Parse dependencies
+        let depends_on_strs: Vec<String> = row.get("depends_on").unwrap_or_default();
+        let depends_on: Vec<Uuid> = depends_on_strs
+            .into_iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+
+        let modifies_files: Vec<String> = row.get("files").unwrap_or_default();
+
+        Ok(Some(TaskDetails {
+            task,
+            steps,
+            decisions,
+            depends_on,
+            modifies_files,
+        }))
+    }
+
+    /// Analyze the impact of a task on the codebase (files it modifies + their dependents)
+    pub async fn analyze_task_impact(&self, task_id: Uuid) -> Result<Vec<String>> {
+        let q = query(
+            r#"
+            MATCH (t:Task {id: $id})-[:MODIFIES]->(f:File)
+            OPTIONAL MATCH (f)<-[:IMPORTS*1..3]-(dependent:File)
+            RETURN f.path AS file, collect(DISTINCT dependent.path) AS dependents
+            "#,
+        )
+        .param("id", task_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        let mut impacted = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            let file: String = row.get("file")?;
+            impacted.push(file);
+            let dependents: Vec<String> = row.get("dependents").unwrap_or_default();
+            impacted.extend(dependents);
+        }
+
+        impacted.sort();
+        impacted.dedup();
+        Ok(impacted)
+    }
+
+    /// Find pending tasks in a plan that are blocked by uncompleted dependencies
+    pub async fn find_blocked_tasks(
+        &self,
+        plan_id: Uuid,
+    ) -> Result<Vec<(TaskNode, Vec<TaskNode>)>> {
+        let q = query(
+            r#"
+            MATCH (p:Plan {id: $plan_id})-[:HAS_TASK]->(t:Task {status: 'Pending'})
+            MATCH (t)-[:DEPENDS_ON]->(blocker:Task)
+            WHERE blocker.status <> 'Completed'
+            RETURN t, collect(blocker) AS blockers
+            "#,
+        )
+        .param("plan_id", plan_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        let mut blocked = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            let task_node: neo4rs::Node = row.get("t")?;
+            let task = self.node_to_task(&task_node)?;
+
+            let blocker_nodes: Vec<neo4rs::Node> = row.get("blockers").unwrap_or_default();
+            let blockers: Vec<TaskNode> = blocker_nodes
+                .iter()
+                .filter_map(|n| self.node_to_task(n).ok())
+                .collect();
+
+            blocked.push((task, blockers));
+        }
+
+        Ok(blocked)
     }
 
     /// Update task status
@@ -3111,6 +4245,41 @@ impl Neo4jClient {
         Ok(())
     }
 
+    /// Delete a task and all its related data (steps, decisions)
+    pub async fn delete_task(&self, task_id: Uuid) -> Result<()> {
+        // Delete all steps belonging to this task
+        let q = query(
+            r#"
+            MATCH (t:Task {id: $id})-[:HAS_STEP]->(s:Step)
+            DETACH DELETE s
+            "#,
+        )
+        .param("id", task_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete all decisions belonging to this task
+        let q = query(
+            r#"
+            MATCH (t:Task {id: $id})-[:INFORMED_BY]->(d:Decision)
+            DETACH DELETE d
+            "#,
+        )
+        .param("id", task_id.to_string());
+        self.graph.run(q).await?;
+
+        // Delete the task itself
+        let q = query(
+            r#"
+            MATCH (t:Task {id: $id})
+            DETACH DELETE t
+            "#,
+        )
+        .param("id", task_id.to_string());
+        self.graph.run(q).await?;
+
+        Ok(())
+    }
+
     // ========================================================================
     // Step operations
     // ========================================================================
@@ -3246,6 +4415,65 @@ impl Neo4jClient {
         }
     }
 
+    /// Get a single step by ID
+    pub async fn get_step(&self, step_id: Uuid) -> Result<Option<StepNode>> {
+        let q = query(
+            r#"
+            MATCH (s:Step {id: $id})
+            RETURN s
+            "#,
+        )
+        .param("id", step_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("s")?;
+            Ok(Some(StepNode {
+                id: node.get::<String>("id")?.parse()?,
+                order: node.get::<i64>("order")? as u32,
+                description: node.get("description")?,
+                status: serde_json::from_str(&format!(
+                    "\"{}\"",
+                    pascal_to_snake_case(&node.get::<String>("status")?)
+                ))
+                .unwrap_or(StepStatus::Pending),
+                verification: node
+                    .get::<String>("verification")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                created_at: node
+                    .get::<String>("created_at")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or_else(chrono::Utc::now),
+                updated_at: node
+                    .get::<String>("updated_at")
+                    .ok()
+                    .and_then(|s| s.parse().ok()),
+                completed_at: node
+                    .get::<String>("completed_at")
+                    .ok()
+                    .and_then(|s| s.parse().ok()),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a step
+    pub async fn delete_step(&self, step_id: Uuid) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (s:Step {id: $id})
+            DETACH DELETE s
+            "#,
+        )
+        .param("id", step_id.to_string());
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
     // ========================================================================
     // Constraint operations
     // ========================================================================
@@ -3317,6 +4545,80 @@ impl Neo4jClient {
         Ok(constraints)
     }
 
+    /// Get a single constraint by ID
+    pub async fn get_constraint(&self, constraint_id: Uuid) -> Result<Option<ConstraintNode>> {
+        let q = query(
+            r#"
+            MATCH (c:Constraint {id: $id})
+            RETURN c
+            "#,
+        )
+        .param("id", constraint_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("c")?;
+            Ok(Some(ConstraintNode {
+                id: node.get::<String>("id")?.parse()?,
+                constraint_type: serde_json::from_str(&format!(
+                    "\"{}\"",
+                    node.get::<String>("constraint_type")?.to_lowercase()
+                ))
+                .unwrap_or(ConstraintType::Other),
+                description: node.get("description")?,
+                enforced_by: node
+                    .get::<String>("enforced_by")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Update a constraint
+    pub async fn update_constraint(
+        &self,
+        constraint_id: Uuid,
+        description: Option<String>,
+        constraint_type: Option<ConstraintType>,
+        enforced_by: Option<String>,
+    ) -> Result<()> {
+        let mut set_clauses = vec![];
+        if description.is_some() {
+            set_clauses.push("c.description = $description");
+        }
+        if constraint_type.is_some() {
+            set_clauses.push("c.constraint_type = $constraint_type");
+        }
+        if enforced_by.is_some() {
+            set_clauses.push("c.enforced_by = $enforced_by");
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let cypher = format!(
+            "MATCH (c:Constraint {{id: $id}}) SET {}",
+            set_clauses.join(", ")
+        );
+
+        let mut q = query(&cypher).param("id", constraint_id.to_string());
+        if let Some(description) = description {
+            q = q.param("description", description);
+        }
+        if let Some(constraint_type) = constraint_type {
+            q = q.param("constraint_type", format!("{:?}", constraint_type));
+        }
+        if let Some(enforced_by) = enforced_by {
+            q = q.param("enforced_by", enforced_by);
+        }
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
     /// Delete a constraint
     pub async fn delete_constraint(&self, constraint_id: Uuid) -> Result<()> {
         let q = query(
@@ -3363,6 +4665,97 @@ impl Neo4jClient {
         )
         .param("decided_by", decision.decided_by.clone())
         .param("decided_at", decision.decided_at.to_rfc3339());
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
+    /// Get a single decision by ID
+    pub async fn get_decision(&self, decision_id: Uuid) -> Result<Option<DecisionNode>> {
+        let q = query(
+            r#"
+            MATCH (d:Decision {id: $id})
+            RETURN d
+            "#,
+        )
+        .param("id", decision_id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("d")?;
+            Ok(Some(DecisionNode {
+                id: node.get::<String>("id")?.parse()?,
+                description: node.get("description")?,
+                rationale: node.get("rationale")?,
+                alternatives: node.get::<Vec<String>>("alternatives").unwrap_or_default(),
+                chosen_option: node
+                    .get::<String>("chosen_option")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                decided_by: node.get::<String>("decided_by").ok().unwrap_or_default(),
+                decided_at: node
+                    .get::<String>("decided_at")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or_else(chrono::Utc::now),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Update a decision
+    pub async fn update_decision(
+        &self,
+        decision_id: Uuid,
+        description: Option<String>,
+        rationale: Option<String>,
+        chosen_option: Option<String>,
+    ) -> Result<()> {
+        let mut set_clauses = vec![];
+        if description.is_some() {
+            set_clauses.push("d.description = $description");
+        }
+        if rationale.is_some() {
+            set_clauses.push("d.rationale = $rationale");
+        }
+        if chosen_option.is_some() {
+            set_clauses.push("d.chosen_option = $chosen_option");
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let cypher = format!(
+            "MATCH (d:Decision {{id: $id}}) SET {}",
+            set_clauses.join(", ")
+        );
+
+        let mut q = query(&cypher).param("id", decision_id.to_string());
+        if let Some(description) = description {
+            q = q.param("description", description);
+        }
+        if let Some(rationale) = rationale {
+            q = q.param("rationale", rationale);
+        }
+        if let Some(chosen_option) = chosen_option {
+            q = q.param("chosen_option", chosen_option);
+        }
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
+    /// Delete a decision
+    pub async fn delete_decision(&self, decision_id: Uuid) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (d:Decision {id: $id})
+            DETACH DELETE d
+            "#,
+        )
+        .param("id", decision_id.to_string());
 
         self.graph.run(q).await?;
         Ok(())
@@ -3574,6 +4967,20 @@ impl Neo4jClient {
         }
 
         Ok(commits)
+    }
+
+    /// Delete a commit
+    pub async fn delete_commit(&self, hash: &str) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (c:Commit {hash: $hash})
+            DETACH DELETE c
+            "#,
+        )
+        .param("hash", hash);
+
+        self.graph.run(q).await?;
+        Ok(())
     }
 
     // ========================================================================
@@ -3834,6 +5241,20 @@ impl Neo4jClient {
         }
     }
 
+    /// Delete a release
+    pub async fn delete_release(&self, release_id: Uuid) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (r:Release {id: $id})
+            DETACH DELETE r
+            "#,
+        )
+        .param("id", release_id.to_string());
+
+        self.graph.run(q).await?;
+        Ok(())
+    }
+
     // ========================================================================
     // Milestone operations
     // ========================================================================
@@ -3862,7 +5283,14 @@ impl Neo4jClient {
             "description",
             milestone.description.clone().unwrap_or_default(),
         )
-        .param("status", format!("{:?}", milestone.status))
+        .param(
+            "status",
+            serde_json::to_value(&milestone.status)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string(),
+        )
         .param("project_id", milestone.project_id.to_string())
         .param(
             "target_date",
@@ -3997,7 +5425,14 @@ impl Neo4jClient {
         let mut q = query(&cypher).param("id", id.to_string());
 
         if let Some(ref s) = status {
-            q = q.param("status", format!("{:?}", s));
+            q = q.param(
+                "status",
+                serde_json::to_value(s)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            );
         }
         if let Some(d) = target_date {
             q = q.param("target_date", d.to_rfc3339());
@@ -4083,6 +5518,20 @@ impl Neo4jClient {
         } else {
             Ok((0, 0))
         }
+    }
+
+    /// Delete a milestone
+    pub async fn delete_milestone(&self, milestone_id: Uuid) -> Result<()> {
+        let q = query(
+            r#"
+            MATCH (m:Milestone {id: $id})
+            DETACH DELETE m
+            "#,
+        )
+        .param("id", milestone_id.to_string());
+
+        self.graph.run(q).await?;
+        Ok(())
     }
 
     // ========================================================================
@@ -4224,6 +5673,7 @@ impl Neo4jClient {
     #[allow(clippy::too_many_arguments)]
     pub async fn list_plans_filtered(
         &self,
+        project_id: Option<Uuid>,
         statuses: Option<Vec<String>>,
         priority_min: Option<i32>,
         priority_max: Option<i32>,
@@ -4248,8 +5698,17 @@ impl Neo4jClient {
         };
         let order_dir = if sort_order == "asc" { "ASC" } else { "DESC" };
 
+        let match_clause = if let Some(pid) = project_id {
+            format!(
+                "MATCH (proj:Project {{id: '{}'}})-[:HAS_PLAN]->(p:Plan)",
+                pid
+            )
+        } else {
+            "MATCH (p:Plan)".to_string()
+        };
+
         // Count query
-        let count_cypher = format!("MATCH (p:Plan) {} RETURN count(p) AS total", where_clause);
+        let count_cypher = format!("{} {} RETURN count(p) AS total", match_clause, where_clause);
         let count_result = self.execute(&count_cypher).await?;
         let total: i64 = count_result
             .first()
@@ -4259,14 +5718,14 @@ impl Neo4jClient {
         // Data query
         let cypher = format!(
             r#"
-            MATCH (p:Plan)
+            {}
             {}
             RETURN p
             ORDER BY {} {}
             SKIP {}
             LIMIT {}
             "#,
-            where_clause, order_field, order_dir, offset, limit
+            match_clause, where_clause, order_field, order_dir, offset, limit
         );
 
         let mut result = self.graph.execute(query(&cypher)).await?;
@@ -5380,6 +6839,258 @@ impl Neo4jClient {
             changes,
             assertion_rule,
             last_assertion_result: None, // Loaded separately if needed
+        })
+    }
+
+    // ========================================================================
+    // Chat Session operations
+    // ========================================================================
+
+    /// Create a new chat session, optionally linking to a project via slug
+    pub async fn create_chat_session(&self, session: &ChatSessionNode) -> Result<()> {
+        let q = if session.project_slug.is_some() {
+            query(
+                r#"
+                CREATE (s:ChatSession {
+                    id: $id,
+                    cli_session_id: $cli_session_id,
+                    project_slug: $project_slug,
+                    cwd: $cwd,
+                    title: $title,
+                    model: $model,
+                    created_at: datetime($created_at),
+                    updated_at: datetime($updated_at),
+                    message_count: $message_count,
+                    total_cost_usd: $total_cost_usd,
+                    conversation_id: $conversation_id
+                })
+                WITH s
+                OPTIONAL MATCH (p:Project {slug: $project_slug})
+                FOREACH (_ IN CASE WHEN p IS NOT NULL THEN [1] ELSE [] END |
+                    CREATE (p)-[:HAS_CHAT_SESSION]->(s)
+                )
+                "#,
+            )
+        } else {
+            query(
+                r#"
+                CREATE (s:ChatSession {
+                    id: $id,
+                    cli_session_id: $cli_session_id,
+                    project_slug: $project_slug,
+                    cwd: $cwd,
+                    title: $title,
+                    model: $model,
+                    created_at: datetime($created_at),
+                    updated_at: datetime($updated_at),
+                    message_count: $message_count,
+                    total_cost_usd: $total_cost_usd,
+                    conversation_id: $conversation_id
+                })
+                "#,
+            )
+        };
+
+        self.graph
+            .run(
+                q.param("id", session.id.to_string())
+                    .param(
+                        "cli_session_id",
+                        session.cli_session_id.clone().unwrap_or_default(),
+                    )
+                    .param(
+                        "project_slug",
+                        session.project_slug.clone().unwrap_or_default(),
+                    )
+                    .param("cwd", session.cwd.clone())
+                    .param("title", session.title.clone().unwrap_or_default())
+                    .param("model", session.model.clone())
+                    .param("created_at", session.created_at.to_rfc3339())
+                    .param("updated_at", session.updated_at.to_rfc3339())
+                    .param("message_count", session.message_count)
+                    .param("total_cost_usd", session.total_cost_usd.unwrap_or(0.0))
+                    .param(
+                        "conversation_id",
+                        session.conversation_id.clone().unwrap_or_default(),
+                    ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Get a chat session by ID
+    pub async fn get_chat_session(&self, id: Uuid) -> Result<Option<ChatSessionNode>> {
+        let q = query("MATCH (s:ChatSession {id: $id}) RETURN s").param("id", id.to_string());
+
+        let mut result = self.graph.execute(q).await?;
+        if let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("s")?;
+            Ok(Some(Self::parse_chat_session_node(&node)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List chat sessions with optional project_slug filter
+    pub async fn list_chat_sessions(
+        &self,
+        project_slug: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<ChatSessionNode>, usize)> {
+        let (data_query, count_query) = if let Some(slug) = project_slug {
+            (
+                query(
+                    r#"
+                    MATCH (s:ChatSession {project_slug: $slug})
+                    RETURN s ORDER BY s.updated_at DESC
+                    SKIP $offset LIMIT $limit
+                    "#,
+                )
+                .param("slug", slug.to_string())
+                .param("offset", offset as i64)
+                .param("limit", limit as i64),
+                query("MATCH (s:ChatSession {project_slug: $slug}) RETURN count(s) AS total")
+                    .param("slug", slug.to_string()),
+            )
+        } else {
+            (
+                query(
+                    r#"
+                    MATCH (s:ChatSession)
+                    RETURN s ORDER BY s.updated_at DESC
+                    SKIP $offset LIMIT $limit
+                    "#,
+                )
+                .param("offset", offset as i64)
+                .param("limit", limit as i64),
+                query("MATCH (s:ChatSession) RETURN count(s) AS total"),
+            )
+        };
+
+        let mut sessions = Vec::new();
+        let mut result = self.graph.execute(data_query).await?;
+        while let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("s")?;
+            sessions.push(Self::parse_chat_session_node(&node)?);
+        }
+
+        let mut count_result = self.graph.execute(count_query).await?;
+        let total = if let Some(row) = count_result.next().await? {
+            row.get::<i64>("total")? as usize
+        } else {
+            0
+        };
+
+        Ok((sessions, total))
+    }
+
+    /// Update a chat session (partial, None fields are skipped)
+    pub async fn update_chat_session(
+        &self,
+        id: Uuid,
+        cli_session_id: Option<String>,
+        title: Option<String>,
+        message_count: Option<i64>,
+        total_cost_usd: Option<f64>,
+        conversation_id: Option<String>,
+    ) -> Result<Option<ChatSessionNode>> {
+        let mut set_clauses = vec!["s.updated_at = datetime()".to_string()];
+
+        if let Some(ref v) = cli_session_id {
+            set_clauses.push(format!("s.cli_session_id = '{}'", v.replace('\'', "\\'")));
+        }
+        if let Some(ref v) = title {
+            set_clauses.push(format!("s.title = '{}'", v.replace('\'', "\\'")));
+        }
+        if let Some(v) = message_count {
+            set_clauses.push(format!("s.message_count = {}", v));
+        }
+        if let Some(v) = total_cost_usd {
+            set_clauses.push(format!("s.total_cost_usd = {}", v));
+        }
+        if let Some(ref v) = conversation_id {
+            set_clauses.push(format!("s.conversation_id = '{}'", v.replace('\'', "\\'")));
+        }
+
+        let cypher = format!(
+            "MATCH (s:ChatSession {{id: $id}}) SET {} RETURN s",
+            set_clauses.join(", ")
+        );
+
+        let q = query(&cypher).param("id", id.to_string());
+        let mut result = self.graph.execute(q).await?;
+
+        if let Some(row) = result.next().await? {
+            let node: neo4rs::Node = row.get("s")?;
+            Ok(Some(Self::parse_chat_session_node(&node)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a chat session
+    pub async fn delete_chat_session(&self, id: Uuid) -> Result<bool> {
+        // First check existence, then delete
+        let check =
+            query("MATCH (s:ChatSession {id: $id}) RETURN s.id AS sid").param("id", id.to_string());
+        let mut check_result = self.graph.execute(check).await?;
+        let exists = check_result.next().await?.is_some();
+
+        if exists {
+            let q = query("MATCH (s:ChatSession {id: $id}) DETACH DELETE s")
+                .param("id", id.to_string());
+            self.graph.run(q).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Parse a Neo4j Node into a ChatSessionNode
+    fn parse_chat_session_node(node: &neo4rs::Node) -> Result<ChatSessionNode> {
+        let cli_session_id: String = node.get("cli_session_id").unwrap_or_default();
+        let project_slug: String = node.get("project_slug").unwrap_or_default();
+        let title: String = node.get("title").unwrap_or_default();
+        let conversation_id: String = node.get("conversation_id").unwrap_or_default();
+
+        Ok(ChatSessionNode {
+            id: node.get::<String>("id")?.parse()?,
+            cli_session_id: if cli_session_id.is_empty() {
+                None
+            } else {
+                Some(cli_session_id)
+            },
+            project_slug: if project_slug.is_empty() {
+                None
+            } else {
+                Some(project_slug)
+            },
+            cwd: node.get("cwd")?,
+            title: if title.is_empty() { None } else { Some(title) },
+            model: node.get("model")?,
+            created_at: node
+                .get::<String>("created_at")?
+                .parse()
+                .unwrap_or_else(|_| chrono::Utc::now()),
+            updated_at: node
+                .get::<String>("updated_at")?
+                .parse()
+                .unwrap_or_else(|_| chrono::Utc::now()),
+            message_count: node.get("message_count").unwrap_or(0),
+            total_cost_usd: {
+                let v: f64 = node.get("total_cost_usd").unwrap_or(0.0);
+                if v == 0.0 {
+                    None
+                } else {
+                    Some(v)
+                }
+            },
+            conversation_id: if conversation_id.is_empty() {
+                None
+            } else {
+                Some(conversation_id)
+            },
         })
     }
 }

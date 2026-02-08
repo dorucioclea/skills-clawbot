@@ -2,13 +2,13 @@
 //!
 //! Implements the actual logic for each MCP tool.
 
-use crate::meilisearch::MeiliClient;
+use crate::chat::ChatManager;
+use crate::meilisearch::SearchStore;
 use crate::neo4j::models::*;
-use crate::neo4j::Neo4jClient;
+use crate::neo4j::GraphStore;
 use crate::orchestrator::Orchestrator;
 use crate::plan::models::*;
 use anyhow::{anyhow, Result};
-use neo4rs;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -16,18 +16,27 @@ use uuid::Uuid;
 /// Handles MCP tool calls
 pub struct ToolHandler {
     orchestrator: Arc<Orchestrator>,
+    chat_manager: Option<Arc<ChatManager>>,
 }
 
 impl ToolHandler {
     pub fn new(orchestrator: Arc<Orchestrator>) -> Self {
-        Self { orchestrator }
+        Self {
+            orchestrator,
+            chat_manager: None,
+        }
     }
 
-    fn neo4j(&self) -> &Neo4jClient {
+    pub fn with_chat_manager(mut self, chat_manager: Option<Arc<ChatManager>>) -> Self {
+        self.chat_manager = chat_manager;
+        self
+    }
+
+    fn neo4j(&self) -> &dyn GraphStore {
         self.orchestrator.neo4j()
     }
 
-    fn meili(&self) -> &MeiliClient {
+    fn meili(&self) -> &dyn SearchStore {
         self.orchestrator.meili()
     }
 
@@ -45,6 +54,8 @@ impl ToolHandler {
             "get_project_roadmap" => self.get_project_roadmap(args).await,
             "list_project_plans" => self.list_project_plans(args).await,
 
+            "update_project" => self.update_project(args).await,
+
             // Plans
             "list_plans" => self.list_plans(args).await,
             "create_plan" => self.create_plan(args).await,
@@ -54,12 +65,14 @@ impl ToolHandler {
             "unlink_plan_from_project" => self.unlink_plan_from_project(args).await,
             "get_dependency_graph" => self.get_dependency_graph(args).await,
             "get_critical_path" => self.get_critical_path(args).await,
+            "delete_plan" => self.delete_plan(args).await,
 
             // Tasks
             "list_tasks" => self.list_tasks(args).await,
             "create_task" => self.create_task(args).await,
             "get_task" => self.get_task(args).await,
             "update_task" => self.update_task(args).await,
+            "delete_task" => self.delete_task(args).await,
             "get_next_task" => self.get_next_task(args).await,
             "add_task_dependencies" => self.add_task_dependencies(args).await,
             "remove_task_dependency" => self.remove_task_dependency(args).await,
@@ -72,12 +85,16 @@ impl ToolHandler {
             // Steps
             "list_steps" => self.list_steps(args).await,
             "create_step" => self.create_step(args).await,
+            "get_step" => self.get_step(args).await,
+            "delete_step" => self.delete_step_handler(args).await,
             "update_step" => self.update_step(args).await,
             "get_step_progress" => self.get_step_progress(args).await,
 
             // Constraints
             "list_constraints" => self.list_constraints(args).await,
             "add_constraint" => self.add_constraint(args).await,
+            "get_constraint" => self.get_constraint(args).await,
+            "update_constraint" => self.update_constraint(args).await,
             "delete_constraint" => self.delete_constraint(args).await,
 
             // Releases
@@ -85,6 +102,7 @@ impl ToolHandler {
             "create_release" => self.create_release(args).await,
             "get_release" => self.get_release(args).await,
             "update_release" => self.update_release(args).await,
+            "delete_release" => self.delete_release(args).await,
             "add_task_to_release" => self.add_task_to_release(args).await,
             "add_commit_to_release" => self.add_commit_to_release(args).await,
 
@@ -93,6 +111,7 @@ impl ToolHandler {
             "create_milestone" => self.create_milestone(args).await,
             "get_milestone" => self.get_milestone(args).await,
             "update_milestone" => self.update_milestone(args).await,
+            "delete_milestone" => self.delete_milestone(args).await,
             "get_milestone_progress" => self.get_milestone_progress(args).await,
             "add_task_to_milestone" => self.add_task_to_milestone(args).await,
 
@@ -118,6 +137,9 @@ impl ToolHandler {
             "get_impl_blocks" => self.get_impl_blocks(args).await,
 
             // Decisions
+            "get_decision" => self.get_decision(args).await,
+            "update_decision" => self.update_decision(args).await,
+            "delete_decision" => self.delete_decision(args).await,
             "search_decisions" => self.search_decisions(args).await,
 
             // Sync
@@ -145,6 +167,9 @@ impl ToolHandler {
             "get_context_notes" => self.get_context_notes(args).await,
             "get_notes_needing_review" => self.get_notes_needing_review(args).await,
             "update_staleness_scores" => self.update_staleness_scores(args).await,
+            "list_project_notes" => self.list_project_notes(args).await,
+            "get_propagated_notes" => self.get_propagated_notes(args).await,
+            "get_entity_notes" => self.get_entity_notes(args).await,
 
             // Workspaces
             "list_workspaces" => self.list_workspaces(args).await,
@@ -158,6 +183,7 @@ impl ToolHandler {
             "remove_project_from_workspace" => self.remove_project_from_workspace(args).await,
 
             // Workspace Milestones
+            "list_all_workspace_milestones" => self.list_all_workspace_milestones(args).await,
             "list_workspace_milestones" => self.list_workspace_milestones(args).await,
             "create_workspace_milestone" => self.create_workspace_milestone(args).await,
             "get_workspace_milestone" => self.get_workspace_milestone(args).await,
@@ -170,6 +196,7 @@ impl ToolHandler {
             "list_resources" => self.list_resources(args).await,
             "create_resource" => self.create_resource(args).await,
             "get_resource" => self.get_resource(args).await,
+            "update_resource" => self.update_resource(args).await,
             "delete_resource" => self.delete_resource(args).await,
             "link_resource_to_project" => self.link_resource_to_project(args).await,
 
@@ -177,11 +204,19 @@ impl ToolHandler {
             "list_components" => self.list_components(args).await,
             "create_component" => self.create_component(args).await,
             "get_component" => self.get_component(args).await,
+            "update_component" => self.update_component(args).await,
             "delete_component" => self.delete_component(args).await,
             "add_component_dependency" => self.add_component_dependency(args).await,
             "remove_component_dependency" => self.remove_component_dependency(args).await,
             "map_component_to_project" => self.map_component_to_project(args).await,
             "get_workspace_topology" => self.get_workspace_topology(args).await,
+
+            // Chat
+            "list_chat_sessions" => self.list_chat_sessions(args).await,
+            "get_chat_session" => self.get_chat_session(args).await,
+            "delete_chat_session" => self.delete_chat_session(args).await,
+            "chat_send_message" => self.chat_send_message(args).await,
+            "list_chat_messages" => self.list_chat_messages(args).await,
 
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
@@ -240,7 +275,7 @@ impl ToolHandler {
             last_synced: None,
         };
 
-        self.neo4j().create_project(&project).await?;
+        self.orchestrator.create_project(&project).await?;
         Ok(serde_json::to_value(project)?)
     }
 
@@ -259,6 +294,36 @@ impl ToolHandler {
         Ok(serde_json::to_value(project)?)
     }
 
+    async fn update_project(&self, args: Value) -> Result<Value> {
+        let slug = args
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("slug is required"))?;
+
+        let project = self
+            .neo4j()
+            .get_project_by_slug(slug)
+            .await?
+            .ok_or_else(|| anyhow!("Project not found: {}", slug))?;
+
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let description = args
+            .get("description")
+            .map(|v| v.as_str().map(|s| s.to_string()));
+        let root_path = args
+            .get("root_path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        self.orchestrator
+            .update_project(project.id, name, description, root_path)
+            .await?;
+        Ok(json!({"updated": true}))
+    }
+
     async fn delete_project(&self, args: Value) -> Result<Value> {
         let slug = args
             .get("slug")
@@ -271,7 +336,7 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Project not found: {}", slug))?;
 
-        self.neo4j().delete_project(project.id).await?;
+        self.orchestrator.delete_project(project.id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -360,6 +425,12 @@ impl ToolHandler {
     // ========================================================================
 
     async fn list_plans(&self, args: Value) -> Result<Value> {
+        let project_id = args
+            .get("project_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .map_err(|_| anyhow!("Invalid project_id UUID"))?;
         let status = args
             .get("status")
             .and_then(|v| v.as_str())
@@ -384,6 +455,7 @@ impl ToolHandler {
         let (plans, total) = self
             .neo4j()
             .list_plans_filtered(
+                project_id,
                 status,
                 priority_min,
                 priority_max,
@@ -467,7 +539,7 @@ impl ToolHandler {
         let plan_id = parse_uuid(&args, "plan_id")?;
         let project_id = parse_uuid(&args, "project_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .link_plan_to_project(plan_id, project_id)
             .await?;
         Ok(json!({"linked": true}))
@@ -476,8 +548,18 @@ impl ToolHandler {
     async fn unlink_plan_from_project(&self, args: Value) -> Result<Value> {
         let plan_id = parse_uuid(&args, "plan_id")?;
 
-        self.neo4j().unlink_plan_from_project(plan_id).await?;
+        self.orchestrator.unlink_plan_from_project(plan_id).await?;
         Ok(json!({"unlinked": true}))
+    }
+
+    async fn delete_plan(&self, args: Value) -> Result<Value> {
+        let plan_id = parse_uuid(&args, "plan_id")?;
+
+        self.orchestrator
+            .plan_manager()
+            .delete_plan(plan_id)
+            .await?;
+        Ok(json!({"deleted": true}))
     }
 
     async fn get_dependency_graph(&self, args: Value) -> Result<Value> {
@@ -734,12 +816,28 @@ impl ToolHandler {
         Ok(serde_json::to_value(details)?)
     }
 
+    async fn delete_task(&self, args: Value) -> Result<Value> {
+        let task_id = parse_uuid(&args, "task_id")?;
+        self.orchestrator
+            .plan_manager()
+            .delete_task(task_id)
+            .await?;
+        Ok(json!({"deleted": true}))
+    }
+
     async fn update_task(&self, args: Value) -> Result<Value> {
         let task_id = parse_uuid(&args, "task_id")?;
-        let status = args
-            .get("status")
-            .and_then(|v| v.as_str())
-            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+        let status = match args.get("status").and_then(|v| v.as_str()) {
+            Some(s) => Some(
+                serde_json::from_str::<TaskStatus>(&format!("\"{}\"", s)).map_err(|_| {
+                    anyhow!(
+                        "Invalid task status '{}'. Valid: pending, in_progress, blocked, completed, failed",
+                        s
+                    )
+                })?,
+            ),
+            None => None,
+        };
         let assigned_to = args
             .get("assigned_to")
             .and_then(|v| v.as_str())
@@ -793,7 +891,9 @@ impl ToolHandler {
             .ok_or_else(|| anyhow!("dependency_ids is required"))?;
 
         for dep_id in dependency_ids {
-            self.neo4j().add_task_dependency(task_id, dep_id).await?;
+            self.orchestrator
+                .add_task_dependency(task_id, dep_id)
+                .await?;
         }
         Ok(json!({"added": true}))
     }
@@ -802,7 +902,7 @@ impl ToolHandler {
         let task_id = parse_uuid(&args, "task_id")?;
         let dependency_id = parse_uuid(&args, "dependency_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .remove_task_dependency(task_id, dependency_id)
             .await?;
         Ok(json!({"removed": true}))
@@ -994,7 +1094,7 @@ impl ToolHandler {
     async fn delete_constraint(&self, args: Value) -> Result<Value> {
         let constraint_id = parse_uuid(&args, "constraint_id")?;
 
-        self.neo4j().delete_constraint(constraint_id).await?;
+        self.orchestrator.delete_constraint(constraint_id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -1056,7 +1156,7 @@ impl ToolHandler {
             project_id,
         };
 
-        self.neo4j().create_release(&release).await?;
+        self.orchestrator.create_release(&release).await?;
         Ok(serde_json::to_value(release)?)
     }
 
@@ -1078,10 +1178,17 @@ impl ToolHandler {
 
     async fn update_release(&self, args: Value) -> Result<Value> {
         let release_id = parse_uuid(&args, "release_id")?;
-        let status = args
-            .get("status")
-            .and_then(|v| v.as_str())
-            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+        let status = match args.get("status").and_then(|v| v.as_str()) {
+            Some(s) => Some(
+                serde_json::from_str::<ReleaseStatus>(&format!("\"{}\"", s)).map_err(|_| {
+                    anyhow!(
+                        "Invalid release status '{}'. Valid: planned, in_progress, released, cancelled",
+                        s
+                    )
+                })?,
+            ),
+            None => None,
+        };
         let target_date = args
             .get("target_date")
             .and_then(|v| v.as_str())
@@ -1101,7 +1208,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        self.neo4j()
+        self.orchestrator
             .update_release(
                 release_id,
                 status,
@@ -1118,7 +1225,7 @@ impl ToolHandler {
         let release_id = parse_uuid(&args, "release_id")?;
         let task_id = parse_uuid(&args, "task_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .add_task_to_release(release_id, task_id)
             .await?;
         Ok(json!({"added": true}))
@@ -1131,7 +1238,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("commit_sha is required"))?;
 
-        self.neo4j()
+        self.orchestrator
             .add_commit_to_release(release_id, commit_sha)
             .await?;
         Ok(json!({"added": true}))
@@ -1190,7 +1297,7 @@ impl ToolHandler {
             project_id,
         };
 
-        self.neo4j().create_milestone(&milestone).await?;
+        self.orchestrator.create_milestone(&milestone).await?;
         Ok(serde_json::to_value(milestone)?)
     }
 
@@ -1212,10 +1319,14 @@ impl ToolHandler {
 
     async fn update_milestone(&self, args: Value) -> Result<Value> {
         let milestone_id = parse_uuid(&args, "milestone_id")?;
-        let status = args
-            .get("status")
-            .and_then(|v| v.as_str())
-            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+        let status = match args.get("status").and_then(|v| v.as_str()) {
+            Some(s) => Some(
+                serde_json::from_str::<MilestoneStatus>(&format!("\"{}\"", s)).map_err(|_| {
+                    anyhow!("Invalid milestone status '{}'. Valid: planned, open, in_progress, completed, closed", s)
+                })?,
+            ),
+            None => None,
+        };
         let target_date = args
             .get("target_date")
             .and_then(|v| v.as_str())
@@ -1235,7 +1346,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        self.neo4j()
+        self.orchestrator
             .update_milestone(
                 milestone_id,
                 status,
@@ -1269,7 +1380,7 @@ impl ToolHandler {
         let milestone_id = parse_uuid(&args, "milestone_id")?;
         let task_id = parse_uuid(&args, "task_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .add_task_to_milestone(milestone_id, task_id)
             .await?;
         Ok(json!({"added": true}))
@@ -1300,7 +1411,7 @@ impl ToolHandler {
             timestamp: chrono::Utc::now(),
         };
 
-        self.neo4j().create_commit(&commit).await?;
+        self.orchestrator.create_commit(&commit).await?;
         Ok(serde_json::to_value(commit)?)
     }
 
@@ -1311,7 +1422,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("commit_sha is required"))?;
 
-        self.neo4j()
+        self.orchestrator
             .link_commit_to_task(commit_sha, task_id)
             .await?;
         Ok(json!({"linked": true}))
@@ -1324,7 +1435,7 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("commit_sha is required"))?;
 
-        self.neo4j()
+        self.orchestrator
             .link_commit_to_plan(commit_sha, plan_id)
             .await?;
         Ok(json!({"linked": true}))
@@ -1390,37 +1501,14 @@ impl ToolHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("file_path is required"))?;
 
-        // Get all symbols in the file
-        let q = neo4rs::query(
-            r#"
-            MATCH (f:File {path: $path})
-            OPTIONAL MATCH (f)-[:CONTAINS]->(func:Function)
-            OPTIONAL MATCH (f)-[:CONTAINS]->(st:Struct)
-            OPTIONAL MATCH (f)-[:CONTAINS]->(tr:Trait)
-            OPTIONAL MATCH (f)-[:CONTAINS]->(en:Enum)
-            RETURN
-                collect(DISTINCT func.name) AS functions,
-                collect(DISTINCT st.name) AS structs,
-                collect(DISTINCT tr.name) AS traits,
-                collect(DISTINCT en.name) AS enums
-            "#,
-        )
-        .param("path", file_path.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let row = rows.first().ok_or_else(|| anyhow!("File not found"))?;
-
-        let functions: Vec<String> = row.get("functions").unwrap_or_default();
-        let structs: Vec<String> = row.get("structs").unwrap_or_default();
-        let traits: Vec<String> = row.get("traits").unwrap_or_default();
-        let enums: Vec<String> = row.get("enums").unwrap_or_default();
+        let symbols = self.neo4j().get_file_symbol_names(file_path).await?;
 
         Ok(json!({
             "file_path": file_path,
-            "functions": functions,
-            "structs": structs,
-            "traits": traits,
-            "enums": enums
+            "functions": symbols.functions,
+            "structs": symbols.structs,
+            "traits": symbols.traits,
+            "enums": symbols.enums
         }))
     }
 
@@ -1429,40 +1517,18 @@ impl ToolHandler {
             .get("symbol")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("symbol is required"))?;
-        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(20);
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
 
-        // Find files that reference this symbol (functions, structs, traits)
-        let q = neo4rs::query(&format!(
-            r#"
-            MATCH (s)
-            WHERE (s:Function OR s:Struct OR s:Trait OR s:Enum) AND s.name = $name
-            OPTIONAL MATCH (caller:Function)-[:CALLS]->(s)
-            OPTIONAL MATCH (f:File)-[:CONTAINS]->(s)
-            RETURN DISTINCT
-                s.name AS name,
-                labels(s)[0] AS type,
-                s.file_path AS definition_file,
-                collect(DISTINCT caller.name)[0..{}] AS callers,
-                f.path AS file_path
-            "#,
-            limit
-        ))
-        .param("name", symbol.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let references: Vec<Value> = rows
+        let refs = self.neo4j().find_symbol_references(symbol, limit).await?;
+        let references: Vec<Value> = refs
             .into_iter()
-            .filter_map(|row| {
-                let name: String = row.get("name").ok()?;
-                let symbol_type: String = row.get("type").ok()?;
-                let def_file: String = row.get("definition_file").ok().unwrap_or_default();
-                let callers: Vec<String> = row.get("callers").ok().unwrap_or_default();
-                Some(json!({
-                    "name": name,
-                    "type": symbol_type,
-                    "definition_file": def_file,
-                    "callers": callers
-                }))
+            .map(|r| {
+                json!({
+                    "file_path": r.file_path,
+                    "line": r.line,
+                    "context": r.context,
+                    "type": r.reference_type
+                })
             })
             .collect();
 
@@ -1482,19 +1548,8 @@ impl ToolHandler {
         let dependents = self.neo4j().find_dependent_files(file_path, 3).await?;
 
         // Get files this file imports
-        let q = neo4rs::query(
-            r#"
-            MATCH (f:File {path: $path})-[:IMPORTS]->(imported:File)
-            RETURN imported.path AS path
-            "#,
-        )
-        .param("path", file_path.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let imports: Vec<String> = rows
-            .into_iter()
-            .filter_map(|row| row.get("path").ok())
-            .collect();
+        let direct_imports = self.neo4j().get_file_direct_imports(file_path).await?;
+        let imports: Vec<String> = direct_imports.into_iter().map(|i| i.path).collect();
 
         Ok(json!({
             "imports": imports,
@@ -1509,39 +1564,14 @@ impl ToolHandler {
             .ok_or_else(|| anyhow!("function is required"))?;
         let depth = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(2) as u32;
 
-        // Find functions that call this function
-        let q = neo4rs::query(&format!(
-            r#"
-            MATCH (f:Function {{name: $name}})
-            MATCH (caller:Function)-[:CALLS*1..{}]->(f)
-            RETURN DISTINCT caller.name AS name
-            "#,
-            depth
-        ))
-        .param("name", function.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let callers: Vec<String> = rows
-            .into_iter()
-            .filter_map(|r| r.get::<String>("name").ok())
-            .collect();
-
-        // Find functions this function calls
-        let q = neo4rs::query(&format!(
-            r#"
-            MATCH (f:Function {{name: $name}})
-            MATCH (f)-[:CALLS*1..{}]->(callee:Function)
-            RETURN DISTINCT callee.name AS name
-            "#,
-            depth
-        ))
-        .param("name", function.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let callees: Vec<String> = rows
-            .into_iter()
-            .filter_map(|r| r.get::<String>("name").ok())
-            .collect();
+        let callers = self
+            .neo4j()
+            .get_function_callers_by_name(function, depth)
+            .await?;
+        let callees = self
+            .neo4j()
+            .get_function_callees_by_name(function, depth)
+            .await?;
 
         Ok(json!({
             "function": function,
@@ -1560,20 +1590,7 @@ impl ToolHandler {
         let dependents = self.neo4j().find_dependent_files(target, 3).await?;
 
         // If target is a function, find callers
-        let q = neo4rs::query(
-            r#"
-            MATCH (f:Function {name: $name})
-            OPTIONAL MATCH (caller:Function)-[:CALLS]->(f)
-            RETURN count(caller) AS caller_count, f.file_path AS file_path
-            "#,
-        )
-        .param("name", target.to_string());
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let caller_count: i64 = rows
-            .first()
-            .and_then(|r| r.get("caller_count").ok())
-            .unwrap_or(0);
+        let caller_count = self.neo4j().get_function_caller_count(target).await?;
 
         Ok(json!({
             "target": target,
@@ -1584,47 +1601,16 @@ impl ToolHandler {
     }
 
     async fn get_architecture(&self, _args: Value) -> Result<Value> {
-        // Get file count by language
-        let q = neo4rs::query(
-            r#"
-            MATCH (f:File)
-            RETURN f.language AS language, count(f) AS count
-            ORDER BY count DESC
-            "#,
-        );
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let languages: Vec<Value> = rows
+        let lang_stats = self.neo4j().get_language_stats().await?;
+        let languages: Vec<Value> = lang_stats
             .into_iter()
-            .filter_map(|r| {
-                let lang: String = r.get("language").ok()?;
-                let count: i64 = r.get("count").ok()?;
-                Some(json!({"language": lang, "file_count": count}))
-            })
+            .map(|s| json!({"language": s.language, "file_count": s.file_count}))
             .collect();
 
-        // Get most connected files (highest import relationships)
-        let q = neo4rs::query(
-            r#"
-            MATCH (f:File)
-            OPTIONAL MATCH (f)-[:IMPORTS]->(imported:File)
-            OPTIONAL MATCH (dependent:File)-[:IMPORTS]->(f)
-            WITH f, count(DISTINCT imported) AS imports, count(DISTINCT dependent) AS dependents
-            RETURN f.path AS path, imports, dependents, imports + dependents AS connections
-            ORDER BY connections DESC
-            LIMIT 10
-            "#,
-        );
-
-        let rows = self.neo4j().execute_with_params(q).await?;
-        let key_files: Vec<Value> = rows
+        let connected = self.neo4j().get_most_connected_files_detailed(10).await?;
+        let key_files: Vec<Value> = connected
             .into_iter()
-            .filter_map(|r| {
-                let path: String = r.get("path").ok()?;
-                let imports: i64 = r.get("imports").ok().unwrap_or(0);
-                let dependents: i64 = r.get("dependents").ok().unwrap_or(0);
-                Some(json!({"path": path, "imports": imports, "dependents": dependents}))
-            })
+            .map(|f| json!({"path": f.path, "imports": f.imports, "dependents": f.dependents}))
             .collect();
 
         Ok(json!({
@@ -2149,6 +2135,82 @@ impl ToolHandler {
         Ok(json!({"notes_updated": count}))
     }
 
+    async fn list_project_notes(&self, args: Value) -> Result<Value> {
+        let project_id = parse_uuid(&args, "project_id")?;
+        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(50);
+        let offset = args.get("offset").and_then(|v| v.as_i64()).unwrap_or(0);
+
+        let filters = crate::notes::NoteFilters {
+            limit: Some(limit),
+            offset: Some(offset),
+            ..Default::default()
+        };
+
+        let (notes, total) = self
+            .orchestrator
+            .note_manager()
+            .list_project_notes(project_id, &filters)
+            .await?;
+
+        Ok(json!({
+            "items": notes,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }))
+    }
+
+    async fn get_propagated_notes(&self, args: Value) -> Result<Value> {
+        let entity_type_str = args
+            .get("entity_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("entity_type is required"))?;
+        let entity_id = args
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("entity_id is required"))?;
+        let max_depth = args.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(3) as u32;
+        let min_score = args
+            .get("min_score")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.1);
+
+        let entity_type: crate::notes::EntityType = entity_type_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid entity type: {}", entity_type_str))?;
+
+        let notes = self
+            .orchestrator
+            .note_manager()
+            .get_propagated_notes(&entity_type, entity_id, max_depth, min_score)
+            .await?;
+
+        Ok(serde_json::to_value(notes)?)
+    }
+
+    async fn get_entity_notes(&self, args: Value) -> Result<Value> {
+        let entity_type_str = args
+            .get("entity_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("entity_type is required"))?;
+        let entity_id = args
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("entity_id is required"))?;
+
+        let entity_type: crate::notes::EntityType = entity_type_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid entity type: {}", entity_type_str))?;
+
+        let notes = self
+            .orchestrator
+            .neo4j()
+            .get_notes_for_entity(&entity_type, entity_id)
+            .await?;
+
+        Ok(serde_json::to_value(notes)?)
+    }
+
     // ========================================================================
     // Workspace Handlers
     // ========================================================================
@@ -2215,7 +2277,7 @@ impl ToolHandler {
             metadata,
         };
 
-        self.neo4j().create_workspace(&workspace).await?;
+        self.orchestrator.create_workspace(&workspace).await?;
         Ok(serde_json::to_value(workspace)?)
     }
 
@@ -2256,7 +2318,7 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found"))?;
 
-        self.neo4j()
+        self.orchestrator
             .update_workspace(workspace.id, name, description, metadata)
             .await?;
 
@@ -2283,7 +2345,7 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found"))?;
 
-        self.neo4j().delete_workspace(workspace.id).await?;
+        self.orchestrator.delete_workspace(workspace.id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -2356,8 +2418,8 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found"))?;
 
-        self.neo4j()
-            .add_project_to_workspace(project_id, workspace.id)
+        self.orchestrator
+            .add_project_to_workspace(workspace.id, project_id)
             .await?;
 
         Ok(json!({"added": true}))
@@ -2376,8 +2438,8 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found"))?;
 
-        self.neo4j()
-            .remove_project_from_workspace(project_id, workspace.id)
+        self.orchestrator
+            .remove_project_from_workspace(workspace.id, project_id)
             .await?;
 
         Ok(json!({"removed": true}))
@@ -2386,6 +2448,48 @@ impl ToolHandler {
     // ========================================================================
     // Workspace Milestone Handlers
     // ========================================================================
+
+    async fn list_all_workspace_milestones(&self, args: Value) -> Result<Value> {
+        let workspace_id = args
+            .get("workspace_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .map_err(|_| anyhow!("Invalid workspace_id UUID"))?;
+        let status_filter = args.get("status").and_then(|v| v.as_str());
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+
+        let total = self
+            .neo4j()
+            .count_all_workspace_milestones(workspace_id, status_filter)
+            .await?;
+
+        let results = self
+            .neo4j()
+            .list_all_workspace_milestones_filtered(workspace_id, status_filter, limit, offset)
+            .await?;
+
+        let items: Vec<Value> = results
+            .into_iter()
+            .map(|(m, wid, wname, wslug)| {
+                let mut v = serde_json::to_value(&m).unwrap_or_default();
+                if let Some(obj) = v.as_object_mut() {
+                    obj.insert("workspace_id".to_string(), json!(wid));
+                    obj.insert("workspace_name".to_string(), json!(wname));
+                    obj.insert("workspace_slug".to_string(), json!(wslug));
+                }
+                v
+            })
+            .collect();
+
+        Ok(json!({
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }))
+    }
 
     async fn list_workspace_milestones(&self, args: Value) -> Result<Value> {
         let slug = args
@@ -2402,28 +2506,10 @@ impl ToolHandler {
             .await?
             .ok_or_else(|| anyhow!("Workspace not found"))?;
 
-        // Get all milestones and filter in memory
-        let all_milestones = self.neo4j().list_workspace_milestones(workspace.id).await?;
-
-        // Filter by status if provided
-        let filtered: Vec<_> = if let Some(status) = status_filter {
-            let status_lower = status.to_lowercase();
-            all_milestones
-                .into_iter()
-                .filter(|m| {
-                    let m_status = match m.status {
-                        MilestoneStatus::Open => "open",
-                        MilestoneStatus::Closed => "closed",
-                    };
-                    m_status == status_lower
-                })
-                .collect()
-        } else {
-            all_milestones
-        };
-
-        let total = filtered.len();
-        let items: Vec<_> = filtered.into_iter().skip(offset).take(limit).collect();
+        let (items, total) = self
+            .neo4j()
+            .list_workspace_milestones_filtered(workspace.id, status_filter, limit, offset)
+            .await?;
 
         Ok(json!({
             "items": items,
@@ -2476,7 +2562,9 @@ impl ToolHandler {
             tags,
         };
 
-        self.neo4j().create_workspace_milestone(&milestone).await?;
+        self.orchestrator
+            .create_workspace_milestone(&milestone)
+            .await?;
         Ok(serde_json::to_value(milestone)?)
     }
 
@@ -2507,20 +2595,21 @@ impl ToolHandler {
             .get("description")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let status = args.get("status").and_then(|v| v.as_str()).and_then(|s| {
-            match s.to_lowercase().as_str() {
-                "open" => Some(MilestoneStatus::Open),
-                "closed" => Some(MilestoneStatus::Closed),
-                _ => None,
-            }
-        });
+        let status = match args.get("status").and_then(|v| v.as_str()) {
+            Some(s) => Some(
+                serde_json::from_str::<MilestoneStatus>(&format!("\"{}\"", s)).map_err(|_| {
+                    anyhow!("Invalid milestone status '{}'. Valid: planned, open, in_progress, completed, closed", s)
+                })?,
+            ),
+            None => None,
+        };
         let target_date = args
             .get("target_date")
             .and_then(|v| v.as_str())
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&chrono::Utc));
 
-        self.neo4j()
+        self.orchestrator
             .update_workspace_milestone(id, title, description, status, target_date)
             .await?;
 
@@ -2536,7 +2625,7 @@ impl ToolHandler {
     async fn delete_workspace_milestone(&self, args: Value) -> Result<Value> {
         let id = parse_uuid(&args, "id")?;
 
-        self.neo4j().delete_workspace_milestone(id).await?;
+        self.orchestrator.delete_workspace_milestone(id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -2544,7 +2633,7 @@ impl ToolHandler {
         let id = parse_uuid(&args, "id")?;
         let task_id = parse_uuid(&args, "task_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .add_task_to_workspace_milestone(id, task_id)
             .await?;
 
@@ -2671,7 +2760,7 @@ impl ToolHandler {
             metadata,
         };
 
-        self.neo4j().create_resource(&resource).await?;
+        self.orchestrator.create_resource(&resource).await?;
         Ok(serde_json::to_value(resource)?)
     }
 
@@ -2690,7 +2779,7 @@ impl ToolHandler {
     async fn delete_resource(&self, args: Value) -> Result<Value> {
         let id = parse_uuid(&args, "id")?;
 
-        self.neo4j().delete_resource(id).await?;
+        self.orchestrator.delete_resource(id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -2704,12 +2793,12 @@ impl ToolHandler {
 
         match link_type.to_lowercase().as_str() {
             "implements" => {
-                self.neo4j()
+                self.orchestrator
                     .link_project_implements_resource(project_id, id)
                     .await?;
             }
             "uses" => {
-                self.neo4j()
+                self.orchestrator
                     .link_project_uses_resource(project_id, id)
                     .await?;
             }
@@ -2817,7 +2906,7 @@ impl ToolHandler {
             tags,
         };
 
-        self.neo4j().create_component(&component).await?;
+        self.orchestrator.create_component(&component).await?;
         Ok(serde_json::to_value(component)?)
     }
 
@@ -2836,7 +2925,7 @@ impl ToolHandler {
     async fn delete_component(&self, args: Value) -> Result<Value> {
         let id = parse_uuid(&args, "id")?;
 
-        self.neo4j().delete_component(id).await?;
+        self.orchestrator.delete_component(id).await?;
         Ok(json!({"deleted": true}))
     }
 
@@ -2852,7 +2941,7 @@ impl ToolHandler {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        self.neo4j()
+        self.orchestrator
             .add_component_dependency(id, depends_on_id, protocol, required)
             .await?;
 
@@ -2863,7 +2952,9 @@ impl ToolHandler {
         let id = parse_uuid(&args, "id")?;
         let dep_id = parse_uuid(&args, "dep_id")?;
 
-        self.neo4j().remove_component_dependency(id, dep_id).await?;
+        self.orchestrator
+            .remove_component_dependency(id, dep_id)
+            .await?;
 
         Ok(json!({"removed": true}))
     }
@@ -2872,7 +2963,7 @@ impl ToolHandler {
         let id = parse_uuid(&args, "id")?;
         let project_id = parse_uuid(&args, "project_id")?;
 
-        self.neo4j()
+        self.orchestrator
             .map_component_to_project(id, project_id)
             .await?;
 
@@ -2893,6 +2984,339 @@ impl ToolHandler {
 
         let topology = self.neo4j().get_workspace_topology(workspace.id).await?;
         Ok(serde_json::to_value(topology)?)
+    }
+
+    // ========================================================================
+    // Additional CRUD Handlers (get_step, delete_step, decisions, constraints,
+    // delete_release, delete_milestone, update_resource, update_component)
+    // ========================================================================
+
+    async fn get_step(&self, args: Value) -> Result<Value> {
+        let step_id = parse_uuid(&args, "step_id")?;
+        let step = self
+            .neo4j()
+            .get_step(step_id)
+            .await?
+            .ok_or_else(|| anyhow!("Step not found"))?;
+        Ok(serde_json::to_value(step)?)
+    }
+
+    async fn delete_step_handler(&self, args: Value) -> Result<Value> {
+        let step_id = parse_uuid(&args, "step_id")?;
+        self.orchestrator.delete_step(step_id).await?;
+        Ok(json!({"deleted": true}))
+    }
+
+    async fn get_constraint(&self, args: Value) -> Result<Value> {
+        let constraint_id = parse_uuid(&args, "constraint_id")?;
+        let constraint = self
+            .neo4j()
+            .get_constraint(constraint_id)
+            .await?
+            .ok_or_else(|| anyhow!("Constraint not found"))?;
+        Ok(serde_json::to_value(constraint)?)
+    }
+
+    async fn update_constraint(&self, args: Value) -> Result<Value> {
+        let constraint_id = parse_uuid(&args, "constraint_id")?;
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let constraint_type = match args.get("constraint_type").and_then(|v| v.as_str()) {
+            Some(s) => Some(
+                serde_json::from_str::<ConstraintType>(&format!("\"{}\"", s)).map_err(|_| {
+                    anyhow!(
+                        "Invalid constraint type '{}'. Valid: performance, compatibility, security, style, testing, other",
+                        s
+                    )
+                })?,
+            ),
+            None => None,
+        };
+        let enforced_by = args
+            .get("enforced_by")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        self.orchestrator
+            .update_constraint(constraint_id, description, constraint_type, enforced_by)
+            .await?;
+        Ok(json!({"updated": true}))
+    }
+
+    async fn delete_release(&self, args: Value) -> Result<Value> {
+        let release_id = parse_uuid(&args, "release_id")?;
+        self.orchestrator.delete_release(release_id).await?;
+        Ok(json!({"deleted": true}))
+    }
+
+    async fn delete_milestone(&self, args: Value) -> Result<Value> {
+        let milestone_id = parse_uuid(&args, "milestone_id")?;
+        self.orchestrator.delete_milestone(milestone_id).await?;
+        Ok(json!({"deleted": true}))
+    }
+
+    async fn get_decision(&self, args: Value) -> Result<Value> {
+        let decision_id = parse_uuid(&args, "decision_id")?;
+        let decision = self
+            .neo4j()
+            .get_decision(decision_id)
+            .await?
+            .ok_or_else(|| anyhow!("Decision not found"))?;
+        Ok(serde_json::to_value(decision)?)
+    }
+
+    async fn update_decision(&self, args: Value) -> Result<Value> {
+        let decision_id = parse_uuid(&args, "decision_id")?;
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let rationale = args
+            .get("rationale")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let chosen_option = args
+            .get("chosen_option")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        self.orchestrator
+            .update_decision(decision_id, description, rationale, chosen_option)
+            .await?;
+        Ok(json!({"updated": true}))
+    }
+
+    async fn delete_decision(&self, args: Value) -> Result<Value> {
+        let decision_id = parse_uuid(&args, "decision_id")?;
+        self.orchestrator.delete_decision(decision_id).await?;
+        Ok(json!({"deleted": true}))
+    }
+
+    async fn update_resource(&self, args: Value) -> Result<Value> {
+        let id = parse_uuid(&args, "id")?;
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let file_path = args
+            .get("file_path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let url = args
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let version = args
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        self.orchestrator
+            .update_resource(id, name, file_path, url, version, description)
+            .await?;
+        Ok(json!({"updated": true}))
+    }
+
+    async fn update_component(&self, args: Value) -> Result<Value> {
+        let id = parse_uuid(&args, "id")?;
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let runtime = args
+            .get("runtime")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let config = args.get("config").cloned();
+        let tags: Option<Vec<String>> = args.get("tags").and_then(|v| v.as_array()).map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        });
+
+        self.orchestrator
+            .update_component(id, name, description, runtime, config, tags)
+            .await?;
+        Ok(json!({"updated": true}))
+    }
+
+    // ========================================================================
+    // Chat
+    // ========================================================================
+
+    async fn list_chat_sessions(&self, args: Value) -> Result<Value> {
+        let project_slug = args.get("project_slug").and_then(|v| v.as_str());
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+
+        let (sessions, total) = self
+            .neo4j()
+            .list_chat_sessions(project_slug, limit, offset)
+            .await?;
+
+        Ok(json!({
+            "items": sessions,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }))
+    }
+
+    async fn get_chat_session(&self, args: Value) -> Result<Value> {
+        let session_id = parse_uuid(&args, "session_id")?;
+        let session = self
+            .neo4j()
+            .get_chat_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow!("Session {} not found", session_id))?;
+
+        Ok(serde_json::to_value(session)?)
+    }
+
+    async fn delete_chat_session(&self, args: Value) -> Result<Value> {
+        let session_id = parse_uuid(&args, "session_id")?;
+
+        // Close active session if chat manager is available
+        if let Some(cm) = &self.chat_manager {
+            let _ = cm.close_session(&session_id.to_string()).await;
+        }
+
+        let deleted = self.neo4j().delete_chat_session(session_id).await?;
+
+        if deleted {
+            Ok(json!({"deleted": true}))
+        } else {
+            Err(anyhow!("Session {} not found", session_id))
+        }
+    }
+
+    async fn chat_send_message(&self, args: Value) -> Result<Value> {
+        let cm = self
+            .chat_manager
+            .as_ref()
+            .ok_or_else(|| anyhow!("Chat manager not initialized"))?;
+
+        let message = args
+            .get("message")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("message is required"))?;
+        let cwd = args
+            .get("cwd")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("cwd is required"))?;
+        let session_id = args
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let project_slug = args
+            .get("project_slug")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let model = args.get("model").and_then(|v| v.as_str()).map(String::from);
+
+        let request = crate::chat::ChatRequest {
+            message: message.to_string(),
+            session_id,
+            cwd: cwd.to_string(),
+            project_slug,
+            model,
+        };
+
+        // Create session and wait for it to complete (non-streaming for MCP)
+        let response = cm.create_session(&request).await?;
+
+        // Subscribe and collect all events until Result
+        let rx = cm.subscribe(&response.session_id).await?;
+        let mut stream = tokio_stream::wrappers::BroadcastStream::new(rx);
+
+        let mut text_parts: Vec<String> = Vec::new();
+        let mut result_session_id = response.session_id.clone();
+        let mut cost_usd = None;
+        let mut duration_ms = 0u64;
+
+        use tokio_stream::StreamExt;
+        while let Some(Ok(event)) = stream.next().await {
+            match event {
+                crate::chat::ChatEvent::AssistantText { content } => {
+                    text_parts.push(content);
+                }
+                crate::chat::ChatEvent::Result {
+                    session_id: sid,
+                    duration_ms: dur,
+                    cost_usd: cost,
+                } => {
+                    result_session_id = sid;
+                    duration_ms = dur;
+                    cost_usd = cost;
+                    break;
+                }
+                crate::chat::ChatEvent::Error { message } => {
+                    return Err(anyhow!("Chat error: {}", message));
+                }
+                _ => {} // Skip tool_use, tool_result, thinking, etc.
+            }
+        }
+
+        Ok(json!({
+            "session_id": result_session_id,
+            "response": text_parts.join(""),
+            "duration_ms": duration_ms,
+            "cost_usd": cost_usd
+        }))
+    }
+
+    async fn list_chat_messages(&self, args: Value) -> Result<Value> {
+        let cm = self
+            .chat_manager
+            .as_ref()
+            .ok_or_else(|| anyhow!("Chat manager not initialized"))?;
+
+        let session_id = args
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("session_id is required"))?;
+        let limit = args
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        let offset = args
+            .get("offset")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+
+        let loaded = cm.get_session_messages(session_id, limit, offset).await?;
+
+        let messages: Vec<serde_json::Value> = loaded
+            .messages_chronological()
+            .iter()
+            .map(|m| {
+                json!({
+                    "id": m.id,
+                    "role": m.role,
+                    "content": m.content,
+                    "turn_index": m.turn_index,
+                    "created_at": m.created_at,
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "messages": messages,
+            "total_count": loaded.total_count,
+            "has_more": loaded.has_more,
+            "offset": loaded.offset,
+            "limit": loaded.limit,
+        }))
     }
 }
 
@@ -3148,18 +3572,22 @@ mod tests {
     #[test]
     fn test_milestone_status_parsing() {
         // Test status parsing logic
-        let parse_status = |s: &str| match s.to_lowercase().as_str() {
-            "open" => Some(MilestoneStatus::Open),
-            "closed" => Some(MilestoneStatus::Closed),
-            _ => None,
+        let parse_status = |s: &str| -> Result<MilestoneStatus, _> {
+            serde_json::from_str(&format!("\"{}\"", s.to_lowercase()))
         };
 
-        assert_eq!(parse_status("open"), Some(MilestoneStatus::Open));
-        assert_eq!(parse_status("OPEN"), Some(MilestoneStatus::Open));
-        assert_eq!(parse_status("Open"), Some(MilestoneStatus::Open));
-        assert_eq!(parse_status("closed"), Some(MilestoneStatus::Closed));
-        assert_eq!(parse_status("CLOSED"), Some(MilestoneStatus::Closed));
-        assert_eq!(parse_status("invalid"), None);
+        assert_eq!(parse_status("open").unwrap(), MilestoneStatus::Open);
+        assert_eq!(parse_status("planned").unwrap(), MilestoneStatus::Planned);
+        assert_eq!(
+            parse_status("in_progress").unwrap(),
+            MilestoneStatus::InProgress
+        );
+        assert_eq!(
+            parse_status("completed").unwrap(),
+            MilestoneStatus::Completed
+        );
+        assert_eq!(parse_status("closed").unwrap(), MilestoneStatus::Closed);
+        assert!(parse_status("invalid").is_err());
     }
 
     #[test]
@@ -3614,5 +4042,1052 @@ mod tests {
 
         // Only strings are extracted
         assert_eq!(tags, vec!["valid", "another"]);
+    }
+
+    // ========================================================================
+    // New CRUD handler arg extraction tests
+    // ========================================================================
+
+    #[test]
+    fn test_update_project_args_extraction() {
+        let args = json!({
+            "slug": "my-project",
+            "name": "New Name",
+            "description": "New desc",
+            "root_path": "/new/path"
+        });
+
+        let slug = args.get("slug").and_then(|v| v.as_str());
+        assert_eq!(slug, Some("my-project"));
+
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(name, Some("New Name".to_string()));
+
+        let description = args
+            .get("description")
+            .map(|v| v.as_str().map(|s| s.to_string()));
+        assert_eq!(description, Some(Some("New desc".to_string())));
+
+        let root_path = args
+            .get("root_path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(root_path, Some("/new/path".to_string()));
+    }
+
+    #[test]
+    fn test_update_project_args_partial() {
+        // Only slug, all others missing
+        let args = json!({"slug": "my-project"});
+
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(name, None);
+
+        let description = args
+            .get("description")
+            .map(|v| v.as_str().map(|s| s.to_string()));
+        assert_eq!(description, None);
+
+        let root_path = args
+            .get("root_path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(root_path, None);
+    }
+
+    #[test]
+    fn test_update_project_args_null_description() {
+        // Explicit null description (to clear it)
+        let args = json!({
+            "slug": "my-project",
+            "description": null
+        });
+
+        let description = args
+            .get("description")
+            .map(|v| v.as_str().map(|s| s.to_string()));
+        // description key exists but value is null -> Some(None)
+        assert_eq!(description, Some(None));
+    }
+
+    #[test]
+    fn test_update_constraint_args_with_enum() {
+        let args = json!({
+            "constraint_id": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Must be fast",
+            "constraint_type": "performance",
+            "enforced_by": "benchmark"
+        });
+
+        let constraint_id = parse_uuid(&args, "constraint_id");
+        assert!(constraint_id.is_ok());
+
+        let constraint_type: Option<crate::neo4j::models::ConstraintType> = args
+            .get("constraint_type")
+            .and_then(|v| v.as_str())
+            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+        assert!(constraint_type.is_some());
+
+        let enforced_by = args
+            .get("enforced_by")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(enforced_by, Some("benchmark".to_string()));
+    }
+
+    #[test]
+    fn test_update_constraint_args_invalid_enum() {
+        let args = json!({
+            "constraint_id": "550e8400-e29b-41d4-a716-446655440000",
+            "constraint_type": "invalid_type"
+        });
+
+        let constraint_type: Option<crate::neo4j::models::ConstraintType> = args
+            .get("constraint_type")
+            .and_then(|v| v.as_str())
+            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+        // Invalid enum variant -> None (graceful)
+        assert!(constraint_type.is_none());
+    }
+
+    #[test]
+    fn test_update_decision_args_extraction() {
+        let args = json!({
+            "decision_id": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Updated desc",
+            "rationale": "New rationale",
+            "chosen_option": "Option B"
+        });
+
+        let decision_id = parse_uuid(&args, "decision_id");
+        assert!(decision_id.is_ok());
+
+        let description = args
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(description, Some("Updated desc".to_string()));
+
+        let rationale = args
+            .get("rationale")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(rationale, Some("New rationale".to_string()));
+
+        let chosen_option = args
+            .get("chosen_option")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(chosen_option, Some("Option B".to_string()));
+    }
+
+    #[test]
+    fn test_update_resource_args_extraction() {
+        let args = json!({
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "API v2",
+            "file_path": "/api/v2.yaml",
+            "url": "https://example.com/api",
+            "version": "2.0.0",
+            "description": "Updated API contract"
+        });
+
+        let id = parse_uuid(&args, "id");
+        assert!(id.is_ok());
+
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(name, Some("API v2".to_string()));
+
+        let url = args
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(url, Some("https://example.com/api".to_string()));
+
+        let version = args
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(version, Some("2.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_update_component_args_with_config_and_tags() {
+        let args = json!({
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "Auth Service",
+            "runtime": "rust",
+            "config": {"port": 8080, "workers": 4},
+            "tags": ["auth", "core", "security"]
+        });
+
+        let id = parse_uuid(&args, "id");
+        assert!(id.is_ok());
+
+        let config = args.get("config").cloned();
+        assert!(config.is_some());
+        assert_eq!(config.as_ref().unwrap()["port"], 8080);
+
+        let tags: Option<Vec<String>> = args.get("tags").and_then(|v| v.as_array()).map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        });
+        assert_eq!(
+            tags,
+            Some(vec![
+                "auth".to_string(),
+                "core".to_string(),
+                "security".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn test_update_component_args_partial() {
+        let args = json!({
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "New Name"
+        });
+
+        let config = args.get("config").cloned();
+        assert!(config.is_none());
+
+        let tags: Option<Vec<String>> = args.get("tags").and_then(|v| v.as_array()).map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        });
+        assert!(tags.is_none());
+
+        let runtime = args
+            .get("runtime")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert!(runtime.is_none());
+    }
+
+    #[test]
+    fn test_delete_handlers_uuid_parsing() {
+        // All delete handlers just need a valid UUID
+        let args = json!({"task_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "task_id").is_ok());
+
+        let args = json!({"step_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "step_id").is_ok());
+
+        let args = json!({"release_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "release_id").is_ok());
+
+        let args = json!({"milestone_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "milestone_id").is_ok());
+
+        let args = json!({"decision_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "decision_id").is_ok());
+
+        let args = json!({"constraint_id": "550e8400-e29b-41d4-a716-446655440000"});
+        assert!(parse_uuid(&args, "constraint_id").is_ok());
+    }
+
+    #[test]
+    fn test_delete_handlers_missing_uuid() {
+        assert!(parse_uuid(&json!({}), "task_id").is_err());
+        assert!(parse_uuid(&json!({}), "step_id").is_err());
+        assert!(parse_uuid(&json!({}), "release_id").is_err());
+        assert!(parse_uuid(&json!({}), "milestone_id").is_err());
+        assert!(parse_uuid(&json!({}), "decision_id").is_err());
+        assert!(parse_uuid(&json!({}), "constraint_id").is_err());
+    }
+
+    // ========================================================================
+    // list_all_workspace_milestones argument extraction tests
+    // ========================================================================
+
+    #[test]
+    fn test_list_all_workspace_milestones_args_full() {
+        let args = json!({
+            "workspace_id": "b37351e3-6c90-4a53-bc4f-8cbd024cecb7",
+            "status": "open",
+            "limit": 25,
+            "offset": 10
+        });
+
+        let workspace_id = args
+            .get("workspace_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .unwrap();
+        assert!(workspace_id.is_some());
+        assert_eq!(
+            workspace_id.unwrap().to_string(),
+            "b37351e3-6c90-4a53-bc4f-8cbd024cecb7"
+        );
+
+        let status_filter = args.get("status").and_then(|v| v.as_str());
+        assert_eq!(status_filter, Some("open"));
+
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        assert_eq!(limit, 25);
+
+        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        assert_eq!(offset, 10);
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_args_defaults() {
+        let args = json!({});
+
+        let workspace_id = args
+            .get("workspace_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .unwrap();
+        assert!(workspace_id.is_none());
+
+        let status_filter = args.get("status").and_then(|v| v.as_str());
+        assert!(status_filter.is_none());
+
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        assert_eq!(limit, 50);
+
+        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_args_invalid_uuid() {
+        let args = json!({
+            "workspace_id": "not-a-uuid"
+        });
+
+        let result = args
+            .get("workspace_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_args_status_only() {
+        let args = json!({
+            "status": "closed"
+        });
+
+        let workspace_id = args
+            .get("workspace_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .unwrap();
+        assert!(workspace_id.is_none());
+
+        let status_filter = args.get("status").and_then(|v| v.as_str());
+        assert_eq!(status_filter, Some("closed"));
+    }
+
+    #[test]
+    fn test_list_all_workspace_milestones_response_structure() {
+        let items = vec![json!({
+            "id": "test-id",
+            "title": "Milestone 1",
+            "workspace_id": "ws-1",
+            "workspace_name": "Workspace One",
+            "workspace_slug": "workspace-one"
+        })];
+        let total = 1usize;
+        let limit = 50usize;
+        let offset = 0usize;
+
+        let response = json!({
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        });
+
+        assert!(response["items"].is_array());
+        assert_eq!(response["items"].as_array().unwrap().len(), 1);
+        assert_eq!(response["total"], 1);
+        assert_eq!(response["limit"], 50);
+        assert_eq!(response["offset"], 0);
+        assert_eq!(response["items"][0]["workspace_slug"], "workspace-one");
+    }
+
+    // ========================================================================
+    // list_plans project_id argument extraction tests
+    // ========================================================================
+
+    #[test]
+    fn test_list_plans_args_with_project_id() {
+        let args = json!({
+            "project_id": "e83b0663-9600-450d-9f63-234e857394df",
+            "status": "draft,in_progress",
+            "limit": 10,
+            "offset": 0
+        });
+
+        let project_id = args
+            .get("project_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .unwrap();
+        assert!(project_id.is_some());
+        assert_eq!(
+            project_id.unwrap().to_string(),
+            "e83b0663-9600-450d-9f63-234e857394df"
+        );
+
+        let status = args.get("status").and_then(|v| v.as_str()).map(|s| {
+            s.split(',')
+                .map(|s| s.trim().to_string())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            status,
+            Some(vec!["draft".to_string(), "in_progress".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_list_plans_args_without_project_id() {
+        let args = json!({
+            "status": "completed"
+        });
+
+        let project_id = args
+            .get("project_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose()
+            .unwrap();
+        assert!(project_id.is_none());
+    }
+
+    #[test]
+    fn test_list_plans_args_invalid_project_id() {
+        let args = json!({
+            "project_id": "invalid-uuid"
+        });
+
+        let result = args
+            .get("project_id")
+            .and_then(|v| v.as_str())
+            .map(Uuid::parse_str)
+            .transpose();
+        assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // list_workspace_milestones (per-workspace) argument extraction tests
+    // ========================================================================
+
+    #[test]
+    fn test_list_workspace_milestones_args_full() {
+        let args = json!({
+            "slug": "my-workspace",
+            "status": "open",
+            "limit": 20,
+            "offset": 5
+        });
+
+        let slug = args.get("slug").and_then(|v| v.as_str());
+        assert_eq!(slug, Some("my-workspace"));
+
+        let status_filter = args.get("status").and_then(|v| v.as_str());
+        assert_eq!(status_filter, Some("open"));
+
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        assert_eq!(limit, 20);
+
+        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        assert_eq!(offset, 5);
+    }
+
+    #[test]
+    fn test_list_workspace_milestones_args_slug_only() {
+        let args = json!({
+            "slug": "prod-workspace"
+        });
+
+        let slug = args
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("slug is required"));
+        assert!(slug.is_ok());
+        assert_eq!(slug.unwrap(), "prod-workspace");
+
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+        assert_eq!(limit, 50);
+    }
+
+    #[test]
+    fn test_list_workspace_milestones_args_missing_slug() {
+        let args = json!({});
+
+        let slug = args
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("slug is required"));
+        assert!(slug.is_err());
+        assert!(slug.unwrap_err().to_string().contains("slug is required"));
+    }
+
+    // ========================================================================
+    // Async integration tests (mock backends)
+    // ========================================================================
+
+    use crate::orchestrator::Orchestrator;
+    use crate::test_helpers::mock_app_state;
+
+    async fn create_handler() -> ToolHandler {
+        let state = mock_app_state();
+        let orchestrator = Arc::new(Orchestrator::new(state).await.unwrap());
+        ToolHandler::new(orchestrator)
+    }
+
+    // -- Basic tool routing -------------------------------------------------
+
+    #[tokio::test]
+    async fn test_unknown_tool() {
+        let handler = create_handler().await;
+        let result = handler.handle("nonexistent_tool", None).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown tool: nonexistent_tool"));
+    }
+
+    #[tokio::test]
+    async fn test_list_plans_empty() {
+        let handler = create_handler().await;
+        let result = handler.handle("list_plans", Some(json!({}))).await.unwrap();
+        assert!(result.is_object());
+        let items = result.get("items").unwrap().as_array().unwrap();
+        assert!(items.is_empty());
+        assert_eq!(result.get("total").unwrap().as_u64().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_create_and_get_plan() {
+        let handler = create_handler().await;
+
+        // Create a plan
+        let create_result = handler
+            .handle(
+                "create_plan",
+                Some(json!({
+                    "title": "Integration Test Plan",
+                    "description": "Testing plan creation via MCP handler"
+                })),
+            )
+            .await
+            .unwrap();
+
+        assert!(create_result.is_object());
+        let plan_id = create_result.get("id").unwrap().as_str().unwrap();
+        assert!(!plan_id.is_empty());
+        assert_eq!(
+            create_result.get("title").unwrap().as_str().unwrap(),
+            "Integration Test Plan"
+        );
+
+        // Get the plan back
+        let get_result = handler
+            .handle("get_plan", Some(json!({"plan_id": plan_id})))
+            .await
+            .unwrap();
+
+        assert!(get_result.is_object());
+        let plan = get_result.get("plan").unwrap();
+        assert_eq!(
+            plan.get("title").unwrap().as_str().unwrap(),
+            "Integration Test Plan"
+        );
+    }
+
+    // -- Project tools ------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_project() {
+        let handler = create_handler().await;
+
+        let result = handler
+            .handle(
+                "create_project",
+                Some(json!({
+                    "name": "My Test Project",
+                    "slug": "my-test-project",
+                    "root_path": "/tmp/my-test-project"
+                })),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.is_object());
+        assert_eq!(
+            result.get("name").unwrap().as_str().unwrap(),
+            "My Test Project"
+        );
+        assert_eq!(
+            result.get("slug").unwrap().as_str().unwrap(),
+            "my-test-project"
+        );
+        assert_eq!(
+            result.get("root_path").unwrap().as_str().unwrap(),
+            "/tmp/my-test-project"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_project_not_found() {
+        let handler = create_handler().await;
+
+        let result = handler
+            .handle("get_project", Some(json!({"slug": "nonexistent"})))
+            .await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Project not found"));
+    }
+
+    // -- Task tools ---------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_task() {
+        let handler = create_handler().await;
+
+        // Create plan first
+        let plan = handler
+            .handle(
+                "create_plan",
+                Some(json!({
+                    "title": "Plan for Tasks",
+                    "description": "Plan to hold tasks"
+                })),
+            )
+            .await
+            .unwrap();
+        let plan_id = plan.get("id").unwrap().as_str().unwrap();
+
+        // Create task
+        let task = handler
+            .handle(
+                "create_task",
+                Some(json!({
+                    "plan_id": plan_id,
+                    "title": "First Task",
+                    "description": "Implement feature X"
+                })),
+            )
+            .await
+            .unwrap();
+
+        assert!(task.is_object());
+        assert_eq!(task.get("title").unwrap().as_str().unwrap(), "First Task");
+        assert_eq!(
+            task.get("description").unwrap().as_str().unwrap(),
+            "Implement feature X"
+        );
+        assert_eq!(task.get("status").unwrap().as_str().unwrap(), "pending");
+    }
+
+    #[tokio::test]
+    async fn test_get_next_task() {
+        let handler = create_handler().await;
+
+        // Create plan
+        let plan = handler
+            .handle(
+                "create_plan",
+                Some(json!({
+                    "title": "Plan with Tasks",
+                    "description": "Plan for next-task test"
+                })),
+            )
+            .await
+            .unwrap();
+        let plan_id = plan.get("id").unwrap().as_str().unwrap();
+
+        // Create two tasks
+        handler
+            .handle(
+                "create_task",
+                Some(json!({
+                    "plan_id": plan_id,
+                    "title": "Task A",
+                    "description": "First task"
+                })),
+            )
+            .await
+            .unwrap();
+
+        handler
+            .handle(
+                "create_task",
+                Some(json!({
+                    "plan_id": plan_id,
+                    "title": "Task B",
+                    "description": "Second task"
+                })),
+            )
+            .await
+            .unwrap();
+
+        // Get next task — should return one of the pending tasks
+        let next = handler
+            .handle("get_next_task", Some(json!({"plan_id": plan_id})))
+            .await
+            .unwrap();
+
+        // get_next_task returns a task or null
+        assert!(next.is_object() || next.is_null());
+        if next.is_object() {
+            assert_eq!(next.get("status").unwrap().as_str().unwrap(), "pending");
+        }
+    }
+
+    // -- Step tools ---------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_and_list_steps() {
+        let handler = create_handler().await;
+
+        // Create plan + task
+        let plan = handler
+            .handle(
+                "create_plan",
+                Some(json!({
+                    "title": "Step Test Plan",
+                    "description": "Plan for step tests"
+                })),
+            )
+            .await
+            .unwrap();
+        let plan_id = plan.get("id").unwrap().as_str().unwrap();
+
+        let task = handler
+            .handle(
+                "create_task",
+                Some(json!({
+                    "plan_id": plan_id,
+                    "title": "Task with Steps",
+                    "description": "A task that has steps"
+                })),
+            )
+            .await
+            .unwrap();
+        let task_id = task.get("id").unwrap().as_str().unwrap();
+
+        // Create two steps
+        let step1 = handler
+            .handle(
+                "create_step",
+                Some(json!({
+                    "task_id": task_id,
+                    "description": "Step one: setup"
+                })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            step1.get("description").unwrap().as_str().unwrap(),
+            "Step one: setup"
+        );
+        assert_eq!(step1.get("order").unwrap().as_u64().unwrap(), 0);
+
+        let step2 = handler
+            .handle(
+                "create_step",
+                Some(json!({
+                    "task_id": task_id,
+                    "description": "Step two: implement"
+                })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(step2.get("order").unwrap().as_u64().unwrap(), 1);
+
+        // List steps
+        let steps = handler
+            .handle("list_steps", Some(json!({"task_id": task_id})))
+            .await
+            .unwrap();
+
+        let steps_arr = steps.as_array().unwrap();
+        assert_eq!(steps_arr.len(), 2);
+    }
+
+    // -- Error handling -----------------------------------------------------
+
+    #[tokio::test]
+    async fn test_missing_required_arg() {
+        let handler = create_handler().await;
+
+        // create_plan requires "title" and "description"
+        let result = handler
+            .handle("create_plan", Some(json!({"title": "No desc"})))
+            .await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("description is required"));
+
+        // create_task requires "plan_id" and "description"
+        let result = handler
+            .handle(
+                "create_task",
+                Some(json!({"description": "Missing plan_id"})),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("plan_id is required"));
+
+        // create_project requires "name" and "root_path"
+        let result = handler
+            .handle("create_project", Some(json!({"name": "test"})))
+            .await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("root_path is required"));
+    }
+
+    // -- Chat tools ---------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_list_chat_sessions_empty() {
+        let handler = create_handler().await;
+        let result = handler
+            .handle("list_chat_sessions", Some(json!({})))
+            .await
+            .unwrap();
+        assert!(result.is_object());
+        let items = result.get("items").unwrap().as_array().unwrap();
+        assert!(items.is_empty());
+        assert_eq!(result.get("total").unwrap().as_u64().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_chat_session_not_found() {
+        let handler = create_handler().await;
+        let result = handler
+            .handle(
+                "get_chat_session",
+                Some(json!({"session_id": "550e8400-e29b-41d4-a716-446655440000"})),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_chat_session_not_found() {
+        let handler = create_handler().await;
+        let result = handler
+            .handle(
+                "delete_chat_session",
+                Some(json!({"session_id": "550e8400-e29b-41d4-a716-446655440000"})),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_chat_send_message_no_chat_manager() {
+        let handler = create_handler().await;
+        // chat_manager is None by default, so chat_send_message should error
+        let result = handler
+            .handle(
+                "chat_send_message",
+                Some(json!({
+                    "message": "Hello",
+                    "cwd": "/tmp"
+                })),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Chat manager not initialized"));
+    }
+
+    #[tokio::test]
+    async fn test_chat_send_message_missing_args() {
+        let handler = create_handler().await;
+        // Missing "message" field
+        let result = handler
+            .handle("chat_send_message", Some(json!({"cwd": "/tmp"})))
+            .await;
+        assert!(result.is_err());
+        // Should fail because chat_manager is None (checked first)
+        assert!(result.unwrap_err().to_string().contains("not initialized"));
+    }
+
+    #[tokio::test]
+    async fn test_list_chat_sessions_with_project_filter() {
+        let handler = create_handler().await;
+
+        // Create a chat session via neo4j directly
+        use crate::test_helpers::test_chat_session;
+        let session = test_chat_session(Some("my-project"));
+        handler.neo4j().create_chat_session(&session).await.unwrap();
+
+        // List with matching filter
+        let result = handler
+            .handle(
+                "list_chat_sessions",
+                Some(json!({"project_slug": "my-project"})),
+            )
+            .await
+            .unwrap();
+        let items = result.get("items").unwrap().as_array().unwrap();
+        assert_eq!(items.len(), 1);
+
+        // List with non-matching filter
+        let result = handler
+            .handle(
+                "list_chat_sessions",
+                Some(json!({"project_slug": "other-project"})),
+            )
+            .await
+            .unwrap();
+        let items = result.get("items").unwrap().as_array().unwrap();
+        assert!(items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_chat_session_crud_via_mcp() {
+        let handler = create_handler().await;
+
+        // Create a session via neo4j
+        use crate::test_helpers::test_chat_session;
+        let session = test_chat_session(Some("test-proj"));
+        let session_id = session.id.to_string();
+        handler.neo4j().create_chat_session(&session).await.unwrap();
+
+        // Get it
+        let result = handler
+            .handle("get_chat_session", Some(json!({"session_id": session_id})))
+            .await
+            .unwrap();
+        assert_eq!(
+            result.get("project_slug").unwrap().as_str().unwrap(),
+            "test-proj"
+        );
+
+        // Delete it
+        let result = handler
+            .handle(
+                "delete_chat_session",
+                Some(json!({"session_id": session_id})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.get("deleted").unwrap().as_bool().unwrap(), true);
+
+        // Verify it's gone
+        let result = handler
+            .handle("get_chat_session", Some(json!({"session_id": session_id})))
+            .await;
+        assert!(result.is_err());
+    }
+
+    // -- list_chat_messages --------------------------------------------------
+
+    #[tokio::test]
+    async fn test_list_chat_messages_no_chat_manager() {
+        let handler = create_handler().await;
+        let result = handler
+            .handle(
+                "list_chat_messages",
+                Some(json!({"session_id": Uuid::new_v4().to_string()})),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Chat manager not initialized"));
+    }
+
+    #[tokio::test]
+    async fn test_list_chat_messages_missing_session_id() {
+        let handler = create_handler().await;
+        let result = handler.handle("list_chat_messages", Some(json!({}))).await;
+        assert!(result.is_err());
+        // Even though chat_manager is None, session_id check comes after
+        // so we get "Chat manager not initialized" first
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Chat manager not initialized"));
+    }
+
+    #[tokio::test]
+    async fn test_list_chat_messages_args_extraction() {
+        // Verify argument parsing logic for list_chat_messages
+        let args = json!({
+            "session_id": "550e8400-e29b-41d4-a716-446655440000",
+            "limit": 25,
+            "offset": 10
+        });
+
+        let session_id = args.get("session_id").and_then(|v| v.as_str());
+        assert_eq!(session_id, Some("550e8400-e29b-41d4-a716-446655440000"));
+
+        let limit = args
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        assert_eq!(limit, Some(25));
+
+        let offset = args
+            .get("offset")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        assert_eq!(offset, Some(10));
+    }
+
+    #[tokio::test]
+    async fn test_list_chat_messages_args_defaults() {
+        let args = json!({
+            "session_id": "550e8400-e29b-41d4-a716-446655440000"
+        });
+
+        let limit = args
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        assert!(limit.is_none());
+
+        let offset = args
+            .get("offset")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        assert!(offset.is_none());
     }
 }

@@ -6,6 +6,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use project_orchestrator::{
     api::{self, handlers::ServerState},
+    chat::{ChatConfig, ChatManager},
+    events::EventBus,
     orchestrator::{FileWatcher, Orchestrator},
     AppState, Config,
 };
@@ -77,16 +79,37 @@ async fn run_server(config: Config) -> Result<()> {
     let state = AppState::new(config.clone()).await?;
     tracing::info!("Connected to databases");
 
-    // Create orchestrator
-    let orchestrator = Arc::new(Orchestrator::new(state).await?);
+    // Create event bus for CRUD notifications
+    let event_bus = Arc::new(EventBus::default());
+
+    // Create orchestrator with event bus
+    let orchestrator = Arc::new(Orchestrator::with_event_bus(state, event_bus.clone()).await?);
 
     // Create file watcher
     let watcher = FileWatcher::new(orchestrator.clone());
+
+    // Create chat manager (optional — requires Claude CLI)
+    let chat_manager = {
+        let chat_config = ChatConfig::from_env();
+        let cm = Arc::new(
+            ChatManager::new(
+                orchestrator.neo4j_arc(),
+                orchestrator.meili_arc(),
+                chat_config,
+            )
+            .await,
+        );
+        cm.start_cleanup_task();
+        tracing::info!("Chat manager initialized");
+        Some(cm)
+    };
 
     // Create server state
     let server_state = Arc::new(ServerState {
         orchestrator,
         watcher: Arc::new(RwLock::new(watcher)),
+        chat_manager,
+        event_bus,
     });
 
     // Create router
