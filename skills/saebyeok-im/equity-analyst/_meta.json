@@ -3,9 +3,15 @@
   "slug": "equity-analyst",
   "displayName": "Equity Analyst",
   "latest": {
-    "version": "1.0.6",
-    "publishedAt": 1770473222760,
-    "commit": "https://github.com/openclaw/skills/commit/eac668dbc62f852a3a68fb829376e180b463f8a3"
+    "version": "1.0.7",
+    "publishedAt": 1770523267763,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.6",
+      "publishedAt": 1770473222760,
+      "commit": "https://github.com/openclaw/skills/commit/eac668dbc62f852a3a68fb829376e180b463f8a3"
+    }
+  ]
 }
