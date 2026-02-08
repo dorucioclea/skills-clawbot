@@ -1,0 +1,11 @@
+{
+  "owner": "daaab",
+  "slug": "nadname-agent",
+  "displayName": "NadName Agent",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770570436769,
+    "commit": null
+  },
+  "history": []
+}
