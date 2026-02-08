@@ -1,13 +1,18 @@
 {
   "owner": "thomaslwang",
   "slug": "moltguard",
-  "displayName": "moltguard",
+  "displayName": "MoltGuard",
   "latest": {
-    "version": "3.0.4",
-    "publishedAt": 1770422429980,
-    "commit": "https://github.com/openclaw/skills/commit/af304d9b1e192d4ce6f371e867cbeda487db5e97"
+    "version": "3.0.5",
+    "publishedAt": 1770552908249,
+    "commit": null
   },
   "history": [
+    {
+      "version": "3.0.4",
+      "publishedAt": 1770422429980,
+      "commit": "https://github.com/openclaw/skills/commit/af304d9b1e192d4ce6f371e867cbeda487db5e97"
+    },
     {
       "version": "2.0.1",
       "publishedAt": 1770378286178,
