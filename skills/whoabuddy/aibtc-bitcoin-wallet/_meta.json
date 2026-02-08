@@ -1,0 +1,11 @@
+{
+  "owner": "whoabuddy",
+  "slug": "aibtc-bitcoin-wallet",
+  "displayName": "AIBTC Bitcoin Wallet",
+  "latest": {
+    "version": "1.14.2",
+    "publishedAt": 1770569379005,
+    "commit": null
+  },
+  "history": []
+}
