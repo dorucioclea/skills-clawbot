@@ -3,11 +3,16 @@
   "slug": "google-maps-teneo",
   "displayName": "Google maps - powered by Teneo Protocol",
   "latest": {
-    "version": "1.0.7",
-    "publishedAt": 1770302190580,
-    "commit": "https://github.com/clawdbot/skills/commit/c3ea5ba56627f3ea391ebdddd07ecea335b43c66"
+    "version": "1.0.10",
+    "publishedAt": 1770643207359,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.7",
+      "publishedAt": 1770302190580,
+      "commit": "https://github.com/clawdbot/skills/commit/c3ea5ba56627f3ea391ebdddd07ecea335b43c66"
+    },
     {
       "version": "1.0.6",
       "publishedAt": 1770216624114,
