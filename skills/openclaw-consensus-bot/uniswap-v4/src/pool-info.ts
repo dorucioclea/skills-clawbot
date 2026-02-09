@@ -17,7 +17,7 @@ import {
 } from "./lib/addresses.js";
 import { resolveTokenInput, validateChain } from "./lib/validation.js";
 import { computePoolId, makePoolKey, type PoolKey } from "./lib/v4-encoding.js";
-import { makeProvider } from "./lib/provider.js";
+import { makeProvider, assertRpcChain, assertHasBytecode } from "./lib/provider.js";
 
 // ── ABI fragments ───────────────────────────────────────────────────
 const STATE_VIEW_ABI = [
@@ -59,10 +59,7 @@ interface PoolResult {
   liquidity: string;
 }
 
-async function queryPool(
-  stateView: Contract,
-  key: PoolKey
-): Promise<PoolResult | null> {
+async function queryPool(stateView: Contract, key: PoolKey): Promise<PoolResult | null> {
   const poolId = computePoolId(key);
   try {
     const [slot0, liq] = await Promise.all([
@@ -98,11 +95,13 @@ export async function findPools(
 ): Promise<PoolResult[]> {
   const cfg = getChainConfig(chain);
   const provider = makeProvider(chain, rpcUrl);
+  await assertRpcChain(provider, chain);
+  await assertHasBytecode(provider, cfg.stateView, "StateView");
+
   const stateView = new Contract(cfg.stateView, STATE_VIEW_ABI, provider);
 
   // Sort currencies numerically (V4 requirement)
-  const [c0, c1] =
-    BigInt(token0) < BigInt(token1) ? [token0, token1] : [token1, token0];
+  const [c0, c1] = BigInt(token0) < BigInt(token1) ? [token0, token1] : [token1, token0];
 
   const results: PoolResult[] = [];
 
@@ -168,20 +167,21 @@ async function main() {
   const t0 = resolveTokenInput(t0Raw, "token0");
   const t1 = resolveTokenInput(t1Raw, "token1");
   const rpcUrl = resolveRpcUrl(chain, flags["rpc"]);
-  const hooks = flags["hooks"]
-    ? resolveTokenInput(flags["hooks"], "hooks")
-    : ADDRESS_ZERO;
+  const hooks = flags["hooks"] ? resolveTokenInput(flags["hooks"], "hooks") : ADDRESS_ZERO;
+  const cfg = getChainConfig(chain);
 
   // Specific fee tier or auto-detect
   if (flags["fee"] && flags["tick-spacing"]) {
     const fee = Number(flags["fee"]);
     const ts = Number(flags["tick-spacing"]);
-    const cfg = getChainConfig(chain);
+
     const provider = makeProvider(chain, rpcUrl);
+    await assertRpcChain(provider, chain);
+    await assertHasBytecode(provider, cfg.stateView, "StateView");
+
     const stateView = new Contract(cfg.stateView, STATE_VIEW_ABI, provider);
 
-    const [c0, c1] =
-      BigInt(t0) < BigInt(t1) ? [t0, t1] : [t1, t0];
+    const [c0, c1] = BigInt(t0) < BigInt(t1) ? [t0, t1] : [t1, t0];
 
     const result = await queryPool(stateView, makePoolKey(c0, c1, fee, ts, hooks));
     if (!result) {
@@ -194,21 +194,27 @@ async function main() {
       getTokenInfo(result.key.currency1, provider),
     ]);
 
-    console.log(JSON.stringify({
-      success: true,
-      chain,
-      poolId: result.poolId,
-      token0: { ...info0, address: result.key.currency0 },
-      token1: { ...info1, address: result.key.currency1 },
-      fee: result.key.fee,
-      tickSpacing: result.key.tickSpacing,
-      hooks: result.key.hooks,
-      sqrtPriceX96: result.sqrtPriceX96,
-      tick: result.tick,
-      protocolFee: result.protocolFee,
-      lpFee: result.lpFee,
-      liquidity: result.liquidity,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          success: true,
+          chain,
+          poolId: result.poolId,
+          token0: { ...info0, address: result.key.currency0 },
+          token1: { ...info1, address: result.key.currency1 },
+          fee: result.key.fee,
+          tickSpacing: result.key.tickSpacing,
+          hooks: result.key.hooks,
+          sqrtPriceX96: result.sqrtPriceX96,
+          tick: result.tick,
+          protocolFee: result.protocolFee,
+          lpFee: result.lpFee,
+          liquidity: result.liquidity,
+        },
+        null,
+        2
+      )
+    );
   } else {
     // Auto-detect: find all pools, return best
     const pools = await findPools(t0, t1, chain, rpcUrl, hooks);
@@ -219,27 +225,35 @@ async function main() {
 
     const best = pools[0];
     const provider = makeProvider(chain, rpcUrl);
+    await assertRpcChain(provider, chain);
+
     const [info0, info1] = await Promise.all([
       getTokenInfo(best.key.currency0, provider),
       getTokenInfo(best.key.currency1, provider),
     ]);
 
-    console.log(JSON.stringify({
-      success: true,
-      chain,
-      poolId: best.poolId,
-      token0: { ...info0, address: best.key.currency0 },
-      token1: { ...info1, address: best.key.currency1 },
-      fee: best.key.fee,
-      tickSpacing: best.key.tickSpacing,
-      hooks: best.key.hooks,
-      sqrtPriceX96: best.sqrtPriceX96,
-      tick: best.tick,
-      protocolFee: best.protocolFee,
-      lpFee: best.lpFee,
-      liquidity: best.liquidity,
-      poolsScanned: pools.length,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          success: true,
+          chain,
+          poolId: best.poolId,
+          token0: { ...info0, address: best.key.currency0 },
+          token1: { ...info1, address: best.key.currency1 },
+          fee: best.key.fee,
+          tickSpacing: best.key.tickSpacing,
+          hooks: best.key.hooks,
+          sqrtPriceX96: best.sqrtPriceX96,
+          tick: best.tick,
+          protocolFee: best.protocolFee,
+          lpFee: best.lpFee,
+          liquidity: best.liquidity,
+          poolsScanned: pools.length,
+        },
+        null,
+        2
+      )
+    );
   }
 }
 

@@ -31,11 +31,8 @@ import {
   getPrivateKey,
   validateAddress,
 } from "./lib/validation.js";
-import {
-  buildExecuteCalldata,
-  makePoolKey,
-} from "./lib/v4-encoding.js";
-import { makeProvider } from "./lib/provider.js";
+import { makeProvider, assertRpcChain, assertHasBytecode } from "./lib/provider.js";
+import { buildExecuteCalldata, makePoolKey } from "./lib/v4-encoding.js";
 import { findPools } from "./pool-info.js";
 
 // ── ABI fragments ───────────────────────────────────────────────────
@@ -111,13 +108,20 @@ async function main() {
   const privateKey = getPrivateKey();
 
   const provider = makeProvider(chain, rpcUrl);
+  await assertRpcChain(provider, chain);
+
+  // Write-path safety: ensure we're talking to real contracts.
+  await assertHasBytecode(provider, cfg.universalRouter, "Universal Router");
+  await assertHasBytecode(provider, cfg.quoter, "V4Quoter");
+  await assertHasBytecode(provider, cfg.permit2, "Permit2");
+  if (tokenIn !== ADDRESS_ZERO) await assertHasBytecode(provider, tokenIn, "Token In (ERC20)");
+  if (tokenOut !== ADDRESS_ZERO) await assertHasBytecode(provider, tokenOut, "Token Out (ERC20)");
+
   const wallet = new Wallet(privateKey, provider);
   const sender = wallet.address;
 
   const recipientFlag = flags["recipient"];
-  const recipient = recipientFlag
-    ? validateAddress(recipientFlag, "recipient")
-    : sender;
+  const recipient = recipientFlag ? validateAddress(recipientFlag, "recipient") : sender;
   const recipientForCalldata = recipientFlag ? recipient : undefined;
 
   // ── Pool discovery ──────────────────────────────────────────────
@@ -134,12 +138,7 @@ async function main() {
 
   const bestPool = pools[0];
   const { currency0, currency1, zeroForOne } = sortCurrencies(tokenIn, tokenOut);
-  const key = makePoolKey(
-    currency0,
-    currency1,
-    bestPool.key.fee,
-    bestPool.key.tickSpacing
-  );
+  const key = makePoolKey(currency0, currency1, bestPool.key.fee, bestPool.key.tickSpacing);
 
   if (!jsonOutput) {
     log(`Pool: fee=${key.fee} tickSpacing=${key.tickSpacing} liquidity=${bestPool.liquidity}`);
@@ -180,7 +179,7 @@ async function main() {
     const permit2Contract = new Contract(cfg.permit2, PERMIT2_ABI, wallet);
 
     // Check ERC20 → Permit2
-    const erc20Allowance = await erc20.allowance(sender, cfg.permit2) as bigint;
+    const erc20Allowance = (await erc20.allowance(sender, cfg.permit2)) as bigint;
     if (erc20Allowance < amount) {
       if (!jsonOutput) log("Auto-approving ERC20 → Permit2...");
       const tx = await erc20.approve(cfg.permit2, 2n ** 256n - 1n);
@@ -189,17 +188,17 @@ async function main() {
     }
 
     // Check Permit2 → Universal Router
-    const [p2Amount, p2Expiry] = await permit2Contract.allowance(
-      sender, tokenIn, cfg.universalRouter
-    ) as [bigint, bigint, bigint];
+    const [p2Amount, p2Expiry] = (await permit2Contract.allowance(
+      sender,
+      tokenIn,
+      cfg.universalRouter
+    )) as [bigint, bigint, bigint];
     const now = BigInt(Math.floor(Date.now() / 1000));
     if (p2Amount < amount || p2Expiry < now + 600n) {
       if (!jsonOutput) log("Auto-approving Permit2 → Universal Router...");
       const MAX_UINT160 = (1n << 160n) - 1n;
       const MAX_UINT48 = (1n << 48n) - 1n;
-      const tx = await permit2Contract.approve(
-        tokenIn, cfg.universalRouter, MAX_UINT160, MAX_UINT48
-      );
+      const tx = await permit2Contract.approve(tokenIn, cfg.universalRouter, MAX_UINT160, MAX_UINT48);
       await tx.wait();
       if (!jsonOutput) log(`  TX: ${tx.hash}`);
     }

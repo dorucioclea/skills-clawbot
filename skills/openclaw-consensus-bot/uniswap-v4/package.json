@@ -1,6 +1,6 @@
 {
   "name": "@clawhub/uniswap-v4",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Swap tokens and read pool state on Uniswap V4 (Base, Ethereum). Production-grade TypeScript skill for OpenClaw agents.",
   "author": "Consensus HQ",
   "license": "MIT",

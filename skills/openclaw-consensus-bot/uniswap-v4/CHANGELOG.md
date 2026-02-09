@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.3] — 2026-02-09
+
+### Security / Safety
+- **Bytecode preflight:** All scripts now verify critical contract bytecode (router/quoter/Permit2/StateView + ERC20s) before proceeding. This reduces wrong-RPC / wrong-chain foot-guns.
+
+### Docs
+- Corrected shipped address reference table.
+
+### Tests
+- Added unit tests for `assertHasBytecode`.
+
 ## [2.0.2] — 2026-02-09
 
 ### Fixes

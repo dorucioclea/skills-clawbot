@@ -60,3 +60,23 @@ export async function assertRpcChain(
     );
   }
 }
+
+/**
+ * Ensure an address has contract bytecode on-chain.
+ *
+ * This prevents foot-guns like:
+ * - wrong address on the right chain
+ * - wrong chain RPC (where that address is an EOA)
+ *
+ * In those cases, a "contract call" can devolve into an ETH transfer.
+ */
+export async function assertHasBytecode(
+  provider: JsonRpcProvider,
+  address: string,
+  label: string
+): Promise<void> {
+  const code = await provider.getCode(address);
+  if (!code || code === "0x") {
+    throw new Error(`${label} has no contract bytecode at ${address}. Refusing to continue.`);
+  }
+}

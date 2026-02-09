@@ -22,8 +22,8 @@ import {
   sortCurrencies,
 } from "./lib/validation.js";
 import { makePoolKey } from "./lib/v4-encoding.js";
-import { makeProvider } from "./lib/provider.js";
 import { findPools } from "./pool-info.js";
+import { makeProvider, assertRpcChain, assertHasBytecode } from "./lib/provider.js";
 
 // ── V4Quoter ABI fragment ───────────────────────────────────────────
 const QUOTER_ABI = [
@@ -76,7 +76,10 @@ async function main() {
   const amount = parseAmount(amountRaw, "amount");
   const rpcUrl = resolveRpcUrl(chain, flags["rpc"]);
   const cfg = getChainConfig(chain);
+
   const provider = makeProvider(chain, rpcUrl);
+  await assertRpcChain(provider, chain);
+  await assertHasBytecode(provider, cfg.quoter, "V4Quoter");
 
   // Resolve pool
   const { currency0, currency1, zeroForOne } = sortCurrencies(tokenIn, tokenOut);
@@ -97,7 +100,9 @@ async function main() {
     }
     poolFee = pools[0].key.fee;
     poolTickSpacing = pools[0].key.tickSpacing;
-    log(`Using pool: fee=${poolFee} tickSpacing=${poolTickSpacing} liquidity=${pools[0].liquidity}`);
+    log(
+      `Using pool: fee=${poolFee} tickSpacing=${poolTickSpacing} liquidity=${pools[0].liquidity}`
+    );
   }
 
   const key = makePoolKey(currency0, currency1, poolFee, poolTickSpacing);
@@ -115,32 +120,44 @@ async function main() {
     const amountOut = result[0] as bigint;
     const gasEstimate = result[1] as bigint;
 
-    console.log(JSON.stringify({
-      success: true,
-      chain,
-      tokenIn,
-      tokenOut,
-      amountIn: amount.toString(),
-      amountOut: amountOut.toString(),
-      gasEstimate: gasEstimate.toString(),
-      pool: {
-        currency0,
-        currency1,
-        fee: poolFee,
-        tickSpacing: poolTickSpacing,
-        zeroForOne,
-      },
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          success: true,
+          chain,
+          tokenIn,
+          tokenOut,
+          amountIn: amount.toString(),
+          amountOut: amountOut.toString(),
+          gasEstimate: gasEstimate.toString(),
+          pool: {
+            currency0,
+            currency1,
+            fee: poolFee,
+            tickSpacing: poolTickSpacing,
+            zeroForOne,
+          },
+        },
+        null,
+        2
+      )
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(JSON.stringify({
-      success: false,
-      error: `Quote failed: ${msg.slice(0, 200)}`,
-      chain,
-      tokenIn,
-      tokenOut,
-      amountIn: amount.toString(),
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          success: false,
+          error: `Quote failed: ${msg.slice(0, 200)}`,
+          chain,
+          tokenIn,
+          tokenOut,
+          amountIn: amount.toString(),
+        },
+        null,
+        2
+      )
+    );
     process.exit(1);
   }
 }

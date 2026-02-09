@@ -3,9 +3,15 @@
   "slug": "uniswap-v4",
   "displayName": "Uniswap V4",
   "latest": {
-    "version": "2.0.2",
-    "publishedAt": 1770624740005,
-    "commit": "https://github.com/openclaw/skills/commit/eeb5f73ba9a695f255760a5b48bb46e30e3112b4"
+    "version": "2.0.3",
+    "publishedAt": 1770678580745,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.0.2",
+      "publishedAt": 1770624740005,
+      "commit": "https://github.com/openclaw/skills/commit/eeb5f73ba9a695f255760a5b48bb46e30e3112b4"
+    }
+  ]
 }

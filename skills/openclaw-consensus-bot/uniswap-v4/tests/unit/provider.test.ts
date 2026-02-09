@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { type JsonRpcProvider } from "ethers";
-import { makeProvider, fetchRpcChainId, assertRpcChain } from "../../src/lib/provider.js";
+import {
+  makeProvider,
+  fetchRpcChainId,
+  assertRpcChain,
+  assertHasBytecode,
+} from "../../src/lib/provider.js";
 
 // These tests are unit-level (no live RPC).
 // We use a dummy RPC URL and rely on `staticNetwork: true` to avoid any network calls.
@@ -55,5 +60,25 @@ describe("provider helpers", () => {
     await expect(assertRpcChain(provider, "base")).rejects.toThrow(
       /RPC unreachable or invalid response: boom/
     );
+  });
+
+  it("assertHasBytecode passes when contract code exists", async () => {
+    const provider = {
+      getCode: vi.fn(async () => "0x1234"),
+    } as unknown as JsonRpcProvider;
+
+    await expect(
+      assertHasBytecode(provider, "0x0000000000000000000000000000000000000001", "TestContract")
+    ).resolves.toBeUndefined();
+  });
+
+  it("assertHasBytecode throws when address has no bytecode", async () => {
+    const provider = {
+      getCode: vi.fn(async () => "0x"),
+    } as unknown as JsonRpcProvider;
+
+    await expect(
+      assertHasBytecode(provider, "0x0000000000000000000000000000000000000002", "TestContract")
+    ).rejects.toThrow(/has no contract bytecode/);
   });
 });

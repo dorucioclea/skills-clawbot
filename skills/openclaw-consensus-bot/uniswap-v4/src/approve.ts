@@ -22,7 +22,7 @@ import {
   validateChain,
   getPrivateKey,
 } from "./lib/validation.js";
-import { makeProvider } from "./lib/provider.js";
+import { makeProvider, assertRpcChain, assertHasBytecode } from "./lib/provider.js";
 
 // ── Constants ───────────────────────────────────────────────────────
 const MAX_UINT160 = (1n << 160n) - 1n;
@@ -73,13 +73,21 @@ async function main() {
   const tokenRaw = flags["token"];
   if (!tokenRaw) fatal("--token required.");
   const token = resolveTokenInput(tokenRaw, "token");
-  if (token === ADDRESS_ZERO) fatal("Cannot approve ETH (native). Only ERC20 tokens need approval.");
+  if (token === ADDRESS_ZERO) {
+    fatal("Cannot approve ETH (native). Only ERC20 tokens need approval.");
+  }
 
   const rpcUrl = resolveRpcUrl(chain, flags["rpc"]);
   const cfg = getChainConfig(chain);
   const privateKey = getPrivateKey();
 
   const provider = makeProvider(chain, rpcUrl);
+  await assertRpcChain(provider, chain);
+  // Write-path safety: ensure we're talking to real contracts.
+  await assertHasBytecode(provider, token, "ERC20 token");
+  await assertHasBytecode(provider, cfg.permit2, "Permit2");
+  await assertHasBytecode(provider, cfg.universalRouter, "Universal Router");
+
   const wallet = new Wallet(privateKey, provider);
   const sender = wallet.address;
 
@@ -88,7 +96,7 @@ async function main() {
 
   let symbol: string;
   try {
-    symbol = await erc20.symbol() as string;
+    symbol = await (erc20.symbol() as Promise<string>);
   } catch {
     symbol = "???";
   }
@@ -97,7 +105,7 @@ async function main() {
 
   // Step 1: ERC20 approve Permit2
   let hash1 = "";
-  const currentAllowance = await erc20.allowance(sender, cfg.permit2) as bigint;
+  const currentAllowance = (await erc20.allowance(sender, cfg.permit2)) as bigint;
   if (currentAllowance < MaxUint256 / 2n) {
     if (!jsonOutput) log("Step 1: Approving Permit2 to spend token...");
     const tx1 = await erc20.approve(cfg.permit2, MaxUint256);
@@ -111,7 +119,12 @@ async function main() {
 
   // Step 2: Permit2 approve Universal Router
   let hash2 = "";
-  const [currentAmount, currentExpiry] = await permit2.allowance(sender, token, cfg.universalRouter) as [bigint, bigint, bigint];
+  const [currentAmount, currentExpiry] =
+    (await permit2.allowance(sender, token, cfg.universalRouter)) as [
+      bigint,
+      bigint,
+      bigint,
+    ];
   const now = BigInt(Math.floor(Date.now() / 1000));
   if (currentAmount < MAX_UINT160 / 2n || currentExpiry < now + 86400n * 7n) {
     if (!jsonOutput) log("Step 2: Granting Universal Router allowance on Permit2...");
