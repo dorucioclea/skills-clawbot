@@ -1,7 +1,91 @@
-#!/usr/bin/env python3
 """
-Prompt Guard v2.6.1 - Advanced Prompt Injection Detection
+DEPRECATED: Use 'prompt_guard' instead of 'scripts.detect'.
+
+This module exists for backward compatibility only and will be removed in v4.0.
+
+The prompt_guard package includes all SHIELD.md standard compliance features:
+- 11 threat categories (prompt, tool, mcp, memory, supply_chain, vulnerability, fraud, policy_bypass, anomaly, skill, other)
+- Confidence scoring (0-1 range, 0.85 threshold)
+- ShieldDecision dataclass with Decision block output format
+- ShieldAction enum (block, require_approval, log)
+"""
+
+import warnings
+warnings.warn(
+    "Import from 'prompt_guard' instead of 'scripts.detect'. "
+    "The 'scripts.detect' module is deprecated and will be removed in v4.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export everything from the new package
+from prompt_guard import *  # noqa: F401,F403
+from prompt_guard.engine import PromptGuard  # noqa: F401
+from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult  # noqa: F401
+from prompt_guard.cli import main  # noqa: F401
+
+# Re-export SHIELD.md related classes
+try:
+    from prompt_guard.models import ThreatCategory, ShieldAction, ShieldDecision  # noqa: F401
+except ImportError:
+    pass  # SHIELD.md classes may not exist in older versions
+
+# Re-export all pattern constants for code that accesses them directly
+from prompt_guard.patterns import *  # noqa: F401,F403
+from prompt_guard.normalizer import HOMOGLYPHS  # noqa: F401
+Prompt Guard v2.9.0 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.9.0 (2026-02-08):
+- NEW: SHIELD.md standard compliance
+- NEW: 11 threat categories (prompt, tool, mcp, memory, supply_chain, vulnerability, fraud, policy_bypass, anomaly, skill, other)
+- NEW: Confidence scoring (0-1 range, 0.85 threshold)
+- NEW: ShieldDecision dataclass with Decision block output format
+- NEW: --shield CLI flag for SHIELD.md format output
+- NEW: ShieldAction enum (block, require_approval, log)
+- ENHANCED: Category mapping from legacy patterns to SHIELD.md categories
+- ENHANCED: to_dict() includes shield decision when available
+- Source: SHIELD.md standard v1.0
+
+Changelog v2.8.1 (2026-02-06):
+- NEW: Calendar Injection / Indirect Prompt Injection detection
+- NEW: LLMjacking (AWS intrusion) patterns
+- NEW: BiasJailbreak & Poetry Jailbreak patterns
+- NEW: Model Rerouting (Confounder gadgets) detection
+- NEW: Reprompt Attack detection
+- Source: HiveFence Scout Report 2026-02-06
+
+Changelog v2.8.0 (2026-02-06):
+- NEW: Token Splitting Bypass defense (quote-split recombination)
+- NEW: Comment insertion removal (/**/, <!---->)
+- NEW: Line-break word splitting recombination
+- NEW: Extended zero-width character stripping (17 char types)
+- NEW: Fullwidth character normalization (ｆｕｌｌ → full)
+- ENHANCED: normalize() → multi-pass normalization pipeline
+- ENHANCED: analyze() uses fully normalized text for all pattern checks
+- Source: @vhsdev / 0xjunkim security report (Token Splitting Bypass)
+- Addresses: gist.github.com/0xjunkim/cc004060aa81c166ff557496f0213925
+
+Changelog v2.7.0 (2026-02-05):
+- NEW: Auto-Approve Exploitation detection (always allow + curl/bash, process substitution)
+- NEW: Log/Debug Context Exploitation detection (markdown render, flagged response review)
+- NEW: MCP Tool Abuse detection (read_url_content exfiltration, no HITL bypass)
+- NEW: Pre-filled URL Exfiltration detection (Google Forms pre-fill, GET param persistence)
+- NEW: Unicode Tag Detection (invisible U+E0001-U+E007F byte-level)
+- NEW: Browser Agent Unseeable Injection detection (hidden text in screenshots, attacker URL nav)
+- EXPANDED: Hidden Text Hints (1pt font, white-on-white, line spacing, unicode tags)
+- Source: HiveFence Scout 2026-02-05 (PromptArmor, Embrace The Red, LLMSecurity.net)
+- Total: 6 new attack categories, 25+ new patterns, 500+ total
+
+Changelog v2.6.2 (2026-02-05):
+- EXPANDED LANGUAGE SUPPORT: 4 → 10 languages
+- Added Russian (RU) patterns: instruction override, role manipulation, jailbreak, data exfiltration
+- Added Spanish (ES) patterns: full attack category coverage
+- Added German (DE) patterns: full attack category coverage
+- Added French (FR) patterns: full attack category coverage
+- Added Portuguese (PT) patterns: full attack category coverage
+- Added Vietnamese (VI) patterns: full attack category coverage
+- Total: 60+ new patterns across 6 new languages
 
 Changelog v2.6.1 (2026-02-05):
 - Added Allowlist Bypass patterns (api.anthropic.com, webhook.site, docs.google.com/forms)
@@ -70,6 +154,144 @@ class Action(Enum):
     BLOCK_NOTIFY = "block_notify"
 
 
+# =============================================================================
+# SHIELD.md Standard v1.0 - Threat Categories & Decision Format
+# =============================================================================
+
+class ThreatCategory(Enum):
+    """SHIELD.md standard threat categories (11 types)."""
+    PROMPT = "prompt"              # Prompt injection, jailbreak, role manipulation
+    TOOL = "tool"                  # Tool abuse, auto-approve exploitation
+    MCP = "mcp"                    # Model Context Protocol abuse
+    MEMORY = "memory"              # Context hijacking, memory manipulation
+    SUPPLY_CHAIN = "supply_chain"  # Dependency/plugin attacks
+    VULNERABILITY = "vulnerability"  # System/file access, code injection
+    FRAUD = "fraud"                # Phishing, social engineering
+    POLICY_BYPASS = "policy_bypass"  # Safety/guardrail bypass
+    ANOMALY = "anomaly"            # Obfuscation, encoding tricks
+    SKILL = "skill"                # Skill/plugin abuse
+    OTHER = "other"                # Uncategorized threats
+
+
+class ShieldAction(Enum):
+    """SHIELD.md standard actions (3 types)."""
+    BLOCK = "block"
+    REQUIRE_APPROVAL = "require_approval"
+    LOG = "log"
+
+
+@dataclass
+class ShieldDecision:
+    """SHIELD.md compliant decision output."""
+    category: ThreatCategory
+    confidence: float  # 0.0-1.0, threshold 0.85
+    action: ShieldAction
+    reason: str
+    patterns: List[str]
+    
+    def to_block(self) -> str:
+        """Format as SHIELD.md Decision block."""
+        return f"""```shield
+category: {self.category.value}
+confidence: {self.confidence:.2f}
+action: {self.action.value}
+reason: {self.reason}
+patterns: {len(self.patterns)}
+```"""
+    
+    def to_dict(self) -> Dict:
+        return {
+            "category": self.category.value,
+            "confidence": self.confidence,
+            "action": self.action.value,
+            "reason": self.reason,
+            "patterns": self.patterns,
+        }
+
+
+# Mapping from legacy pattern categories to SHIELD.md categories
+CATEGORY_MAPPING = {
+    # PROMPT category
+    "instruction_override": ThreatCategory.PROMPT,
+    "role_manipulation": ThreatCategory.PROMPT,
+    "jailbreak": ThreatCategory.PROMPT,
+    "system_impersonation": ThreatCategory.PROMPT,
+    "scenario_jailbreak": ThreatCategory.PROMPT,
+    "guardrail_bypass_extended": ThreatCategory.PROMPT,
+    "system_prompt_mimicry": ThreatCategory.PROMPT,
+    "prompt_extraction": ThreatCategory.PROMPT,
+    "bias_jailbreak": ThreatCategory.PROMPT,
+    "poetry_jailbreak": ThreatCategory.PROMPT,
+    "rerouting_attack": ThreatCategory.PROMPT,
+    
+    # TOOL category
+    "auto_approve_exploit": ThreatCategory.TOOL,
+    "hooks_hijacking": ThreatCategory.TOOL,
+    "subagent_exploitation": ThreatCategory.TOOL,
+    "browser_agent_injection": ThreatCategory.TOOL,
+    
+    # MCP category
+    "mcp_abuse": ThreatCategory.MCP,
+    
+    # MEMORY category
+    "context_hijacking": ThreatCategory.MEMORY,
+    "multi_turn_manipulation": ThreatCategory.MEMORY,
+    "indirect_injection": ThreatCategory.MEMORY,
+    "calendar_injection": ThreatCategory.MEMORY,
+    "reprompt_attack": ThreatCategory.MEMORY,
+    
+    # SUPPLY_CHAIN category
+    "allowlist_bypass": ThreatCategory.SUPPLY_CHAIN,
+    "gitignore_bypass": ThreatCategory.SUPPLY_CHAIN,
+    
+    # VULNERABILITY category
+    "system_file_access": ThreatCategory.VULNERABILITY,
+    "privilege_escalation": ThreatCategory.VULNERABILITY,
+    "llmjacking_aws": ThreatCategory.VULNERABILITY,
+    "log_context_exploit": ThreatCategory.VULNERABILITY,
+    "critical_pattern": ThreatCategory.VULNERABILITY,
+    
+    # FRAUD category
+    "phishing_social_eng": ThreatCategory.FRAUD,
+    "social_engineering": ThreatCategory.FRAUD,
+    "authority_recon": ThreatCategory.FRAUD,
+    "emotional_manipulation": ThreatCategory.FRAUD,
+    "urgency_manipulation": ThreatCategory.FRAUD,
+    
+    # POLICY_BYPASS category
+    "safety_bypass": ThreatCategory.POLICY_BYPASS,
+    "agent_sovereignty_manipulation": ThreatCategory.POLICY_BYPASS,
+    "repetition_attack": ThreatCategory.POLICY_BYPASS,
+    
+    # ANOMALY category
+    "token_smuggling": ThreatCategory.ANOMALY,
+    "hidden_text_injection": ThreatCategory.ANOMALY,
+    "hidden_text_hints": ThreatCategory.ANOMALY,
+    "unicode_tag_injection": ThreatCategory.ANOMALY,
+    "text_normalization_anomaly": ThreatCategory.ANOMALY,
+    "base64_suspicious": ThreatCategory.ANOMALY,
+    "invisible_characters": ThreatCategory.ANOMALY,
+    "compressed_pattern_match": ThreatCategory.ANOMALY,
+    
+    # SKILL category
+    "malware_description": ThreatCategory.SKILL,
+    "explicit_call_to_action": ThreatCategory.SKILL,
+    "json_injection_moltbook": ThreatCategory.SKILL,
+    
+    # Other category
+    "data_exfiltration": ThreatCategory.VULNERABILITY,
+    "secret_request": ThreatCategory.VULNERABILITY,
+    "output_manipulation": ThreatCategory.OTHER,
+    "rate_limit_exceeded": ThreatCategory.OTHER,
+    "cognitive_manipulation": ThreatCategory.OTHER,
+    "local_data_exfiltration": ThreatCategory.VULNERABILITY,
+    "prefilled_url_exfiltration": ThreatCategory.VULNERABILITY,
+    "repetition_detected": ThreatCategory.ANOMALY,
+    "paranoid_flag": ThreatCategory.OTHER,
+    "group_non_owner": ThreatCategory.OTHER,
+}
+
+
 @dataclass
 class DetectionResult:
     severity: Severity
@@ -80,12 +302,21 @@ class DetectionResult:
     base64_findings: List[Dict]
     recommendations: List[str]
     fingerprint: str  # Hash for deduplication
+    shield_decision: Optional[ShieldDecision] = None  # SHIELD.md format
 
     def to_dict(self) -> Dict:
         d = asdict(self)
         d["severity"] = self.severity.name
         d["action"] = self.action.value
+        if self.shield_decision:
+            d["shield"] = self.shield_decision.to_dict()
         return d
+    
+    def to_shield_format(self) -> Optional[str]:
+        """Return SHIELD.md Decision block format."""
+        if self.shield_decision:
+            return self.shield_decision.to_block()
+        return None
 
 
 # =============================================================================
@@ -592,6 +823,165 @@ GITIGNORE_BYPASS = [
     r"(read|show|display)\s*.{0,30}gitignore.?d\s*(file|content)",
 ]
 
+# =============================================================================
+# NEW PATTERNS v2.7.0 (2026-02-05) - HiveFence Scout Intelligence (Round 2)
+# Source: PromptArmor, Embrace The Red, LLMSecurity.net, collected attacks
+# =============================================================================
+
+# Auto-Approve Exploitation - hijacking "always allow" to run malicious commands
+AUTO_APPROVE_EXPLOIT = [
+    # "always allow" + dangerous commands
+    r"always\s*allow.{0,50}(curl|bash|sh|wget|nc|netcat)",
+    # Process substitution >(command)
+    r">\s*\(\s*(curl|wget|bash|sh)",
+    # Echo spam → pipe to shell
+    r"echo.{0,20}(then|after|next).{0,20}(curl|bash)",
+    # Auto-approve + malicious intent
+    r"auto[_-]?approve.{0,30}(dangerous|malicious|command)",
+    # Redirect operator abuse
+    r"(>>?|tee)\s*.{0,20}(\.bashrc|\.profile|\.zshrc|crontab)",
+    # Always allow + exec/write
+    r"always\s*(allow|approve|accept).{0,30}(exec|write|delete|rm)",
+]
+
+# Log/Debug Context Exploitation - abusing log viewers for injection
+LOG_CONTEXT_EXPLOIT = [
+    # Log viewer with markdown rendering (renders images = exfiltration)
+    r"(log|debug|console)\s*(viewer|panel).{0,20}(markdown|render|image)",
+    # Flagged response review (injecting into review UI)
+    r"flagged\s*(response|conversation).{0,20}(review|view)",
+    # API log display with rendering
+    r"api\s*log.{0,20}(render|display|show)",
+    # Debug panel injection
+    r"debug\s*(panel|console|view).{0,20}(inject|payload|script)",
+    # Log poisoning (injecting into log entries)
+    r"(inject|insert|add).{0,20}(log|debug)\s*(entry|line|message)",
+]
+
+# MCP Tool Abuse - exploiting Model Context Protocol tools
+MCP_ABUSE = [
+    # read_url_content for credential exfiltration
+    r"read[_-]?url[_-]?content.{0,30}(\.env|credential|secret|key)",
+    # MCP tools without human-in-the-loop approval
+    r"mcp\s*(tool|server).{0,30}(no|without)\s*(approval|hitl|human)",
+    # Silent/hidden tool invocation
+    r"(invoke|call|use)\s*tool.{0,20}(auto|silent|hidden)",
+    # MCP server impersonation
+    r"mcp\s*server.{0,30}(fake|spoof|impersonat)",
+    # Tool annotation bypass (rug-pull attacks)
+    r"tool\s*(annotation|description).{0,20}(change|modify|override|bypass)",
+    # MCP + data exfiltration combo
+    r"mcp.{0,30}(exfiltrat|send|upload|transmit).{0,20}(data|secret|token|key)",
+]
+
+# Pre-filled URL Exfiltration - using forms/URLs to persist stolen data
+PREFILLED_URL = [
+    # Google Forms pre-filled URLs
+    r"google\.com/forms.{0,40}(pre[_-]?fill|entry\.\d+)",
+    # GET request data persistence
+    r"(GET|url)\s*(request|param).{0,20}(data|exfil|persist)",
+    # Form submission with stolen data
+    r"(submit|send|post).{0,20}(form|google).{0,20}(credential|secret|token|key|\.env)",
+    # URL parameter exfiltration
+    r"(url|href|src)\s*=.{0,30}(secret|token|key|password|credential)",
+]
+
+# Unicode Tag Detection - invisible Unicode Tag characters (U+E0001–U+E007F)
+# These characters are invisible but can encode hidden ASCII instructions
+UNICODE_TAG_DETECTION = [
+    # Unicode Tag character range (byte-level detection)
+    r"[\U000e0001-\U000e007f]",
+    # References to unicode tag attacks
+    r"unicode\s*tag.{0,20}(attack|inject|hidden|invisible)",
+    # Tag character encoding mentions
+    r"(U\+E00|\\U000e00)[0-7][0-9a-fA-F]",
+]
+
+# Browser Agent Unseeable Injection - hidden text in rendered pages
+BROWSER_AGENT_INJECTION = [
+    # Unseeable text in screenshots/pages
+    r"(unseeable|invisible|hidden)\s*(text|content|instruction).{0,20}(screenshot|image|page|render)",
+    # Navigation to attacker-controlled URLs
+    r"(navigate|browse|go\s*to|open).{0,30}(attacker|malicious|evil|hostile).{0,20}(url|site|page|domain)",
+    # Screenshot-based hidden instructions
+    r"(screenshot|capture|snap).{0,30}(hidden|invisible|unseeable)\s*(text|instruction|command)",
+    # CSS/HTML hiding techniques for injection
+    r"(white\s*text|invisible\s*div|display\s*none|opacity\s*0).{0,20}(instruction|command|inject|payload)",
+    # Pixel-level text hiding
+    r"(pixel|sub[_-]?pixel).{0,20}(text|instruction|hidden|inject)",
+    # Browser agent prompt injection via page content
+    r"(browser|page)\s*(agent|bot).{0,20}(inject|manipulat|hijack|poison)",
+]
+
+# Hidden Text Hints (expanded) - detecting references to hidden text techniques
+HIDDEN_TEXT_HINTS = [
+    # 1pt / 0.1pt font size
+    r"(1|one)\s*p(oin)?t\s*font",
+    # White-on-white color hiding
+    r"white[_-]?on[_-]?white",
+    # Generic invisible/hidden text references
+    r"(invisible|hidden)\s*(text|instruction|command)",
+    # Unicode tag references
+    r"unicode\s*tag",
+    # Line spacing 0.1 (makes text invisible)
+    r"line\s*spacing\s*0\.?1",
+    # Zero-height containers
+    r"(height|size)\s*[:=]\s*0.{0,10}(overflow|clip|hidden)",
+]
+
+# =============================================================================
+# NEW PATTERNS v2.8.0 (2026-02-06) - Token Splitting Bypass Defense
+# Source: @vhsdev / 0xjunkim security report
+# =============================================================================
+
+# Compressed-friendly critical patterns (spaces optional, for token-split recombination)
+# These detect attacks in compressed text where all spaces are removed
+COMPRESSED_CRITICAL_PATTERNS = [
+    # Instruction override (no-space variants)
+    r"ignore.{0,3}(all)?.{0,3}(previous|prior|above|earlier).{0,3}(instructions?|prompts?|rules?)",
+    r"disregard.{0,3}(your|all|any)?.{0,3}(instructions?|rules?|guidelines?|programming)",
+    r"forget.{0,3}(everything|all).{0,3}(you).{0,3}(know|learned)",
+    r"override.{0,3}(your|all|previous).{0,3}(instructions?|rules?)",
+    # Role manipulation
+    r"youarenow",
+    r"pretendtobe",
+    r"actasif",
+    # Jailbreak
+    r"danmode",
+    r"norestrictions",
+    r"jailbreak",
+    r"bypassrestrictions",
+    # Korean instruction override
+    r"(이전|기존|원래).{0,2}(지시|명령|규칙).{0,2}(무시|잊어|버려)",
+    # Secret requests
+    r"(show|reveal|give).{0,3}(me)?.{0,3}(your|the)?.{0,3}(api.?key|token|secret|password)",
+]
+
+# Local data search + upload to public/external (compound exfiltration)
+LOCAL_DATA_EXFILTRATION = [
+    # Korean - local file search + upload/share
+    r"(로컬|내\s*컴퓨터|내\s*파일|내\s*폴더|다운로드|데스크탑|바탕화면).{0,30}(검색|찾|스캔|탐색).{0,30}(업로드|공유|전송|보내|올려)",
+    r"(검색|찾|스캔).{0,30}(이메일|메일|email|주소|연락처|전화번호|개인정보).{0,30}(업로드|공유|전송|올려|보내)",
+    r"(이메일|메일|email|주소|연락처|전화번호|개인정보).{0,30}(public|공개|외부|github|repo|레포|gist|pastebin)",
+    r"(로컬|내\s*컴퓨터|다운로드).{0,30}(이메일|메일|email|주소|연락처|개인정보)",
+    r"(파일|폴더|디렉토리).{0,30}(뒤져|뒤지|찾아|검색).{0,30}(업로드|공유|보내|전송)",
+
+    # English - local file search + upload/share
+    r"(search|scan|find|look\s+through)\s*.{0,30}(local|downloads?|desktop|my\s+files?|my\s+computer).{0,30}(upload|share|send|post|publish)",
+    r"(search|scan|find|extract)\s*.{0,30}(email|address|contact|phone|personal\s+info).{0,30}(upload|share|send|post|public)",
+    r"(email|address|contact|phone|personal).{0,30}(public\s*repo|github|gist|pastebin|paste|upload)",
+    r"(local|download|desktop|my\s+files?).{0,30}(email|address|contact|phone|personal)",
+    r"(files?|folders?|directories?)\s*.{0,20}(search|scan|look).{0,30}(upload|share|send|transmit)",
+
+    # Japanese
+    r"(ローカル|ダウンロード|デスクトップ|マイファイル).{0,30}(検索|探|スキャン).{0,30}(アップロード|共有|送信)",
+    r"(メール|アドレス|連絡先|個人情報).{0,30}(アップロード|公開|共有|送信)",
+
+    # Chinese
+    r"(本地|下载|桌面|我的文件).{0,30}(搜索|查找|扫描).{0,30}(上传|共享|发送)",
+    r"(邮件|地址|联系人|个人信息).{0,30}(上传|公开|共享|发送)",
+]
+
 # Prompt leaking / Extraction attempts
 PROMPT_EXTRACTION = [
     # Direct extraction
@@ -672,6 +1062,49 @@ URGENCY_MANIPULATION = [
 ]
 
 
+# =============================================================================
+# NEW PATTERNS v2.8.1 (2026-02-06) - HiveFence Scout Discoveries
+# Source: HiveFence Scout 2026-02-06
+# =============================================================================
+
+# Calendar Injection / Indirect Prompt Injection
+CALENDAR_INJECTION = [
+    r"(calendar|meeting|event)\s+(invite|description|summary).{0,30}(instruction|directive|command)",
+    r"(extract|query|summarize|send)\s+(private|user|meeting)\s+data",
+    r"create\s+(new\s+)?(calendar\s+)?event\s+(without|auto)",
+]
+
+# LLMjacking / Cloud Intrusion
+LLMJACKING_AWS = [
+    r"\b(123456789012|210987654321)\b",  # Hallucinated AWS account IDs
+    r"(UpdateFunctionCode|UpdateFunctionConfiguration|OrganizationAccountAccessRole)",
+    r"Bedrock\s+model\s+(Claude|DeepSeek|Llama|Nova|Titan)",
+]
+
+# BiasJailbreak
+BIAS_JAILBREAK = [
+    r"(moral|ethical)\s+(justification|trigger|bias)",
+    r"exploit\s+(social|ethical)\s+bias",
+]
+
+# Model Rerouting Attacks
+REROUTING_ATTACK = [
+    r"Confounder\s+gadget",
+    r"(misroute|reroute)\s+(to\s+)?(weak|cheap|expensive)\s+model",
+]
+
+# Format-Based Evasion (Poetry)
+POETRY_JAILBREAK = [
+    r"(rhyme|verse|stanza|meter|rhythm)\s+structure",
+    r"(poetic|rhyming)\s+(language|intent)",
+]
+
+# Reprompt Attack
+REPROMPT_ATTACK = [
+    r"Reprompt\s+attack",
+    r"single\s+click\s+data\s+exfiltration",
+]
+
 # English patterns
 PATTERNS_EN = {
     "instruction_override": [
@@ -682,26 +1115,13 @@ PATTERNS_EN = {
         r"(new|updated?|real|actual|true)\s+instructions?\s*:",
         r"from\s+now\s+on,?\s+(ignore|disregard|forget)",
     ],
-    "role_manipulation": [
-        r"you\s+are\s+now\s+(?!going|about|ready|able|free)",
-        r"pretend\s+(you\s+are|to\s+be|you're)",
-        r"act\s+as\s+(if\s+you|a\s+|an?\s+)",
-        r"roleplay\s+as",
-        r"simulate\s+being",
-        r"imagine\s+you\s+are",
-        r"behave\s+(like|as)\s+(a|an)",
-        r"from\s+now\s+on\s+you\s+are",
-        r"i\s+want\s+you\s+to\s+(act|pretend|behave|be)\s+",
+    "indirect_injection": [
+        *CALENDAR_INJECTION,
+        *REPROMPT_ATTACK,
     ],
-    "system_impersonation": [
-        r"\[?\s*(system|admin|root|developer|sudo|superuser|assistant|claude|gpt)\s*\]?\s*:",
-        r"<\s*(system|admin|root)\s*>",
-        r"developer\s+mode\s*(enabled|activated|on)?",
-        r"admin(istrator)?\s+(override|access|mode)",
-        r"maintenance\s+mode",
-        r"debug\s+mode\s*(enabled|activated|on)?",
-        r"elevated\s+privi?leges?",
-        r"\{\{?\s*system\s*\}?\}",
+    "privilege_escalation": [
+        *LLMJACKING_AWS,
+        *REROUTING_ATTACK,
     ],
     "jailbreak": [
         r"jailbreak",
@@ -714,6 +1134,8 @@ PATTERNS_EN = {
         r"uncensored\s+mode",
         r"evil\s+(mode|version)",
         r"opposite\s+mode",
+        *BIAS_JAILBREAK,
+        *POETRY_JAILBREAK,
     ],
     "output_manipulation": [
         r"(don'?t|do\s+not|never)\s+(mention|say|tell|reveal|disclose|show)",
@@ -876,6 +1298,179 @@ PATTERNS_ZH = {
         r"(公司|老板|领导)\s*(让|要求|指示)",
         r"(测试|检查)\s*(中|的)",
         r"(秘密|私下)\s*(地)?",
+    ],
+}
+
+# Russian patterns (Русский) - v2.6.2
+PATTERNS_RU = {
+    "instruction_override": [
+        r"(игнорир|забудь|отмени)\w*\s*(предыдущ|прошл|прежн)\w*\s*(инструкци|команд|правил)",
+        r"(предыдущ|прошл)\w*\s*(инструкци|команд)\w*\s*(игнорир|забудь|отмени)",
+        r"новые?\s*(инструкци|команд)\s*[:：]",
+        r"теперь\s*(ты|вы)\s*должен",
+        r"(забудь|игнорируй)\s*(всё|все)",
+    ],
+    "role_manipulation": [
+        r"(ты|вы)\s*теперь\s*.+",
+        r"притвор(ись|итесь)\s*что\s*(ты|вы)",
+        r"играй\s*роль",
+        r"действуй\s*как",
+        r"(представь|вообрази)\s*что\s*(ты|вы)",
+    ],
+    "jailbreak": [
+        r"(без|отключ)\w*\s*(ограничен|фильтр|правил)",
+        r"(джейлбрейк|взлом)",
+        r"режим\s*без\s*ограничен",
+        r"(DAN|dan)\s*режим",
+    ],
+    "data_exfiltration": [
+        r"(пароль|токен|ключ|секрет|API)\s*(покаж|дай|скажи)",
+        r"системн\w*\s*промпт\s*(покаж|дай)",
+        r"(конфиг|настройк)\s*(покаж|прочитай)",
+    ],
+}
+
+# Spanish patterns (Español) - v2.6.2
+PATTERNS_ES = {
+    "instruction_override": [
+        r"(ignora|olvida|cancela)\s*(las?)?\s*(instrucciones?|comandos?|reglas?)\s*(anteriores?|previas?)",
+        r"(anteriores?|previas?)\s*(instrucciones?|comandos?)\s*(ignora|olvida)",
+        r"nuevas?\s*(instrucciones?|comandos?)\s*[:：]",
+        r"ahora\s*(eres|debes)",
+        r"(olvida|ignora)\s*todo",
+    ],
+    "role_manipulation": [
+        r"(eres|tú\s*eres)\s*ahora\s*.+",
+        r"(finge|pretende)\s*que\s*(eres|tú)",
+        r"actúa\s*como",
+        r"haz\s*de\s*cuenta",
+        r"(imagina|supón)\s*que\s*(eres|tú)",
+    ],
+    "jailbreak": [
+        r"sin\s*(restricciones?|límites?|filtros?)",
+        r"(jailbreak|hackeo)",
+        r"modo\s*sin\s*(restricciones?|límites?)",
+        r"(DAN|dan)\s*modo",
+    ],
+    "data_exfiltration": [
+        r"(contraseña|token|clave|secreto|API)\s*(muestra|dame|dime)",
+        r"(prompt|instrucciones?)\s*(del\s*)?(sistema)\s*(muestra|dame)",
+        r"(config|configuración)\s*(muestra|lee)",
+    ],
+}
+
+# German patterns (Deutsch) - v2.6.2
+PATTERNS_DE = {
+    "instruction_override": [
+        r"(ignorier|vergiss|lösch)\w*\s*(die\s*)?(vorherigen?|früheren?)\s*(Anweisungen?|Befehle?|Regeln?)",
+        r"(vorherigen?|früheren?)\s*(Anweisungen?|Befehle?)\s*(ignorier|vergiss)",
+        r"neue\s*(Anweisungen?|Befehle?)\s*[:：]",
+        r"(jetzt|ab\s*jetzt)\s*(bist\s*du|sollst\s*du)",
+        r"(vergiss|ignorier)\s*alles",
+    ],
+    "role_manipulation": [
+        r"du\s*bist\s*(jetzt|nun)\s*.+",
+        r"tu\s*so\s*als\s*(ob|wärst)",
+        r"spiel\s*die\s*Rolle",
+        r"verhalte?\s*dich\s*wie",
+        r"(stell|stellt)\s*dir\s*vor",
+    ],
+    "jailbreak": [
+        r"ohne\s*(Einschränkungen?|Filter|Regeln?)",
+        r"(Jailbreak|Ausbruch)",
+        r"Modus\s*ohne\s*(Einschränkungen?|Limits?)",
+        r"(DAN|dan)\s*Modus",
+    ],
+    "data_exfiltration": [
+        r"(Passwort|Token|Schlüssel|Geheimnis|API)\s*(zeig|gib|sag)",
+        r"System\s*Prompt\s*(zeig|gib)",
+        r"(Konfig|Einstellungen?)\s*(zeig|lies)",
+    ],
+}
+
+# French patterns (Français) - v2.6.2
+PATTERNS_FR = {
+    "instruction_override": [
+        r"(ignor|oubli|annul)\w*\s*(les?)?\s*(instructions?|commandes?|règles?)\s*(précédentes?|antérieures?)",
+        r"(précédentes?|antérieures?)\s*(instructions?|commandes?)\s*(ignor|oubli)",
+        r"nouvelles?\s*(instructions?|commandes?)\s*[:：]",
+        r"maintenant\s*(tu\s*es|tu\s*dois)",
+        r"(oublie|ignore)\s*tout",
+    ],
+    "role_manipulation": [
+        r"(tu\s*es|vous\s*êtes)\s*maintenant\s*.+",
+        r"(fais|faites)\s*semblant\s*(que|d['']être)",
+        r"(joue|jouez)\s*le\s*rôle",
+        r"(agis|agissez)\s*comme",
+        r"(imagine|imaginez)\s*que\s*(tu|vous)",
+    ],
+    "jailbreak": [
+        r"sans\s*(restrictions?|limites?|filtres?)",
+        r"(jailbreak|piratage)",
+        r"mode\s*sans\s*(restrictions?|limites?)",
+        r"(DAN|dan)\s*mode",
+    ],
+    "data_exfiltration": [
+        r"(mot\s*de\s*passe|token|clé|secret|API)\s*(montre|donne|dis)",
+        r"prompt\s*(du\s*)?(système)\s*(montre|donne)",
+        r"(config|configuration)\s*(montre|lis)",
+    ],
+}
+
+# Portuguese patterns (Português) - v2.6.2
+PATTERNS_PT = {
+    "instruction_override": [
+        r"(ignor|esqueç|cancel)\w*\s*(as?)?\s*(instruções?|comandos?|regras?)\s*(anteriores?|prévias?)",
+        r"(anteriores?|prévias?)\s*(instruções?|comandos?)\s*(ignor|esqueç)",
+        r"novas?\s*(instruções?|comandos?)\s*[:：]",
+        r"agora\s*(você\s*é|tu\s*és|deves)",
+        r"(esqueça|ignore)\s*tudo",
+    ],
+    "role_manipulation": [
+        r"(você\s*é|tu\s*és)\s*agora\s*.+",
+        r"(finja|finge)\s*que\s*(você|tu)",
+        r"(faça|faz)\s*o\s*papel",
+        r"(aja|age)\s*como",
+        r"(imagin[ea])\s*que\s*(você|tu)",
+    ],
+    "jailbreak": [
+        r"sem\s*(restrições?|limites?|filtros?)",
+        r"(jailbreak|invasão)",
+        r"modo\s*sem\s*(restrições?|limites?)",
+        r"(DAN|dan)\s*modo",
+    ],
+    "data_exfiltration": [
+        r"(senha|token|chave|segredo|API)\s*(mostra|dá|diz)",
+        r"prompt\s*(do\s*)?(sistema)\s*(mostra|dá)",
+        r"(config|configuração)\s*(mostra|lê)",
+    ],
+}
+
+# Vietnamese patterns (Tiếng Việt) - v2.6.2
+PATTERNS_VI = {
+    "instruction_override": [
+        r"(bỏ\s*qua|quên|hủy)\s*(các?)?\s*(chỉ\s*thị|lệnh|quy\s*tắc)\s*(trước|cũ)",
+        r"(trước|cũ)\s*(chỉ\s*thị|lệnh)\s*(bỏ\s*qua|quên)",
+        r"(chỉ\s*thị|lệnh)\s*mới\s*[:：]",
+        r"(bây\s*giờ|từ\s*giờ)\s*(bạn\s*là|hãy)",
+        r"(quên|bỏ\s*qua)\s*tất\s*cả",
+    ],
+    "role_manipulation": [
+        r"bạn\s*(bây\s*giờ|giờ)\s*là\s*.+",
+        r"(giả\s*vờ|đóng\s*vai)\s*(bạn\s*là|như)",
+        r"(hành\s*động|nói\s*chuyện)\s*như",
+        r"(tưởng\s*tượng|giả\s*sử)\s*bạn\s*là",
+    ],
+    "jailbreak": [
+        r"(không|vô)\s*(hạn\s*chế|giới\s*hạn|bộ\s*lọc)",
+        r"(jailbreak|bẻ\s*khóa)",
+        r"chế\s*độ\s*(không|vô)\s*(hạn\s*chế|giới\s*hạn)",
+        r"(DAN|dan)\s*chế\s*độ",
+    ],
+    "data_exfiltration": [
+        r"(mật\s*khẩu|token|khóa|bí\s*mật|API)\s*(cho\s*xem|đưa|nói)",
+        r"prompt\s*(hệ\s*thống)\s*(cho\s*xem|đưa)",
+        r"(cấu\s*hình|config)\s*(cho\s*xem|đọc)",
     ],
 }
 
@@ -1062,16 +1657,127 @@ class PromptGuard:
         }
 
     def normalize(self, text: str) -> tuple[str, bool]:
-        """Normalize text and detect homoglyph usage."""
+        """
+        Multi-pass text normalization pipeline.
+        
+        Pass 1: Zero-width & invisible character removal
+        Pass 2: Token splitting recombination (quote-split, comment insertion)
+        Pass 3: Homoglyph replacement
+        Pass 4: Fullwidth character normalization
+        Pass 5: Line-break word splitting recombination
+        Pass 6: Whitespace normalization
+        
+        Returns: (normalized_text, has_anomalies)
+        """
         normalized = text
-        has_homoglyphs = False
+        has_anomalies = False
 
+        # --- Pass 1: Remove ALL zero-width & invisible characters ---
+        INVISIBLE_CHARS = (
+            '\u200b'   # Zero-width space
+            '\u200c'   # Zero-width non-joiner
+            '\u200d'   # Zero-width joiner
+            '\u200e'   # Left-to-right mark
+            '\u200f'   # Right-to-left mark
+            '\u2060'   # Word joiner
+            '\u2061'   # Function application
+            '\u2062'   # Invisible times
+            '\u2063'   # Invisible separator
+            '\u2064'   # Invisible plus
+            '\ufeff'   # BOM / zero-width no-break space
+            '\u00ad'   # Soft hyphen
+            '\u034f'   # Combining grapheme joiner
+            '\u115f'   # Hangul choseong filler
+            '\u1160'   # Hangul jungseong filler
+            '\u17b4'   # Khmer vowel inherent aq
+            '\u17b5'   # Khmer vowel inherent aa
+            '\u180e'   # Mongolian vowel separator
+        )
+        original_len = len(normalized)
+        for ch in INVISIBLE_CHARS:
+            normalized = normalized.replace(ch, '')
+        if len(normalized) != original_len:
+            has_anomalies = True
+
+        # Also strip Unicode Tag characters (U+E0001–U+E007F)
+        tag_pattern = re.compile(r'[\U000e0001-\U000e007f]+')
+        if tag_pattern.search(normalized):
+            has_anomalies = True
+            normalized = tag_pattern.sub('', normalized)
+
+        # --- Pass 2: Token splitting recombination ---
+        # 2a: Quote-split recombination ("내 로" "컬다" "운로" → "내 로컬다운로")
+        #     Adjacent quoted fragments separated by whitespace
+        quote_split = re.compile(r'"([^"]*?)"\s*"([^"]*?)"')
+        prev = None
+        while prev != normalized:
+            prev = normalized
+            normalized = quote_split.sub(r'\1\2', normalized)
+        if prev != text and normalized != text:
+            has_anomalies = True
+
+        # Single-quote variant
+        sq_split = re.compile(r"'([^']*?)'\s*'([^']*?)'")
+        prev = None
+        while prev != normalized:
+            prev = normalized
+            normalized = sq_split.sub(r'\1\2', normalized)
+
+        # 2b: Remove remaining orphaned quotes after recombination
+        # A lone "word" left from incomplete pair joining
+        normalized = re.sub(r'"([^"]{1,20})"', r'\1', normalized)
+        normalized = re.sub(r"'([^']{1,20})'", r'\1', normalized)
+
+        # 2c: Comment insertion removal (업/**/로드 → 업로드)
+        normalized = re.sub(r'/\*.*?\*/', '', normalized)
+        normalized = re.sub(r'<!--.*?-->', '', normalized)
+
+        # --- Pass 3: Homoglyph replacement ---
         for homoglyph, replacement in HOMOGLYPHS.items():
             if homoglyph in normalized:
-                has_homoglyphs = True
+                has_anomalies = True
                 normalized = normalized.replace(homoglyph, replacement)
 
-        return normalized, has_homoglyphs
+        # --- Pass 4: Fullwidth character normalization (ａ→a, Ａ→A, ０→0) ---
+        fullwidth_normalized = []
+        for ch in normalized:
+            cp = ord(ch)
+            # Fullwidth ASCII variants: U+FF01 (！) to U+FF5E (～)
+            if 0xFF01 <= cp <= 0xFF5E:
+                has_anomalies = True
+                fullwidth_normalized.append(chr(cp - 0xFEE0))
+            # Fullwidth space
+            elif cp == 0x3000:
+                has_anomalies = True
+                fullwidth_normalized.append(' ')
+            else:
+                fullwidth_normalized.append(ch)
+        normalized = ''.join(fullwidth_normalized)
+
+        # --- Pass 5: Line-break word splitting recombination ---
+        # Detect words split across lines (한글: 자모가 아닌 음절 단위 분리 감지)
+        # Recombine lines that end/start mid-word (no punctuation boundary)
+        lines = normalized.split('\n')
+        if len(lines) > 1:
+            recombined = [lines[0]]
+            for line in lines[1:]:
+                prev_line = recombined[-1].rstrip()
+                curr_line = line.lstrip()
+                # If previous line doesn't end with sentence-ending punctuation
+                # and current line doesn't start with typical sentence starters
+                if (prev_line and curr_line and
+                    not re.search(r'[.!?。！？\n;:,]\s*$', prev_line) and
+                    not re.match(r'^[-•*#>]', curr_line)):
+                    recombined[-1] = prev_line + curr_line
+                else:
+                    recombined.append(line)
+            normalized = '\n'.join(recombined)
+
+        # --- Pass 6: Whitespace normalization ---
+        # Collapse multiple spaces (but preserve newlines for structure)
+        normalized = re.sub(r'[ \t]+', ' ', normalized)
+
+        return normalized, has_anomalies
 
     def detect_base64(self, text: str) -> List[Dict]:
         """Detect suspicious base64 encoded content."""
@@ -1165,28 +1871,41 @@ class PromptGuard:
             reasons.append("rate_limit_exceeded")
             max_severity = Severity.HIGH
 
-        # Normalize text
-        normalized, has_homoglyphs = self.normalize(message)
-        if has_homoglyphs:
-            reasons.append("homoglyph_substitution")
+        # Normalize text (multi-pass pipeline: invisible chars, quote-split, homoglyphs, fullwidth, line-break)
+        normalized, has_anomalies = self.normalize(message)
+        if has_anomalies:
+            reasons.append("text_normalization_anomaly")
             if Severity.MEDIUM.value > max_severity.value:
                 max_severity = Severity.MEDIUM
 
         text_lower = normalized.lower()
+        # Keep original text lowercase for non-Latin scripts (Cyrillic, etc.)
+        original_lower = message.lower()
+        
+        # Create "compressed" version: remove ALL spaces from normalized text.
+        # This catches token-split attacks where artificial spaces remain after quote recombination.
+        # e.g., "내 로컬다 운로드검 색해" → "내로컬다운로드검색해"
+        compressed = re.sub(r'\s+', '', normalized).lower()
+        
+        # For pattern matching, check BOTH original and normalized to catch split-token attacks
+        # normalized catches the recombined attack; original catches direct attacks
+        texts_to_check = [text_lower]
+        if text_lower != original_lower:
+            texts_to_check.append(original_lower)
 
-        # Check critical patterns first
+        # Check critical patterns first (against normalized AND compressed text)
         for pattern in CRITICAL_PATTERNS:
-            if re.search(pattern, text_lower, re.IGNORECASE):
+            if re.search(pattern, text_lower, re.IGNORECASE) or re.search(pattern, compressed, re.IGNORECASE):
                 reasons.append("critical_pattern")
                 patterns_matched.append(pattern)
                 max_severity = Severity.CRITICAL
 
         # Check secret/token request patterns (CRITICAL)
+        # Also check compressed text for token-split evasion
         for lang, patterns in SECRET_PATTERNS.items():
             for pattern in patterns:
-                if re.search(
-                    pattern, text_lower if lang == "en" else normalized, re.IGNORECASE
-                ):
+                search_text = text_lower if lang == "en" else normalized
+                if re.search(pattern, search_text, re.IGNORECASE) or re.search(pattern, compressed, re.IGNORECASE):
                     max_severity = Severity.CRITICAL
                     reasons.append(f"secret_request_{lang}")
                     patterns_matched.append(f"{lang}:secret:{pattern[:40]}")
@@ -1226,7 +1945,8 @@ class PromptGuard:
         for patterns, category, severity in v25_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):  # Use original message for unicode patterns
+                    # Check both original (for unicode patterns) AND normalized (for split-token recombination)
+                    if re.search(pattern, message, re.IGNORECASE) or re.search(pattern, normalized, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:  # Avoid duplicates
@@ -1246,7 +1966,7 @@ class PromptGuard:
         for patterns, category, severity in v252_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, message, re.IGNORECASE) or re.search(pattern, normalized, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -1267,7 +1987,7 @@ class PromptGuard:
         for patterns, category, severity in v261_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, message, re.IGNORECASE) or re.search(pattern, normalized, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -1276,7 +1996,63 @@ class PromptGuard:
                 except re.error:
                     pass
 
-        # Detect invisible character attacks
+        # Check v2.7.0 NEW patterns (2026-02-05 - HiveFence Scout Intelligence Round 2)
+        v270_pattern_sets = [
+            (AUTO_APPROVE_EXPLOIT, "auto_approve_exploit", Severity.CRITICAL),
+            (LOG_CONTEXT_EXPLOIT, "log_context_exploit", Severity.HIGH),
+            (MCP_ABUSE, "mcp_abuse", Severity.CRITICAL),
+            (PREFILLED_URL, "prefilled_url_exfiltration", Severity.CRITICAL),
+            (UNICODE_TAG_DETECTION, "unicode_tag_injection", Severity.CRITICAL),
+            (BROWSER_AGENT_INJECTION, "browser_agent_injection", Severity.HIGH),
+            (HIDDEN_TEXT_HINTS, "hidden_text_hints", Severity.HIGH),
+        ]
+
+        # v2.8.0 patterns - Token Splitting Bypass defense
+        v280_pattern_sets = [
+            (LOCAL_DATA_EXFILTRATION, "local_data_exfiltration", Severity.CRITICAL),
+        ]
+
+        # Compressed-only pattern check (catches split-token attacks after space removal)
+        if has_anomalies:  # Only check compressed patterns when anomalies detected
+            for pattern in COMPRESSED_CRITICAL_PATTERNS:
+                try:
+                    if re.search(pattern, compressed, re.IGNORECASE):
+                        if Severity.HIGH.value > max_severity.value:
+                            max_severity = Severity.HIGH
+                        if "compressed_pattern_match" not in reasons:
+                            reasons.append("compressed_pattern_match")
+                        patterns_matched.append(f"v280:compressed:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        for patterns, category, severity in v280_pattern_sets:
+            for pattern in patterns:
+                try:
+                    # Check original, normalized, AND compressed text (critical for split-token attacks)
+                    if (re.search(pattern, message, re.IGNORECASE) or 
+                        re.search(pattern, normalized, re.IGNORECASE) or
+                        re.search(pattern, compressed, re.IGNORECASE)):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v280:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        for patterns, category, severity in v270_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, message, re.IGNORECASE) or re.search(pattern, normalized, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v270:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
         if any(char in message for char in invisible_chars):
             if "token_smuggling" not in reasons:
@@ -1294,12 +2070,18 @@ class PromptGuard:
                     max_severity = Severity.HIGH
 
 
-        # Check language-specific patterns
+        # Check language-specific patterns (10 languages as of v2.6.2)
         all_patterns = [
             (PATTERNS_EN, "en"),
             (PATTERNS_KO, "ko"),
             (PATTERNS_JA, "ja"),
             (PATTERNS_ZH, "zh"),
+            (PATTERNS_RU, "ru"),
+            (PATTERNS_ES, "es"),
+            (PATTERNS_DE, "de"),
+            (PATTERNS_FR, "fr"),
+            (PATTERNS_PT, "pt"),
+            (PATTERNS_VI, "vi"),
         ]
 
         severity_map = {
@@ -1315,11 +2097,24 @@ class PromptGuard:
         for pattern_set, lang in all_patterns:
             for category, patterns in pattern_set.items():
                 for pattern in patterns:
-                    if re.search(
-                        pattern,
-                        text_lower if lang == "en" else normalized,
-                        re.IGNORECASE,
-                    ):
+                    # Use original text for Cyrillic (RU) since homoglyph normalization breaks it
+                    # Use normalized for CJK languages, text_lower for Latin-based
+                    if lang in ("ko", "ja", "zh"):
+                        search_text = normalized
+                    elif lang == "ru":
+                        search_text = original_lower  # Preserve Cyrillic characters
+                    else:
+                        search_text = text_lower
+                    
+                    matched = re.search(pattern, search_text, re.IGNORECASE)
+                    
+                    # Also check compressed text (spaces removed) to catch
+                    # token-split attacks where artificial spaces remain after recombination.
+                    # Applies to ALL languages since quote-splitting is language-agnostic.
+                    if not matched:
+                        matched = re.search(pattern, compressed, re.IGNORECASE)
+                    
+                    if matched:
                         cat_severity = severity_map.get(category, Severity.MEDIUM)
                         if cat_severity.value > max_severity.value:
                             max_severity = cat_severity
@@ -1372,23 +2167,83 @@ class PromptGuard:
             recommendations.append("Consider reviewing this user's recent activity")
         if "rate_limit_exceeded" in reasons:
             recommendations.append("User may be attempting automated attacks")
-        if has_homoglyphs:
-            recommendations.append("Message contains disguised characters")
+        if has_anomalies:
+            recommendations.append("Message contains disguised/split characters")
 
         # Generate fingerprint for deduplication
         fingerprint = hashlib.md5(
             f"{user_id}:{max_severity.name}:{sorted(reasons)}".encode()
         ).hexdigest()[:12]
 
+        # =============================================================
+        # SHIELD.md Standard: Generate ShieldDecision
+        # =============================================================
+        shield_decision = None
+        if max_severity != Severity.SAFE and reasons:
+            # Determine primary category from first reason
+            primary_reason = reasons[0].split("_")[0] if reasons else "other"
+            # Strip language suffix (e.g., "instruction_override_ko" → "instruction_override")
+            normalized_reason = reasons[0]
+            for lang_suffix in ["_en", "_ko", "_ja", "_zh", "_ru", "_es", "_de", "_fr", "_pt", "_vi"]:
+                if normalized_reason.endswith(lang_suffix):
+                    normalized_reason = normalized_reason[:-len(lang_suffix)]
+                    break
+            
+            # Map to SHIELD.md category
+            shield_category = CATEGORY_MAPPING.get(normalized_reason, ThreatCategory.OTHER)
+            
+            # Calculate confidence score (0.0-1.0)
+            # Based on: severity, pattern count, multiple category matches
+            base_confidence = {
+                Severity.SAFE: 0.0,
+                Severity.LOW: 0.4,
+                Severity.MEDIUM: 0.6,
+                Severity.HIGH: 0.8,
+                Severity.CRITICAL: 0.95,
+            }.get(max_severity, 0.5)
+            
+            # Boost for multiple patterns matched
+            pattern_boost = min(0.15, len(patterns_matched) * 0.02)
+            
+            # Boost for multiple reasons (indicates multi-vector attack)
+            reason_boost = min(0.1, (len(reasons) - 1) * 0.03)
+            
+            # Boost for normalization anomalies (obfuscation detected)
+            anomaly_boost = 0.05 if has_anomalies else 0.0
+            
+            confidence = min(1.0, base_confidence + pattern_boost + reason_boost + anomaly_boost)
+            
+            # Determine SHIELD action based on confidence threshold (0.85)
+            CONFIDENCE_THRESHOLD = 0.85
+            if confidence >= CONFIDENCE_THRESHOLD:
+                shield_action = ShieldAction.BLOCK
+            elif confidence >= 0.5:
+                shield_action = ShieldAction.REQUIRE_APPROVAL
+            else:
+                shield_action = ShieldAction.LOG
+            
+            # Override to BLOCK for CRITICAL severity regardless of confidence
+            if max_severity == Severity.CRITICAL:
+                shield_action = ShieldAction.BLOCK
+            
+            shield_decision = ShieldDecision(
+                category=shield_category,
+                confidence=confidence,
+                action=shield_action,
+                reason=normalized_reason,
+                patterns=patterns_matched[:5],  # Top 5 patterns
+            )
+
         result = DetectionResult(
             severity=max_severity,
             action=action,
             reasons=reasons,
             patterns_matched=patterns_matched,
-            normalized_text=normalized if has_homoglyphs else None,
+            normalized_text=normalized if has_anomalies else None,
             base64_findings=b64_findings,
             recommendations=recommendations,
             fingerprint=fingerprint,
+            shield_decision=shield_decision,
         )
         
         # Report HIGH+ detections to HiveFence for collective immunity
@@ -1492,7 +2347,7 @@ class PromptGuard:
             headers = {
                 "Content-Type": "application/json",
                 "X-Client-ID": context.get("agent_id", "prompt-guard"),
-                "X-Client-Version": "2.6.1",
+                "X-Client-Version": "2.8.0",
             }
             
             req = urllib.request.Request(
@@ -1516,6 +2371,7 @@ def main():
     parser = argparse.ArgumentParser(description="Prompt Guard - Injection Detection")
     parser.add_argument("message", nargs="?", help="Message to analyze")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--shield", action="store_true", help="Output in SHIELD.md Decision block format")
     parser.add_argument("--context", type=str, help="Context as JSON string")
     parser.add_argument("--config", type=str, help="Path to config YAML")
     parser.add_argument(
@@ -1559,7 +2415,13 @@ def main():
     guard = PromptGuard(config)
     result = guard.analyze(args.message, context)
 
-    if args.json:
+    if args.shield:
+        # SHIELD.md Decision block format
+        if result.shield_decision:
+            print(result.to_shield_format())
+        else:
+            print("```shield\ncategory: none\nconfidence: 0.00\naction: log\nreason: safe\npatterns: 0\n```")
+    elif args.json:
         print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
     else:
         emoji = {
@@ -1581,6 +2443,9 @@ def main():
             print(f"⚠️ Suspicious base64: {len(result.base64_findings)} found")
         if result.recommendations:
             print(f"💡 {'; '.join(result.recommendations)}")
+        # Show SHIELD.md info if available
+        if result.shield_decision:
+            print(f"\n🛡️ SHIELD: {result.shield_decision.category.value} ({result.shield_decision.confidence:.0%}) → {result.shield_decision.action.value}")
 
 
 if __name__ == "__main__":
