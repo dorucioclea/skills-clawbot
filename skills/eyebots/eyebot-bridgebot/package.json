@@ -1,0 +1,8 @@
+{
+  "name": "eyebot-bridgebot",
+  "version": "1.0.0",
+  "description": "Cross-chain bridge specialist",
+  "author": "ILL4NE",
+  "license": "MIT",
+  "keywords": ["eyebot", "bridge", "crosschain", "layerzero", "crypto", "a2a"]
+}

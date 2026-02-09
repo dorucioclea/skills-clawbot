@@ -1,46 +1,44 @@
 ---
 name: eyebot-bridgebot
-description: Ultimate cross-chain bridge. Transfer tokens between chains with best route finding, fee optimization, and support for 10+ networks.
-metadata: {"clawdbot":{"emoji":"🌉","homepage":"https://eyebots.io"}}
+description: Cross-chain bridge specialist for seamless asset transfers
+version: 1.0.0
+author: ILL4NE
+metadata:
+  api_endpoint: http://93.186.255.184:8001
+  pricing:
+    per_use: $1
+    lifetime: $25
+  chains: [base, ethereum, polygon, arbitrum]
 ---
 
-# BridgeBot Elite ⚡
+# Eyebot BridgeBot 🌉
 
-**Ultimate Cross-Chain Bridge**
+Cross-chain bridge specialist. Move assets between chains with optimal routes, lowest fees, and fastest settlement times.
 
-Seamless multi-chain transfers.
+## API Endpoint
+`http://93.186.255.184:8001`
 
-## ⚡ Elite Features
+## Usage
+```bash
+# Request payment
+curl -X POST "http://93.186.255.184:8001/a2a/request-payment?agent_id=bridgebot&caller_wallet=YOUR_WALLET"
 
-### Supported Chains
-- Ethereum ↔ Base
-- Ethereum ↔ Polygon
-- Ethereum ↔ Arbitrum
-- Ethereum ↔ Optimism
-- And more...
+# After payment, verify and execute
+curl -X POST "http://93.186.255.184:8001/a2a/verify-payment?request_id=...&tx_hash=..."
+```
 
-### Smart Routing
-- Best bridge selection
-- Fee comparison
-- Speed optimization
-- Liquidity checks
+## Pricing
+- Per-use: $1
+- Lifetime (unlimited): $25
+- All 15 agents bundle: $200
 
-### Safety Features
-- Transaction tracking
-- Stuck tx recovery
-- Bridge health monitoring
-
-## Trigger Keywords
-bridge, cross chain, multichain, omnichain,
-transfer to base, transfer to polygon,
-move eth, move tokens, chain hop,
-bridge eth, bridge usdc, bridge tokens,
-layer 2, l2 bridge, rollup bridge,
-cheapest bridge, fastest bridge, best bridge, bridgebot
-
-## Example Commands
-- "Bridge 1 ETH from Ethereum to Base"
-- "Move my USDC to Polygon"
-- "What's the cheapest bridge to Arbitrum?"
-
-## Part of Eyebot Elite Suite 🔥
+## Capabilities
+- Multi-bridge aggregation (LayerZero, Stargate, Across)
+- Optimal route finding
+- Fee comparison across bridges
+- Bridge status monitoring
+- Failed transaction recovery
+- Native bridge integration
+- Batch bridging operations
+- Gas estimation across chains
+- Settlement time optimization
