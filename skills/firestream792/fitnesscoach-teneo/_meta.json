@@ -3,11 +3,16 @@
   "slug": "fitnesscoach-teneo",
   "displayName": "FitnessCoach - powered by Teneo Protocol",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770302185538,
-    "commit": "https://github.com/clawdbot/skills/commit/0f1c130c0f8aad8dc2ce480e2e614e7bf8b6be16"
+    "version": "1.0.6",
+    "publishedAt": 1770643203267,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770302185538,
+      "commit": "https://github.com/clawdbot/skills/commit/0f1c130c0f8aad8dc2ce480e2e614e7bf8b6be16"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770216617250,
