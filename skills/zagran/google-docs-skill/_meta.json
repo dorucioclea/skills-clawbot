@@ -1,0 +1,11 @@
+{
+  "owner": "zagran",
+  "slug": "google-docs-skill",
+  "displayName": "Google Docs Skill",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1770604976104,
+    "commit": null
+  },
+  "history": []
+}
