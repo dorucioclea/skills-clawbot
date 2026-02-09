@@ -1,13 +1,18 @@
 {
   "owner": "clawd800",
   "slug": "token-launcher",
-  "displayName": "PumpClaw Token Launcher",
+  "displayName": "Pumpclaw",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1770604860977,
-    "commit": "https://github.com/openclaw/skills/commit/73c82e5ec7365b9ad8ec52c449c755edf7a61207"
+    "version": "1.2.0",
+    "publishedAt": 1770628020215,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1770604860977,
+      "commit": "https://github.com/openclaw/skills/commit/73c82e5ec7365b9ad8ec52c449c755edf7a61207"
+    },
     {
       "version": "0.1.0",
       "publishedAt": 1770000820561,
