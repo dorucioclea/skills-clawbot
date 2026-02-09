@@ -194,6 +194,18 @@ When answering Sui/Move questions:
 | PTB | `move-book/book/move-advanced/ptb/` |
 | BCS | `move-book/book/move-advanced/bcs.md` |
 
+## Related Skills
+
+This skill works great with the Sui development skill suite:
+
+- **sui-decompile**: Fetch and read on-chain contract source code. Study how existing DeFi protocols work before writing your own.
+- **sui-coverage**: Analyze test coverage and find untested code paths. Ensure your contracts are well-tested before deployment.
+
+**Typical workflow:**
+1. `sui-decompile` - Study existing contracts for patterns and best practices
+2. `sui-move` - Write your own contract
+3. `sui-coverage` - Ensure comprehensive test coverage
+
 ## Notes
 
 - Move 2024 edition introduces new features (enums, method syntax, etc.)
