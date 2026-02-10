@@ -1,11 +1,17 @@
 {
   "owner": "freakyflow",
   "slug": "garmin-pulse",
-  "displayName": "Garmin Pulse",
+  "displayName": "Garminskill",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770600931767,
-    "commit": "https://github.com/openclaw/skills/commit/e6af6d851f7738f209bfb0e557f22aed020e25cb"
+    "version": "1.0.1",
+    "publishedAt": 1770747705908,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770600931767,
+      "commit": "https://github.com/openclaw/skills/commit/e6af6d851f7738f209bfb0e557f22aed020e25cb"
+    }
+  ]
 }
