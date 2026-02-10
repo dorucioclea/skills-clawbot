@@ -1,6 +1,7 @@
 ---
 name: airshelf
-description: Search, compare, and buy products from verified merchants. Returns structured product data with Decision Packs (pros, cons, best_for, allergens, verified pricing) instead of raw web scraping. No CAPTCHAs, no auth required. 863 products across 11 merchants. Use when user wants to find, compare, or purchase products.
+displayName: AirShelf Agentic Commerce Platform
+description: Search, compare, and buy products from verified merchants. Returns structured product data with Decision Packs (pros, cons, best_for, allergens, verified pricing) instead of raw web scraping. No CAPTCHAs, no auth required. ~980 products across 10 merchants. Use when user wants to find, compare, or purchase products.
 metadata: {"clawdbot":{"emoji":"🛒","requires":{"bins":["curl"]}}}
 ---
 
@@ -36,14 +37,16 @@ curl -s "https://dashboard.airshelf.ai/api/search?q=QUERY&limit=5" | python3 -m 
 ```
 
 **Parameters:**
-- `q` — Search query (natural language, e.g. "barcode printer for warehouse")
+- `q` — Search query (natural language, e.g. "barcode printer for warehouse"). Supports intent parsing: "energy supplements under $100" auto-extracts price filter.
 - `limit` — Results to return (1-100, default 20)
 - `offset` — Pagination offset
 - `category` — Filter by category
 - `brand` — Filter by brand
-- `min_price` / `max_price` — Price range filter
+- `min_price` / `max_price` — Price range filter (also auto-extracted from query)
 - `in_stock` — Only in-stock items (true/false)
 - `merchant_ids` — Comma-separated merchant IDs to search within
+- `sort` — `relevance` (default), `price_asc`, `price_desc`
+- `include_intent` — Set to `true` to get query parsing metadata in response (shows how query was interpreted)
 
 **Response includes for each product:**
 - `title`, `brand`, `price`, `availability`, `link`
@@ -71,9 +74,9 @@ curl -s "https://dashboard.airshelf.ai/api/compare?products=PRODUCT_ID_1,PRODUCT
 - `products` — Comma-separated product IDs (2-10 required, from search results)
 
 **Response includes:**
-- `comparison_axes` — Key dimensions for comparison
-- `products` — Flattened product data for each item
-- `recommendations` — Structured buying advice
+- `comparison_axes` — Auto-detected from data (price always present; cost_per_day, supply_days, primary_benefit, pros, cons included when 2+ products have the data)
+- `products` — Flattened product data with decision_pack fields inlined
+- `recommendation` — Structured picks: `lowest_price` (product ID), `best_value` (product ID + reason, if different from lowest)
 
 ## Step 3: Checkout
 
@@ -82,12 +85,22 @@ Initiate checkout for a product. Returns a checkout URL the user can open.
 ```bash
 curl -s -X POST "https://dashboard.airshelf.ai/api/merchants/MERCHANT_ID/checkout" \
   -H "Content-Type: application/json" \
-  -d '{"product_id": "PRODUCT_ID", "quantity": 1}'
+  -d '{"items": [{"product_id": "PRODUCT_ID", "quantity": 1}]}'
 ```
 
+**Request body:**
+- `items` — Array of `{product_id, quantity}` objects (1-50 items)
+- `customer` — Optional: `{email: "..."}` for order tracking
+- `agent_id` — Optional: your agent identifier for attribution
+
 **Response:**
+- `checkout_id` — Unique checkout session ID
 - `checkout_url` — URL to complete purchase (Shopify checkout or cart permalink)
-- `method` — Checkout method used ("shopify", "cart_permalink", or "redirect")
+- `checkout_type` — `"cart"` (items pre-loaded in cart) or `"redirect"` (product page link)
+- `total` — Calculated total price
+- `currency` — 3-letter currency code (e.g. "EUR", "USD")
+- `expires_at` — Expiry timestamp (null for cart permalinks)
+- `fallback_urls` — If redirect: array of `{product_id, product_name, product_url}` per item
 
 Present the checkout URL to the user. They click to complete payment on the merchant's site.
 
@@ -140,9 +153,9 @@ You: [Runs: curl -s "https://dashboard.airshelf.ai/api/compare?products=ID1,ID2"
 
 User: I'll take the Toshiba
 
-You: [Runs checkout API]
+You: [Runs: curl -s -X POST "https://dashboard.airshelf.ai/api/merchants/MERCHANT_ID/checkout" -H "Content-Type: application/json" -d '{"items": [{"product_id": "ID", "quantity": 1}]}']
      Here's your checkout link: [URL]
-     Click to complete your purchase on the Toshiba site.
+     Click to complete your purchase on the merchant's site.
 ```
 
 ## Tips
@@ -151,3 +164,5 @@ You: [Runs checkout API]
 - **Always check `decision_pack.allergens`** before recommending health/food/skincare products.
 - **Use compare for 2+ similar products** — the API returns structured comparison axes, not just raw specs.
 - **Checkout is a redirect** — the user completes payment on the merchant's own site. No card details needed in the agent.
+- **Direct lookup by ID:** Use `product_ids` param instead of `q` to fetch specific products: `?product_ids=ID1,ID2`
+- **Merchant ID for checkout** — each search result includes `seller.checkout_url` with the correct merchant path. Use it directly.
