@@ -3,11 +3,16 @@
   "slug": "carapace",
   "displayName": "Carapace AI",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770409897497,
-    "commit": "https://github.com/openclaw/skills/commit/53e2b63c7c75a381ae032b6500b1e3d723c3d241"
+    "version": "1.0.3",
+    "publishedAt": 1770781300224,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770409897497,
+      "commit": "https://github.com/openclaw/skills/commit/53e2b63c7c75a381ae032b6500b1e3d723c3d241"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770237711744,
