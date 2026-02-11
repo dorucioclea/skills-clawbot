@@ -1,13 +1,18 @@
 {
   "owner": "robbyczgw-cla",
   "slug": "elevenlabs-voices",
-  "displayName": "Elevenlabs Voices",
+  "displayName": "ElevenLabs Voices",
   "latest": {
-    "version": "2.1.3",
-    "publishedAt": 1770246231465,
-    "commit": "https://github.com/clawdbot/skills/commit/cc2eb7c5e9d5b367847028e15a2cbf2ab813331a"
+    "version": "2.1.5",
+    "publishedAt": 1770800696606,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.1.3",
+      "publishedAt": 1770246231465,
+      "commit": "https://github.com/clawdbot/skills/commit/cc2eb7c5e9d5b367847028e15a2cbf2ab813331a"
+    },
     {
       "version": "2.1.2",
       "publishedAt": 1770139075264,
