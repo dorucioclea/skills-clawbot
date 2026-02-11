@@ -3,11 +3,16 @@
   "slug": "zoho-recruit",
   "displayName": "Zoho Recruit",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770497035420,
-    "commit": "https://github.com/openclaw/skills/commit/73ce78c99b946fa69a915a0bb927d15a11a19f0a"
+    "version": "1.0.3",
+    "publishedAt": 1770756654064,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770497035420,
+      "commit": "https://github.com/openclaw/skills/commit/73ce78c99b946fa69a915a0bb927d15a11a19f0a"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770380053368,

@@ -8,6 +8,11 @@ description: |
 metadata:
   author: maton
   version: "1.0"
+  clawdbot:
+    emoji: 🧠
+    requires:
+      env:
+        - MATON_API_KEY
 ---
 
 # Zoho Recruit
@@ -649,9 +654,7 @@ data = response.json()
 | INVALID_MODULE | Invalid module API name |
 | NO_PERMISSION | Insufficient permissions |
 
-### Troubleshooting: Invalid API Key
-
-**When you receive a "Invalid API key" error, ALWAYS follow these steps before concluding there is an issue:**
+### Troubleshooting: API Key Issues
 
 1. Check that the `MATON_API_KEY` environment variable is set:
 
@@ -670,6 +673,13 @@ print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
 EOF
 ```
 
+### Troubleshooting: Invalid App Name
+
+1. Ensure your URL path starts with `zoho-recruit`. For example:
+
+- Correct: `https://gateway.maton.ai/zoho-recruit/recruit/v2/Candidates`
+- Incorrect: `https://gateway.maton.ai/recruit/v2/Candidates`
+
 ## Resources
 
 - [Zoho Recruit API v2 Overview](https://www.zoho.com/recruit/developer-guide/apiv2/)
@@ -679,3 +689,5 @@ EOF
 - [Delete Records API](https://www.zoho.com/recruit/developer-guide/apiv2/delete-records.html)
 - [Search Records API](https://www.zoho.com/recruit/developer-guide/apiv2/search-records.html)
 - [Modules API](https://www.zoho.com/recruit/developer-guide/apiv2/modules-api.html)
+- [Maton Community](https://discord.com/invite/dBfFAcefs2)
+- [Maton Support](mailto:support@maton.ai)
