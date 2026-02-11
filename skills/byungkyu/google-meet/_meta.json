@@ -3,11 +3,16 @@
   "slug": "google-meet",
   "displayName": "Google Meet",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770343424298,
-    "commit": "https://github.com/openclaw/skills/commit/b20d9b61a6041513ed862a23fda2b0d38eaa62bd"
+    "version": "1.0.4",
+    "publishedAt": 1770756162719,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770343424298,
+      "commit": "https://github.com/openclaw/skills/commit/b20d9b61a6041513ed862a23fda2b0d38eaa62bd"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770116905481,

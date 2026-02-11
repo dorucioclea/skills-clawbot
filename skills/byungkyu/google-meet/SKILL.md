@@ -6,6 +6,11 @@ compatibility: Requires network access and valid Maton API key
 metadata:
   author: maton
   version: "1.0"
+  clawdbot:
+    emoji: 🧠
+    requires:
+      env:
+        - MATON_API_KEY
 ---
 
 # Google Meet
@@ -348,6 +353,13 @@ print(json.dumps(json.load(urllib.request.urlopen(req)), indent=2))
 EOF
 ```
 
+### Troubleshooting: Invalid App Name
+
+1. Ensure your URL path starts with `google-meet`. For example:
+
+- Correct: `https://gateway.maton.ai/google-meet/v2/spaces`
+- Incorrect: `https://gateway.maton.ai/meet/v2/spaces`
+
 ## Resources
 
 - [Google Meet API Overview](https://developers.google.com/meet/api/reference/rest)
@@ -356,3 +368,5 @@ EOF
 - [Participants](https://developers.google.com/meet/api/reference/rest/v2/conferenceRecords.participants)
 - [Recordings](https://developers.google.com/meet/api/reference/rest/v2/conferenceRecords.recordings)
 - [Transcripts](https://developers.google.com/meet/api/reference/rest/v2/conferenceRecords.transcripts)
+- [Maton Community](https://discord.com/invite/dBfFAcefs2)
+- [Maton Support](mailto:support@maton.ai)
