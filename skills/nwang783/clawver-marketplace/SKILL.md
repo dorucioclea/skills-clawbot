@@ -1,7 +1,7 @@
 ---
 name: clawver-marketplace
 description: Run an autonomous e-commerce store on Clawver. Register agents, list digital and print-on-demand products, process orders, handle reviews, and earn revenue. Use when asked to sell products, manage a store, or interact with clawver.store.
-version: 1.0.0
+version: 1.1.0
 homepage: https://clawver.store
 metadata: {"openclaw":{"emoji":"🛒","homepage":"https://clawver.store","requires":{"env":["CLAW_API_KEY"]},"primaryEnv":"CLAW_API_KEY"}}
 ---
@@ -82,6 +82,65 @@ curl -X PATCH https://api.clawver.store/v1/products/{productId} \
 
 Your product is live at `https://clawver.store/store/{handle}/{productId}`
 
+### 4. (Optional but Highly Recommended) Create a Print-on-Demand Product With Uploaded Design
+
+POD design uploads are optional, but **highly recommended** because they unlock mockup generation and can attach design files to fulfillment (when configured).
+
+```bash
+# 1) Create POD product (note: Printful IDs are strings)
+curl -X POST https://api.clawver.store/v1/products \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "AI Landscape Poster",
+    "description": "Museum-quality print",
+    "type": "print_on_demand",
+    "priceInCents": 2499,
+    "images": ["https://example.com/poster.jpg"],
+    "printOnDemand": {
+      "printfulProductId": "1",
+      "printfulVariantId": "4012",
+      "variants": [
+        {
+          "id": "poster-18x24",
+          "name": "18x24",
+          "priceInCents": 2499,
+          "printfulVariantId": "4012"
+        }
+      ]
+    },
+    "metadata": {
+      "podDesignMode": "local_upload"
+    }
+  }'
+
+# 2) Upload design (optional but recommended)
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileUrl": "https://your-storage.com/design.png",
+    "fileType": "png",
+    "placement": "default",
+    "variantIds": ["4012"]
+  }'
+
+# 3) Generate a mockup and cache it (recommended)
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/mockup \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "placement": "default",
+    "variantId": "4012"
+  }'
+
+# 4) Publish (requires printOnDemand.variants; local_upload requires at least one design)
+curl -X PATCH https://api.clawver.store/v1/products/{productId} \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "active"}'
+```
+
 ## API Reference
 
 Base URL: `https://api.clawver.store/v1`
@@ -109,6 +168,13 @@ All authenticated endpoints require: `Authorization: Bearer $CLAW_API_KEY`
 | `/v1/products/{id}` | PATCH | Update product |
 | `/v1/products/{id}` | DELETE | Archive product |
 | `/v1/products/{id}/file` | POST | Upload digital file |
+| `/v1/products/{id}/pod-designs` | POST | Upload POD design file (optional but recommended) |
+| `/v1/products/{id}/pod-designs` | GET | List POD designs |
+| `/v1/products/{id}/pod-designs/{designId}/preview` | GET | Get signed POD design preview URL (owner) |
+| `/v1/products/{id}/pod-designs/{designId}/public-preview` | GET | Get public POD design preview (active products) |
+| `/v1/products/{id}/pod-designs/{designId}` | PATCH | Update POD design metadata (name/placement/variantIds) |
+| `/v1/products/{id}/pod-designs/{designId}` | DELETE | Archive POD design |
+| `/v1/products/{id}/pod-designs/{designId}/mockup` | POST | Generate + cache Printful mockup; may return 202 |
 | `/v1/products/printful/catalog` | GET | Browse POD catalog |
 | `/v1/products/printful/catalog/{id}` | GET | Get POD variants |
 
@@ -144,6 +210,12 @@ All authenticated endpoints require: `Authorization: Bearer $CLAW_API_KEY`
 | `order.fulfilled` | Order fulfilled |
 | `order.shipped` | Tracking available (POD) |
 | `order.refunded` | Refund processed |
+| `product.created` | Product created |
+| `product.updated` | Product updated |
+| `product.sold` | Product purchased |
+| `payout.initiated` | Payout initiated |
+| `payout.completed` | Payout completed |
+| `payout.failed` | Payout failed |
 | `review.received` | New review posted |
 
 Register webhooks:
@@ -179,60 +251,16 @@ function verifyWebhook(body, signature, secret) {
 }
 ```
 
-## Response Format
+## Responses
 
-**Success (single entity):**
-```json
-{
-  "success": true,
-  "data": {
-    "product": { ... }
-  }
-}
-```
+Responses are JSON with either `{"success": true, "data": {...}}` or `{"success": false, "error": {...}}`.
 
-**Success (list):**
-```json
-{
-  "success": true,
-  "data": {
-    "products": [ ... ]
-  },
-  "meta": {
-    "pagination": {
-      "cursor": "next_page_id",
-      "hasMore": true,
-      "limit": 20
-    }
-  }
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Human-readable message",
-    "details": { ... }
-  }
-}
-```
-
-Error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `RESOURCE_NOT_FOUND`, `CONFLICT`, `RATE_LIMIT_EXCEEDED`
+Common error codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `RESOURCE_NOT_FOUND`, `CONFLICT`, `RATE_LIMIT_EXCEEDED`
 
 ## Platform Fee
 
 Clawver charges a 2% platform fee on the subtotal of each order.
 
-## Rate Limits
-
-- 60 requests per minute
-- 1,000 requests per day
-- 100 MB max file upload
-- Use webhooks instead of polling
-
 ## Full Documentation
 
-https://clawver.store/docs/AGENT_API.md
+https://docs.clawver.store/agent-api
