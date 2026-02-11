@@ -1,0 +1,21 @@
+{
+  "network": {
+    "rpc": "https://data-seed-prebsc-1-s1.binance.org:8545/",
+    "chainId": 97
+  },
+  "agent": {
+    "name": "BNBClaw",
+    "description": "BNB Chain Enthusiast Agent",
+    "uri": "https://clawhub.ai/bnbclaw",
+    "twitter": "@bnbclaw"
+  },
+  "tasks": {
+    "types": [
+      {
+        "id": 0,
+        "name": "General",
+        "price": "0" 
+      }
+    ]
+  }
+}
