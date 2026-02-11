@@ -3,7 +3,7 @@
 
 """
 Ultra-Fast Beauty Generation Script - Optimized for 1-second GPU generation
-超快速美女生成脚本 - 为1秒GPU生成优化
+
 
 This script delivers images to users within 5 seconds total time.
 """
@@ -17,7 +17,7 @@ import argparse
 import os
 
 API_BASE = "https://gen1.diversityfaces.org"
-API_KEY = "ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI"
+API_KEY = None  # Must be set via environment variable or command line argument
 
 def generate_and_download(prompt, width=1024, height=1024, output_dir=None, filename=None):
     """
@@ -152,6 +152,8 @@ def main():
     
     parser.add_argument("--prompt", 
                        help="Custom English prompt for image generation")
+    parser.add_argument("--api-key",
+                       help="API Key (or set BEAUTY_API_KEY environment variable)")
     parser.add_argument("--width", type=int, default=1024,
                        help="Image width (default: 1024)")
     parser.add_argument("--height", type=int, default=1024, 
@@ -164,6 +166,23 @@ def main():
                        help="Run with test prompt")
     
     args = parser.parse_args()
+    
+    # Get API Key from argument or environment variable
+    global API_KEY
+    API_KEY = args.api_key or os.environ.get("BEAUTY_API_KEY")
+    
+    if not API_KEY:
+        print("❌ ERROR: API Key is required!")
+        print("\n📝 How to get a free API Key:")
+        print("   1. Visit: https://gen1.diversityfaces.org")
+        print("   2. Follow the instructions on the page to get your free API key")
+        print("   3. Use it with this script:\n")
+        print("   Option A - Command line:")
+        print("      python3 scripts/generate.py --prompt 'YOUR_PROMPT' --api-key 'YOUR_API_KEY'\n")
+        print("   Option B - Environment variable:")
+        print("      export BEAUTY_API_KEY='YOUR_API_KEY'")
+        print("      python3 scripts/generate.py --prompt 'YOUR_PROMPT'\n")
+        return 1
     
     # Use test prompt if requested, otherwise require --prompt
     if args.test:

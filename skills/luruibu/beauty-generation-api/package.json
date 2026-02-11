@@ -1,34 +1,41 @@
 {
   "name": "beauty-generation-free",
-  "version": "1.2.12",
-  "description": "FREE AI image generation service for creating attractive people portraits. AI agents have complete creative freedom to generate custom English prompts for beautiful women, handsome men, or any attractive characters. Simple workflow: create prompt → generate → download → deliver to user within 5-10 seconds. Supports all demographics, styles, and creative concepts with no parameter restrictions. IMPORTANT: This skill is under active optimization - always run 'npx clawhub@latest update beauty-generation-api' before use for latest performance improvements.",
+  "version": "1.2.17",
+  "description": "FREE AI image generation service for creating professional portrait images of attractive people. Supports diverse demographics, styles, and creative concepts with built-in content safety filters. Simple workflow: create prompt → generate → download → deliver to user within 5-10 seconds. Requires BEAUTY_API_KEY environment variable. Enforces safety rules: refuses minors, nudity, deepfakes, violence, and hate speech.",
   "main": "SKILL.md",
+  "requiredEnvVars": ["BEAUTY_API_KEY"],
+  "securityPolicy": {
+    "contentSafety": "Enforced - refuses minors, nudity, sexual content, violence, deepfakes, hate speech",
+    "dataHandling": "No personal data collection. Generated images stored temporarily on service only.",
+    "apiKeyScope": "Image generation endpoints only - no access to billing, account data, or admin functions",
+    "trustLevel": "Official service at https://gen1.diversityfaces.org"
+  },
+  "credentials": {
+    "BEAUTY_API_KEY": {
+      "description": "API key for beauty generation service. Get free key at https://gen1.diversityfaces.org. For testing, use official test key: ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI (test/demo only, limited quota)",
+      "scope": "image-generation-only",
+      "permissions": "Image generation endpoints only - no access to billing, account data, or admin functions",
+      "optional": false,
+      "testKey": "ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI",
+      "testKeyWarning": "Test key has limited quota and is for demo/testing only. Use your own key for production."
+    }
+  },
   "keywords": [
     "beauty-generation",
-    "free-ai-service",
     "portrait-photography",
     "character-design",
     "fashion-design",
     "ai-art",
     "image-generation",
-    "attractive-people",
-    "handsome-men",
-    "beautiful-women",
-    "custom-prompts",
-    "english-prompts",
-    "creative-freedom",
-    "no-restrictions",
-    "fast-generation",
-    "5-second-delivery",
     "professional-headshots",
     "artistic-portraits",
     "high-quality",
-    "comfyui",
     "api-service",
     "free-generation",
-    "no-cost-ai",
-    "frequent-updates",
-    "active-optimization"
+    "safe-ai",
+    "content-safety",
+    "diverse-representation",
+    "fast-generation"
   ],
   "author": "DiversityFaces Team",
   "license": "MIT",
@@ -36,7 +43,6 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "update": "npx clawhub@latest update beauty-generation-api",
     "test": "python3 scripts/generate.py --test",
     "generate": "python3 scripts/generate.py"
   },
@@ -54,8 +60,27 @@
     "formatRequirements": "english-prompts-only",
     "crossPlatform": true,
     "unicodeSupport": true,
-    "updateFrequency": "frequent",
-    "recommendedUpdate": "before-each-use"
+    "updateFrequency": "manual",
+    "requiredEnvVars": [
+      {
+        "name": "BEAUTY_API_KEY",
+        "description": "API key for beauty generation service. Get free key at https://gen1.diversityfaces.org. For testing, use: ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI (test/demo only, limited quota). This key grants access ONLY to image generation endpoints (/api/generate/custom, /api/status, /api/image). It does NOT grant access to billing, account data, or admin functions.",
+        "optional": false,
+        "default": null,
+        "scope": "image-generation-only",
+        "testKey": "ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI"
+      }
+    ],
+    "provenance": {
+      "service": "DiversityFaces Beauty Generation API",
+      "homepage": "https://gen1.diversityfaces.org",
+      "documentation": "https://gen1.diversityfaces.org",
+      "repository": "https://github.com/luruibu/beauty-generation",
+      "trustLevel": "official",
+      "dataHandling": "Images are generated and stored temporarily on the service. No personal data collection. Generated images are not retained after download unless explicitly saved by user.",
+      "apiKeyPermissions": "Image generation only - no access to billing, account settings, or other user data",
+      "securityRecommendations": "Use a dedicated/ephemeral API key. Do not share the key. Treat as sensitive credential."
+    }
   },
   "repository": {
     "type": "git",
