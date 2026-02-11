@@ -10,9 +10,30 @@ import tempfile
 import time
 from pathlib import Path
 
+
+def _find_workspace_root() -> Path:
+    """Walk up from script location to find workspace root (parent of 'skills/')."""
+    env = os.environ.get("ANNOUNCER_WORKSPACE")
+    if env:
+        return Path(env)
+    
+    # Prefer CWD if it looks like a workspace (handles symlinks correctly)
+    cwd = Path.cwd()
+    if (cwd / "skills").is_dir():
+        return cwd
+
+    d = Path(__file__).resolve().parent
+    for _ in range(6):
+        if (d / "skills").is_dir() and d != d.parent:
+            return d
+        d = d.parent
+    return Path.cwd()
+
+
 SCRIPT_DIR = Path(__file__).parent
 SKILL_DIR = SCRIPT_DIR.parent
-CONFIG_PATH = Path.home() / "clawd" / "announcer" / "config.json"
+WORKSPACE_ROOT = _find_workspace_root()
+CONFIG_PATH = WORKSPACE_ROOT / "announcer" / "config.json"
 ELEVENLABS_SPEECH = SKILL_DIR.parent / "elevenlabs" / "scripts" / "speech.py"
 
 def load_config():
