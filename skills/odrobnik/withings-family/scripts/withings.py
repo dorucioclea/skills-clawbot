@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from datetime import datetime, timedelta
+import re
 
 def _base_dir() -> Path:
     new = Path.home() / ".openclaw" / "withings-family"
@@ -33,16 +34,38 @@ CLIENT_SECRET = os.environ.get('WITHINGS_CLIENT_SECRET')
 REDIRECT_URI = 'http://localhost:18081'
 
 
-def get_token_file(user_id='default'):
+def _sanitize_user_id(user_id: str) -> str:
+    """Sanitize user_id to prevent path traversal.
+
+    Token files are named: tokens-<user_id>.json
+    We only allow a small safe character set.
+    """
+    uid = (user_id or "default").strip()
+    if uid == "":
+        uid = "default"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", uid):
+        raise ValueError(
+            f"Invalid user_id '{user_id}'. Allowed: letters/digits plus . _ - (max 64 chars)."
+        )
+    return uid
+
+
+def get_token_file(user_id: str = 'default') -> Path:
     """Get token file path for a user."""
-    return BASE_DIR / f'tokens-{user_id}.json'
+    uid = _sanitize_user_id(user_id)
+    return BASE_DIR / f'tokens-{uid}.json'
 
 
-def save_tokens(data, user_id='default'):
+def save_tokens(data: dict, user_id: str = 'default') -> dict:
     """Save tokens with expiry calculation."""
     expiry = time.time() + data['expires_in']
     payload = {**data, 'expiry_date': expiry}
-    get_token_file(user_id).write_text(json.dumps(payload, indent=2))
+    token_file = get_token_file(user_id)
+    token_file.write_text(json.dumps(payload, indent=2))
+    try:
+        os.chmod(token_file, 0o600)
+    except Exception:
+        pass
     return payload
 
 

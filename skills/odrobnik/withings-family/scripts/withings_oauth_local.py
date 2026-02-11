@@ -17,6 +17,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Optional, Tuple
+import re
 
 def _base_dir() -> Path:
     new = Path.home() / ".openclaw" / "withings-family"
@@ -41,9 +42,21 @@ AUTHORIZE_URL = "https://account.withings.com/oauth2_user/authorize2"
 TOKEN_URL = "https://wbsapi.withings.net/v2/oauth2"
 
 
+def _sanitize_user_id(user_id: str) -> str:
+    uid = (user_id or "default").strip()
+    if uid == "":
+        uid = "default"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", uid):
+        raise ValueError(
+            f"Invalid user_id '{user_id}'. Allowed: letters/digits plus . _ - (max 64 chars)."
+        )
+    return uid
+
+
 def get_token_file(user_id: str = 'default') -> Path:
     """Get token file path for a user."""
-    return BASE_DIR / f'tokens-{user_id}.json'
+    uid = _sanitize_user_id(user_id)
+    return BASE_DIR / f'tokens-{uid}.json'
 
 
 def save_tokens(data: dict, user_id: str = 'default') -> dict:
