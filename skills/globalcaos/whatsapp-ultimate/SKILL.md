@@ -1,7 +1,7 @@
 ---
 name: whatsapp-ultimate
-version: 1.2.1
-description: "The most comprehensive WhatsApp skill for AI agents. Full messaging (text, media, polls, stickers, voice), reactions, replies, edits, unsend, complete group management, AND persistent searchable message history with SQLite + FTS5. Native Baileys integration - no external services required."
+version: 1.3.0
+description: "Send WhatsApp messages, media, polls, stickers, voice notes, reactions, replies, and manage groups from your AI agent. Search message history with full-text search (SQLite + FTS5). Import WhatsApp chat exports. Native Baileys integration — zero external dependencies, no Docker, no CLI tools. The most complete WhatsApp skill for OpenClaw."
 homepage: https://github.com/openclaw/openclaw
 repository: https://github.com/globalcaos/clawdbot-moltbot-openclaw
 metadata:
@@ -9,13 +9,26 @@ metadata:
     emoji: "📱"
     requires:
       channels: ["whatsapp"]
+    tags:
+      - whatsapp
+      - messaging
+      - chat
+      - voice-notes
+      - group-management
+      - message-history
+      - search
+      - media
+      - polls
+      - stickers
+      - reactions
+      - baileys
 ---
 
 # WhatsApp Ultimate
 
-**Everything you can do in WhatsApp, your AI agent can do too.**
+**Send messages, media, polls, voice notes, and manage groups — all from your AI agent. Search your entire WhatsApp history instantly.**
 
-This skill documents all WhatsApp capabilities available through OpenClaw's native channel integration. No external Docker services, no CLI wrappers — just direct WhatsApp Web protocol via Baileys.
+The most complete WhatsApp skill for OpenClaw. Native Baileys integration — no Docker, no CLI tools, no external services. Just connect and go.
 
 ---
 
@@ -261,6 +274,15 @@ When using `to=` with phone numbers, OpenClaw auto-converts to JID format.
 
 ## Tips
 
+### Resolving Group Names
+The history database often has `NULL` for `chat_name`. To get a group's display name, use:
+```
+message action=getGroupInfo channel=whatsapp target="<group-jid>"
+```
+Returns: `subject` (group name), `description`, full participant list with admin roles.
+
+**Always refer to groups by name when talking to humans** — JIDs are internal identifiers only.
+
 ### Voice Notes
 Always use OGG/Opus format:
 ```bash
@@ -284,28 +306,41 @@ To react/edit/unsend, you need the message ID. Incoming messages include this in
 
 ---
 
+## When to Use This Skill
+
+Use `whatsapp-ultimate` when your agent needs to:
+- Send text, images, videos, documents, or voice notes via WhatsApp
+- Create and manage polls in group chats
+- React to messages with emoji, reply/quote, edit or unsend messages
+- Create groups, manage participants, get invite links
+- Search past WhatsApp conversations by keyword, sender, or date
+- Import and index WhatsApp chat export files (.txt)
+- Get group metadata (name, description, participant list)
+- Set up automated daily summaries of busy group chats
+
 ## Comparison with Other Skills
 
-| Feature | whatsapp-ultimate | wacli | whatsapp-automation | gif-whatsapp |
-|---------|-------------------|-------|---------------------|--------------|
-| Native integration | ✅ | ❌ (CLI) | ❌ (Docker) | N/A |
-| Send text | ✅ | ✅ | ❌ | ❌ |
-| Send media | ✅ | ✅ | ❌ | ❌ |
-| Polls | ✅ | ❌ | ❌ | ❌ |
-| Stickers | ✅ | ❌ | ❌ | ❌ |
-| Voice notes | ✅ | ❌ | ❌ | ❌ |
-| GIFs | ✅ | ❌ | ❌ | ✅ |
-| Reactions | ✅ | ❌ | ❌ | ❌ |
-| Reply/Quote | ✅ | ❌ | ❌ | ❌ |
-| Edit | ✅ | ❌ | ❌ | ❌ |
-| Unsend | ✅ | ❌ | ❌ | ❌ |
-| Group create | ✅ | ❌ | ❌ | ❌ |
-| Group management | ✅ (full) | ❌ | ❌ | ❌ |
-| Receive messages | ✅ | ✅ | ✅ | ❌ |
-| Two-way chat | ✅ | ❌ | ❌ | ❌ |
-| Message history (SQLite) | ✅ FTS5 | ❌ | ❌ | ❌ |
-| Import chat exports | ✅ | ❌ | ❌ | ❌ |
-| External deps | None | Go binary | Docker + WAHA | ffmpeg |
+| Feature | whatsapp-ultimate | wacli | whatsapp-business |
+|---------|-------------------|-------|-------------------|
+| Native integration | ✅ Zero deps | ❌ Go CLI binary | ❌ External API + key |
+| Send text | ✅ | ✅ | ✅ |
+| Send media | ✅ | ✅ (files) | ✅ (templates) |
+| Polls | ✅ | ❌ | ❌ |
+| Stickers | ✅ | ❌ | ❌ |
+| Voice notes | ✅ | ❌ | ❌ |
+| GIFs | ✅ | ❌ | ❌ |
+| Reactions | ✅ | ❌ | ❌ |
+| Reply/Quote | ✅ | ❌ | ❌ |
+| Edit messages | ✅ | ❌ | ❌ |
+| Unsend/Delete | ✅ | ❌ | ❌ |
+| Group management | ✅ (full: create, rename, icon, description, participants, admin, invite) | ❌ | ❌ |
+| Group info/metadata | ✅ | ❌ | ❌ |
+| Two-way chat | ✅ | ❌ | ✅ (webhooks) |
+| Message history (SQLite + FTS5) | ✅ | ✅ (sync) | ❌ |
+| Import chat exports | ✅ | ❌ | ❌ |
+| Personal WhatsApp | ✅ | ✅ | ❌ (Business only) |
+| External deps | **None** | Go binary (brew/go install) | Maton API key + account |
+| **Total actions** | **22+** | ~6 | ~10 |
 
 ---
 
