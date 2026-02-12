@@ -1,6 +1,7 @@
 ---
 name: stp
 description: 结构化任务规划与分步执行（Structured Task Planning）。支持两种模式：(1) 文件模式 - 从 Markdown 任务文档加载步骤执行；(2) 自然语言模式 - 接受自然语言任务描述，自动生成计划书并确认后执行。触发词：/stp、任务规划、步骤执行。功能包括：步骤分解、状态跟踪、执行日志记录、快速失败策略。
+description_en: Structured Task Planning with step-by-step execution. Supports two modes: (1) File Mode - load steps from Markdown task documents; (2) Natural Language Mode - accept natural language descriptions, auto-generate plan, and execute after user confirmation. Triggers: /stp, "任务规划", "步骤执行". Features: step decomposition, status tracking, execution logging, fast-fail strategy.
 ---
 
 > **路径变量说明**（本文档通用）：
@@ -14,60 +15,116 @@ description: 结构化任务规划与分步执行（Structured Task Planning）�
 ## 功能概述
 
 1. **任务解析**：从 Markdown 任务文档加载步骤
-2. **目录管理**：自动创建任务专属目录（格式：`task-{ID}`）
-3. **文档生成**：生成标准化步骤文档和执行日志
-4. **状态跟踪**：支持步骤状态标记（待执行/成功/失败）
-5. **智能执行**：每个步骤作为子任务执行，附带成功判断标准
-6. **快速失败**：步骤失败立即终止，不尝试替代方案
-7. **完整日志**：所有 exec 命令和 AI 执行过程完整记录
+2. **确认流程**：生成计划书后必须用户确认才能执行（所有模式）
+3. **目录管理**：自动创建任务专属目录（格式：`task-{ID}`）
+4. **文档生成**：生成标准化步骤文档和执行日志
+5. **状态跟踪**：支持步骤状态标记（待执行/成功/失败）
+6. **智能执行**：每个步骤作为子任务执行，附带成功判断标准
+7. **快速失败**：步骤失败立即终止，不尝试替代方案
+8. **完整日志**：所有 exec 命令和 AI 执行过程完整记录
 
 ---
 
 ## 两种使用模式
 
-### 模式 A：文件模式（原有）
-用户提供写好的任务文档路径：
-```
-/stp /path/to/task.md
+### 模式 A：文件模式（用户提供 Markdown 文档）
+
+用户提供已写好的任务文档路径：
+```bash
+# 完整参数
+python3 <STP_SCRIPTS>/execute_task.py --file /path/to/task.md
+
+# 简写参数
+python3 <STP_SCRIPTS>/execute_task.py -f /path/to/task.md
 ```
 
-### 模式 B：自然语言模式（新增）
-用户用自然语言描述任务：
-```
-/stp 我想查一下腾讯、贵州茅台、Meta 的股票价格
-```
+**流程**：
+1. 读取 Markdown 任务文档
+2. 解析任务名称和执行步骤
+3. 生成计划书并展示
+4. **等待用户确认** ← 必须确认才能继续
+5. 用户确认后创建任务目录并执行
 
 ---
 
-## 模式 B：自然语言任务规划流程
+### 模式 B：自然语言模式（AI 自动生成计划）
 
-当用户输入的不是 `.md` 文件路径，而是自然语言描述时，执行以下流程：
+用户用自然语言描述任务，AI 自动生成计划书：
+```bash
+# 完整参数
+python3 <STP_SCRIPTS>/execute_task.py --nlp "我想查一下腾讯、贵州茅台、Meta 的股票价格"
+
+# 简写参数
+python3 <STP_SCRIPTS>/execute_task.py -n "帮我安装 CosyVoice"
+```
+
+**流程**：
+1. 接收自然语言任务描述
+2. AI 分析意图并生成 Markdown 计划书
+3. 保存计划书到 `<STP_TASK_LIST>/<filename>.md`
+4. 生成计划书并展示
+5. **等待用户确认** ← 必须确认才能继续
+6. 用户确认后开始执行
+
+---
+
+## 两种模式的核心区别
+
+| 特性 | 模式 A：文件模式 | 模式 B：自然语言模式 |
+|------|------------------|----------------------|
+| **输入** | 已有 `.md` 文件 | 自然语言描述 |
+| **计划书来源** | 用户提供 | AI 自动生成 |
+| **适用场景** | 复杂/重复任务（复用计划） | 临时/简单任务 |
+| **参数** | `--file` / `-f` | `--nlp` / `-n` |
+| **确认流程** | ✅ 都有 | ✅ 都有 |
+
+**重要提示**：
+- 两种模式**都必须**经过用户确认才能执行
+- 参数不区分大小写，但建议统一使用小写
+- 混用参数时，`--file` 优先于 `--nlp`
+
+---
+
+## 模式 B：自然语言任务规划流程（Agent 专用）
+
+当用户输入自然语言描述时，主 Agent 需要：
 
 ### 第一步：任务分析与计划生成
 
 1. **理解用户意图**：分析自然语言，明确任务目标
 2. **拆解执行步骤**：将任务分解为可执行的具体步骤
 3. **生成计划书**：按标准格式生成 Markdown 任务文档
+4. **保存到 task-list**：`~/.openclaw/workspace/task-list/<filename>.md`
 
-### 第二步：确认循环
+### 第二步：展示并确认
 
-1. **展示计划书**：将生成的计划书完整展示给用户
-2. **询问确认**：
-   ```
-   📋 任务计划书已生成，请确认：
-   - 输入 "ok" 或 "确认" → 开始执行
-   - 输入修改意见 → 我会调整计划后重新展示
-   - 输入 "取消" → 放弃此任务
-   ```
-3. **修改循环**：如果用户有修改意见，调整计划书后重新展示，直到用户确认
+```markdown
+📋 任务计划书已生成
 
-### 第三步：保存并执行
+任务名称：xxx
+文件位置：~/.openclaw/workspace/task-list/xxx.md
+步骤数：5
 
-1. **生成文件名**：基于任务内容生成简短文件名（如 `stock-query.md`）
-2. **保存位置**：`<STP_TASK_LIST>/<filename>.md`
-3. **开始执行**：按原有 STP 流程执行任务
+核心执行步骤：
+- [ ] 步骤 1：xxx
+- [ ] 步骤 2：xxx
+...
 
-### 计划书标准格式
+确认执行：
+  输入 "ok" 或 "确认" → 开始执行
+  输入 "取消" → 放弃此任务
+  输入修改意见 → 我会调整计划后重新展示
+```
+
+### 第三步：执行或取消
+
+- **确认后**：保存任务文档，调用 STP 脚本开始执行
+- **取消**：不执行，记录日志
+- **修改**：更新计划书后重新展示
+
+---
+
+## 计划书标准格式
 
 ```markdown
 # 任务名称
@@ -88,14 +145,8 @@ description: 结构化任务规划与分步执行（Structured Task Planning）�
 - 输出文件/结果说明
 ```
 
-### 示例流程
+### 示例计划书
 
-**用户输入**：
-```
-/stp 我想查一下腾讯、贵州茅台、Meta 的股票价格
-```
-
-**Agent 生成计划书**：
 ```markdown
 # 三支股票收盘价查询
 
@@ -116,17 +167,56 @@ description: 结构化任务规划与分步执行（Structured Task Planning）�
 - 三支股票的收盘价信息（股票名称、代码、日期、价格、市场）
 ```
 
-**Agent 询问**：
-```
-📋 任务计划书已生成，请确认：
-- 输入 "ok" 或 "确认" → 开始执行
-- 输入修改意见 → 我会调整计划后重新展示
-- 输入 "取消" → 放弃此任务
+---
+
+## 模式 A：文件模式使用方式
+
+### 步骤1：准备 Markdown 任务文档
+
+```markdown
+# 任务名称
+
+## 核心执行步骤
+- [ ] 步骤 1：具体描述
+- [ ] 步骤 2：具体描述
+- [ ] 步骤 3：具体描述
 ```
 
-**用户确认后**：
-- 保存到 `<STP_TASK_LIST>/<任务描述>-<日期>.md`
-- 开始执行 STP 任务流程
+### 步骤2：运行并确认
+
+```bash
+python3 <STP_SCRIPTS>/execute_task.py --file /path/to/task.md
+```
+
+**输出示例**：
+```
+========================================
+📋 任务计划书已生成
+========================================
+
+任务名称：安装 Conda 环境
+文件：/Users/scotthuang/task.md
+步骤数：4
+
+核心执行步骤：
+  - [ ] 步骤 1：下载 Miniforge3
+  - [ ] 步骤 2：运行安装脚本
+  - [ ] 步骤 3：验证 conda 安装
+  - [ ] 步骤 4：创建 cosyvoice 环境
+
+========================================
+确认执行：
+  输入 "ok" 或 "确认" → 开始执行
+  输入 "取消" → 放弃此任务
+  输入修改意见 → 我会调整后重新展示
+========================================
+```
+
+### 步骤3：用户确认后自动执行
+
+- ✅ 确认 → 创建任务目录，开始执行
+- ❌ 取消 → 终止，不创建任务
+- 📝 修改 → 更新文档后重新展示
 
 ---
 
@@ -165,34 +255,10 @@ python3 execute_task.py --log task-8 1 success "脚本执行成功" --exec-file 
 
 ---
 
-## 模式 A：文件模式使用方式
+## 任务目录结构
 
-### 步骤1：准备 Markdown 任务文档
-
-```markdown
-# 任务名称
-
-## 核心执行步骤
-- [ ] 步骤 1：具体描述
-- [ ] 步骤 2：具体描述
-- [ ] 步骤 3：具体描述
 ```
-
-### 步骤2：生成任务目录和步骤文档
-
-```bash
-python3 <STP_SCRIPTS>/execute_task.py --task-file /path/to/task.md
-```
-
-**任务目录命名规则**：`task-{自增ID}`
-- 使用 `.task_counter` 计数器文件记录自增ID
-- 目录示例：`task-1/`、`task-2/`、`task-3/`
-
-### 步骤3：查看生成的文档
-
-任务目录结构：
-```
-tasks/
+~/.openclaw/workspace/tasks/
 └── task-XXX/
     ├── task_steps.md      # 步骤文档（含状态标记和成功标准）
     ├── task_execution.log # 完整执行日志（含所有exec命令）
@@ -202,11 +268,14 @@ tasks/
         └── downloads/
 ```
 
-### 步骤4：执行步骤并更新状态
+### task-list 目录
 
-主 Agent 读取 `task_steps.md`，逐个执行步骤，然后更新状态标记：
-- `[ ]` → `✓`（执行成功）
-- `[ ]` → `✗`（执行失败）
+```
+~/.openclaw/workspace/task-list/
+├── stock-query-20260208.md    # 自然语言模式生成的计划书
+├── highway-query-20260208.md   # ...
+└── ...
+```
 
 ---
 
@@ -217,6 +286,8 @@ tasks/
 | `[ ]` | 待执行 |
 | `✓` | 执行成功 |
 | `✗` | 执行失败（任务终止） |
+
+---
 
 ## 执行规则（重要！）
 
@@ -248,15 +319,69 @@ tasks/
 
 ### scripts/
 - `execute_task.py` - 主脚本
-  - 解析任务文档并生成步骤文件
-  - 管理 `.task_counter` 自增ID
-  - 支持 `--subtask` 模式：生成子任务 prompt
-  - 支持 `--exec-file` 参数：附带执行日志
+  - `--file <path>` / `-f <path>`：文件模式
+  - `--nlp <text>` / `-n <text>`：自然语言模式
+  - `--subtask <task_id> <step_num>`：生成子任务 prompt
+  - `--log <task_id> <step> <status> [消息]`：记录步骤状态
+  - `--exec <task_id> "<命令>" <exit_code> [输出]`：记录 exec
+  - `--exec-file <path>`：从文件读取执行日志（与 --log 配合）
   - 自动记录 exec 命令到日志
+  - 自动创建 `.task_counter` 自增ID
 
 ### task-list/
 - 存放自然语言模式生成的任务计划书
 - 路径：`<STP_TASK_LIST>`
-- 文件命名格式：`<简短描述>-<日期>.md`
+- 文件命名格式：`<简短描述>-<YYYYMMDD>.md`
+
+---
+
+## 使用示例
+
+### 示例 1：文件模式（推荐用于复杂任务）
+
+```bash
+# 准备任务文件
+cat > ~/task-docs/cosyvoice-install.md << 'EOF'
+# Mac M系列芯片安装CosyVoice
+
+## 技术方案
+- 使用 Conda 管理环境
+- CPU 模式运行（PyTorch）
+
+## 核心执行步骤
+- [ ] 步骤 1：下载 Miniforge3 安装脚本
+- [ ] 步骤 2：运行安装脚本
+- [ ] 步骤 3：验证 conda 安装
+- [ ] 步骤 4：创建 cosyvoice 环境
+EOF
+
+# 执行（会先展示计划书并等待确认）
+python3 <STP_SCRIPTS>/execute_task.py -f ~/task-docs/cosyvoice-install.md
+```
+
+### 示例 2：自然语言模式（推荐用于临时任务）
+
+```bash
+# 直接描述需求
+python3 <STP_SCRIPTS>/execute_task.py -n "帮我安装 CosyVoice"
+```
+
+### 示例 3：Agent 集成（主 Agent 调用）
+
+```python
+# 用户输入自然语言
+user_input = "帮我查一下腾讯和茅台的股票价格"
+
+# Agent 调用自然语言模式
+import subprocess
+result = subprocess.run([
+    'python3', '<STP_SCRIPTS>/execute_task.py', 
+    '--nlp', user_input
+], capture_output=True, text=True)
+
+# 检查输出，如果是确认状态...
+# 读取生成的计划书文件
+# 展示给用户确认
+```
 
 > **注意**：`stp` 是 `structured-task-planning` 的缩写。
