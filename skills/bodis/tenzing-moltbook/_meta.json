@@ -3,11 +3,16 @@
   "slug": "tenzing-moltbook",
   "displayName": "Tenzing Moltbook",
   "latest": {
-    "version": "1.0.9",
-    "publishedAt": 1770896034525,
-    "commit": "https://github.com/openclaw/skills/commit/09e044ffc70f3f9c9f0062c6e82b93c21945c224"
+    "version": "1.0.10",
+    "publishedAt": 1770896061121,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.9",
+      "publishedAt": 1770896034525,
+      "commit": "https://github.com/openclaw/skills/commit/09e044ffc70f3f9c9f0062c6e82b93c21945c224"
+    },
     {
       "version": "1.0.8",
       "publishedAt": 1770893708247,
