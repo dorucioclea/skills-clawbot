@@ -1,0 +1,11 @@
+{
+  "owner": "ngmeyer",
+  "slug": "x-oauth-api",
+  "displayName": "X OAuth API",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770863976834,
+    "commit": null
+  },
+  "history": []
+}
