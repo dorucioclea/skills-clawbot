@@ -3,11 +3,16 @@
   "slug": "paylobster",
   "displayName": "Paylobster",
   "latest": {
-    "version": "4.3.0",
-    "publishedAt": 1770802824308,
-    "commit": "https://github.com/openclaw/skills/commit/3d4ee75074cb3f1e649e42c589ba6c76937fe085"
+    "version": "4.4.0",
+    "publishedAt": 1770804616492,
+    "commit": null
   },
   "history": [
+    {
+      "version": "4.3.0",
+      "publishedAt": 1770802824308,
+      "commit": "https://github.com/openclaw/skills/commit/3d4ee75074cb3f1e649e42c589ba6c76937fe085"
+    },
     {
       "version": "3.0.0",
       "publishedAt": 1770691917387,

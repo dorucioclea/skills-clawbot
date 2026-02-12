@@ -140,6 +140,7 @@ const agent = await reader.getAgent('0x...');
 | `revenueShare` | Revenue sharing agreements |
 | `swap` | Token swaps via 0x on Base |
 | `bridge` | Cross-chain bridges via Li.Fi |
+| `investment` | On-chain investment term sheets |
 
 ## CLI (@paylobster/cli@4.2.0)
 
@@ -212,6 +213,16 @@ plob bridge chains
 
 # Portfolio
 plob portfolio
+
+# Investment
+plob invest propose --treasury 0x... --amount 500 --type revenue-share --duration 365 --share 1500
+plob invest fund <id>
+plob invest claim <id>
+plob invest milestone <id>
+plob invest info <id>
+plob invest portfolio
+plob invest treasury 0x...
+plob invest stats
 ```
 
 All commands support `--json` for automation.
@@ -285,6 +296,14 @@ All commands support `--json` for automation.
 | `bridge_chains` | List supported chains |
 | `get_portfolio` | View multi-token balances |
 | `get_token_price` | Get token price in USD |
+| `investment_propose` | Propose investment into treasury |
+| `investment_fund` | Fund a proposed investment |
+| `investment_claim` | Claim streaming/fixed returns |
+| `investment_milestone` | Complete milestone (oracle) |
+| `investment_info` | Get investment details |
+| `investment_portfolio` | Investor's portfolio |
+| `investment_treasury` | Treasury's investments |
+| `investment_stats` | Protocol-wide stats |
 
 ### MCP Resources (6)
 
@@ -332,6 +351,7 @@ Base URL: `https://paylobster.com`
 | CrossRailLedger | `0x74AcB48650f12368960325d3c7304965fd62db18` |
 | SpendingMandate | `0x8609eBA4F8B6081AcC8ce8B0C126C515f6140849` |
 | TreasuryFactory | `0x171a685f28546a0ebb13059184db1f808b915066` |
+| InvestmentTermSheet | `0xfa4d9933422401e8b0846f14889b383e068860eb` |
 
 ### V4 (Compiled, Pending Deploy)
 
@@ -376,6 +396,26 @@ plob swap execute --from USDC --to WETH --amount 50
 
 # Bridge to another chain
 plob bridge execute --from base --to solana --token USDC --amount 100
+```
+
+### Invest in an agent's treasury
+
+```bash
+# Propose a revenue share investment
+plob invest propose --treasury 0xAGENT_TREASURY --amount 500 \
+  --type revenue-share --duration 365 --share 1500
+
+# Fund the investment
+plob invest fund 0
+
+# Check claimable returns
+plob invest info 0
+
+# Claim returns
+plob invest claim 0
+
+# View your portfolio
+plob invest portfolio
 ```
 
 ### Agent paying for a service
