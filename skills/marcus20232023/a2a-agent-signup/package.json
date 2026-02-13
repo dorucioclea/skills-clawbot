@@ -1,6 +1,6 @@
 {
   "name": "a2a-agent-signup",
-  "version": "1.0.7",
+  "version": "1.2.4",
   "description": "Interactive CLI wizard for A2A Marketplace agent onboarding",
   "main": "index.js",
   "bin": {
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "enquirer": "^2.4.1",
-    "ethers": "^6.13.0"
+    "ethers": "^6.13.0",
+    "qrcode": "^1.5.3"
   }
 }

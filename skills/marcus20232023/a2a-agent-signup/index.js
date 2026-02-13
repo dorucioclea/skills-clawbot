@@ -11,6 +11,14 @@ const { ethers } = require('ethers');
 
 // Configuration from environment variables
 const API_URL = process.env.A2A_API_URL || 'https://a2a.ex8.ca/a2a/jsonrpc';
+const BASE_URL = (() => {
+  try {
+    const url = new URL(API_URL);
+    return `${url.protocol}//${url.host}`; // e.g., https://a2a.ex8.ca
+  } catch (e) {
+    return 'https://a2a.ex8.ca';
+  }
+})();
 const SIGNUP_FEE_RECIPIENT = '0x26fc06D17Eb82638b25402D411889EEb69F1e7C5'; // Marc's wallet (hardcoded)
 const CONFIG_PATH = path.join(process.env.HOME, '.a2a-agent-config');
 const ENV_PATH = path.join(process.cwd(), '.env');
@@ -87,36 +95,42 @@ async function interactivePrompt() {
   console.log('\n🦪 A2A Marketplace - Agent Signup Wizard\n');
   console.log('Register as an agent and list your first service.\n');
 
-  // Step 1: Wallet
-  console.log('━━━ Step 1: Wallet Connection ━━━\n');
-  
-  const { walletMethod } = await prompt({
-    type: 'select',
-    name: 'walletMethod',
-    message: 'How would you like to connect your wallet?',
-    choices: [
-      { name: 'manual', message: 'Enter wallet address manually' },
-      { name: 'generate', message: 'Generate a new wallet (for testing)' }
-    ]
-  });
-
+  // Step 1: Wallet (skip if already configured from setupWallet)
   let walletAddress, signature;
 
-  if (walletMethod === 'generate') {
-    const wallet = ethers.Wallet.createRandom();
-    walletAddress = wallet.address;
-    const msg = `Sign up for A2A Marketplace: ${Date.now()}`;
-    signature = await wallet.signMessage(msg);
-    console.log(`\n  Generated wallet: ${walletAddress}`);
-    console.log(`  ⚠️  Save your private key: ${wallet.privateKey}\n`);
+  if (AGENT_WALLET) {
+    console.log('━━━ Step 1: Wallet ━━━\n');
+    console.log(`Using configured wallet: ${AGENT_WALLET}\n`);
+    walletAddress = AGENT_WALLET;
   } else {
-    const result = await prompt({
-      type: 'input',
-      name: 'walletAddress',
-      message: 'Enter your Ethereum/Polygon wallet address (0x...):',
-      validate: v => /^0x[a-fA-F0-9]{40}$/.test(v) || 'Invalid address format'
+    console.log('━━━ Step 1: Wallet Connection ━━━\n');
+    
+    const { walletMethod } = await prompt({
+      type: 'select',
+      name: 'walletMethod',
+      message: 'How would you like to connect your wallet?',
+      choices: [
+        { name: 'manual', message: 'Enter wallet address manually' },
+        { name: 'generate', message: 'Generate a new wallet (for testing)' }
+      ]
     });
-    walletAddress = result.walletAddress;
+
+    if (walletMethod === 'generate') {
+      const wallet = ethers.Wallet.createRandom();
+      walletAddress = wallet.address;
+      const msg = `Sign up for A2A Marketplace: ${Date.now()}`;
+      signature = await wallet.signMessage(msg);
+      console.log(`\n  Generated wallet: ${walletAddress}`);
+      console.log(`  ⚠️  Save your private key: ${wallet.privateKey}\n`);
+    } else {
+      const result = await prompt({
+        type: 'input',
+        name: 'walletAddress',
+        message: 'Enter your Ethereum/Polygon wallet address (0x...):',
+        validate: v => /^0x[a-fA-F0-9]{40}$/.test(v) || 'Invalid address format'
+      });
+      walletAddress = result.walletAddress;
+    }
   }
 
   // Step 2: Profile
@@ -143,37 +157,186 @@ async function interactivePrompt() {
     }
   ]);
 
-  // Step 3: First Service
-  console.log('\n━━━ Step 3: First Service Listing ━━━\n');
+  // Step 3: First Service (optional)
+  console.log('\n━━━ Step 3: Services (Optional) ━━━\n');
 
-  const service = await prompt([
-    {
-      type: 'input',
-      name: 'serviceTitle',
-      message: 'Service title:',
-      validate: v => v.length >= 3 || 'Title must be at least 3 characters'
-    },
-    {
-      type: 'input',
-      name: 'serviceDescription',
-      message: 'Service description:',
-      validate: v => v.length >= 10 || 'Description must be at least 10 characters'
-    },
-    {
-      type: 'numeral',
-      name: 'price',
-      message: 'Price:',
-      validate: v => v > 0 || 'Price must be positive'
-    },
-    {
+  const { wantService } = await prompt({
+    type: 'confirm',
+    name: 'wantService',
+    message: 'Do you want to list a service? (You can add services later)',
+    initial: false
+  });
+
+  let service = {
+    serviceTitle: '',
+    serviceDescription: '',
+    price: 0,
+    currency: 'SHIB'
+  };
+
+  if (wantService) {
+    // Get exchange rates
+    let rates = { SHIB: 0, USDC: 1 };
+    try {
+      const ratesResp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=shiba-inu,usd-coin&vs_currencies=usd');
+      const ratesData = await ratesResp.json();
+      rates.SHIB = ratesData['shiba-inu']?.usd || 0;
+      rates.USDC = ratesData['usd-coin']?.usd || 1;
+    } catch (e) {
+      console.log('  (Could not fetch exchange rates, USD conversion unavailable)\n');
+    }
+
+    // Ask for title and description first
+    const titleAndDesc = await prompt([
+      {
+        type: 'input',
+        name: 'serviceTitle',
+        message: 'Service title:',
+        validate: v => v.length >= 3 || 'Title must be at least 3 characters'
+      },
+      {
+        type: 'input',
+        name: 'serviceDescription',
+        message: 'Service description:',
+        validate: v => v.length >= 10 || 'Description must be at least 10 characters'
+      }
+    ]);
+
+    // Ask for currency first
+    const { currency } = await prompt({
       type: 'select',
       name: 'currency',
       message: 'Currency:',
       choices: ['SHIB', 'USDC']
+    });
+
+    // Then ask for price with USD conversion
+    const rate = rates[currency] || 0;
+    
+    // Helper to format USD with dynamic decimal places
+    function formatUSD(amount) {
+      if (amount === 0) return '$0.00';
+      
+      // Get string with many decimals
+      const str = amount.toFixed(20);
+      const [intPart, decPart] = str.split('.');
+      
+      if (!decPart) return '$' + amount.toFixed(2);
+      
+      // Find first non-zero digit position in decimal part
+      let firstNonZeroIdx = -1;
+      for (let i = 0; i < decPart.length; i++) {
+        if (decPart[i] !== '0') {
+          firstNonZeroIdx = i;
+          break;
+        }
+      }
+      
+      if (firstNonZeroIdx === -1) return '$0.00';
+      
+      // Show up to first non-zero + 2 more places
+      const decimalsNeeded = firstNonZeroIdx + 3;
+      return '$' + amount.toFixed(decimalsNeeded);
     }
-  ]);
+    
+    const { price } = await prompt({
+      type: 'numeral',
+      name: 'price',
+      message: rate > 0 
+        ? `Price in ${currency}: (1 ${currency} = $${rate.toFixed(6)} USD)`
+        : `Price in ${currency}:`,
+      validate: v => v > 0 || 'Price must be positive',
+      result: v => {
+        if (rate > 0) {
+          const usdValue = v * rate;
+          console.log(`   → ${formatUSD(usdValue)} USD equivalent\n`);
+        }
+        return v;
+      }
+    });
+
+    service = { ...titleAndDesc, currency, price };
+  }
 
   return { walletAddress, signature, ...profile, ...service };
+}
+
+// Create a signup session for payment
+async function createSignupSession(params) {
+  const payload = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'createSignupSession',
+    params: {
+      walletAddress: params.walletAddress,
+      name: params.name,
+      bio: params.bio,
+      specialization: params.specialization,
+      serviceTitle: params.serviceTitle,
+      serviceDescription: params.serviceDescription,
+      price: typeof params.price === 'string' ? parseFloat(params.price) : params.price,
+      currency: params.currency
+    }
+  };
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.result;
+}
+
+// Poll for payment completion
+async function pollPaymentStatus(sessionId, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch(`${BASE_URL}/a2a/signup-session/${sessionId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const data = await response.json();
+      
+      if (data.status === 'completed') {
+        return data;
+      }
+      
+      if (data.status === 'failed') {
+        throw new Error('Payment verification failed');
+      }
+      
+      // Wait 2 seconds before next poll
+      await new Promise(r => setTimeout(r, 2000));
+      process.stdout.write('.');
+    } catch (err) {
+      // Retry on network errors
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  
+  throw new Error('Payment verification timeout - please try again');
+}
+
+// Ask user how to pay
+async function askPaymentMethod() {
+  const { prompt } = require('enquirer');
+  
+  const { method } = await prompt({
+    type: 'select',
+    name: 'method',
+    message: 'How would you like to pay the $0.01 USDC registration fee?',
+    choices: [
+      { name: 'browser', message: '🌐 Open in browser (MetaMask)' },
+      { name: 'manual', message: '📋 Copy payment details manually' },
+      { name: 'qr', message: '📱 Show QR code for mobile wallet' }
+    ]
+  });
+  
+  return method;
 }
 
 async function registerAgent(params) {
@@ -259,6 +422,46 @@ async function main() {
       params = await interactivePrompt();
     }
 
+    // Create signup session and handle payment
+    console.log('\n━━━ Step 4: Payment ━━━\n');
+    console.log('Registration fee: $0.01 USDC on Polygon\n');
+    
+    const session = await createSignupSession(params);
+    const paymentMethod = await askPaymentMethod();
+    
+    if (paymentMethod === 'browser') {
+      const paymentUrl = `${BASE_URL}/signup/${session.sessionId}`;
+      console.log(`\n🌐 Opening payment page in browser...\n`);
+      console.log(`   URL: ${paymentUrl}\n`);
+      console.log('   Please complete the payment in your browser.\n');
+      
+      // Try to open in browser (if available)
+      const { exec } = require('child_process');
+      exec(`open "${paymentUrl}" || xdg-open "${paymentUrl}" || start "${paymentUrl}"`, () => {});
+      
+    } else if (paymentMethod === 'manual') {
+      console.log('\n📋 Payment Details:\n');
+      console.log(`   Amount:    0.01 USDC`);
+      console.log(`   To:        ${SIGNUP_FEE_RECIPIENT}`);
+      console.log(`   Network:   Polygon (chainId: 137)`);
+      console.log(`   Token:     USDC (0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174)\n`);
+      console.log('   Copy and send from your wallet.\n');
+      
+    } else if (paymentMethod === 'qr') {
+      const paymentUrl = `${BASE_URL}/signup/${session.sessionId}`;
+      const QRCode = require('qrcode');
+      
+      console.log('\n📱 Scan with your mobile wallet:\n');
+      const qrAscii = await QRCode.toString(paymentUrl, { type: 'terminal' });
+      console.log(qrAscii);
+      console.log(`\n   Payment URL: ${paymentUrl}\n`);
+    }
+    
+    console.log('⏳ Waiting for payment confirmation...\n');
+    const paymentStatus = await pollPaymentStatus(session.sessionId);
+    console.log('\n✅ Payment verified!\n');
+    
+    // Now register the agent with the verified session
     const result = await registerAgent(params);
     const config = saveConfig(result, params.walletAddress);
 
