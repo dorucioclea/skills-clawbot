@@ -39,10 +39,14 @@ result = skill_main("https://www.bilibili.com/video/BV1xx411c7mD")
 result = skill_main(
     url="https://www.youtube.com/watch?v=xxx",
     whisper_model="large-v3",       # tiny/base/small/medium/large-v2/large-v3/turbo/distil-large-v2/distil-large-v3/distil-large-v3.5
+    transcribe_language=None,       # 自动识别语言；可显式传 "zh"/"en"/"ja"
     analysis_types=["evaluation", "summary"],  # 分析类型
     output_dir="./my-analysis",     # 输出目录
     save_transcript=True,           # 保存原始转写
-    enable_screenshots=True         # 启用关键帧截图（默认启用）
+    enable_screenshots=True,        # 启用关键帧截图（默认启用）
+    publish_to_feishu=True,         # 完成后发布到飞书知识库
+    feishu_space_id="your_space_id",
+    feishu_parent_node_token="your_parent_node_token"
 )
 ```
 
@@ -52,11 +56,15 @@ result = skill_main(
 |------|------|--------|------|
 | `url` | string | 必填 | 视频链接或本地文件路径 |
 | `whisper_model` | string | large-v2 | Whisper模型名称（仅多语言）：tiny/base/small/medium/large-v2/large-v3/turbo/distil-large-v2/distil-large-v3/distil-large-v3.5 |
+| `transcribe_language` | string | None | Whisper语言代码（如 zh/en/ja），为空时自动识别 |
 | `analysis_types` | list | [evaluation, summary] | 分析类型列表 |
 | `output_dir` | string | ./video-analysis | 输出目录 |
 | `save_transcript` | bool | true | 是否保存原始转写 |
 | `enable_screenshots` | bool | true | 启用关键帧截图（自动在总结中插入关键节点截图） |
 | `config_path` | string | None | 配置文件路径 |
+| `publish_to_feishu` | bool | true | 是否自动发布到飞书知识库 |
+| `feishu_space_id` | string | None | 飞书知识库 space_id（发布时必填） |
+| `feishu_parent_node_token` | string | None | 飞书知识库父节点 token（发布时必填） |
 
 ## 返回结果
 
@@ -64,12 +72,19 @@ result = skill_main(
 {
     "success": True,
     "video_title": "视频标题",
-    "duration_seconds": 145.3,
+    "duration_seconds": 623.8,
+    "processing_seconds": 145.3,
     "transcript_length": 3245,
     "output_files": {
         "transcript": "./video-analysis/xxx_transcript.md",
         "evaluation": "./video-analysis/xxx_evaluation.md",
         "summary": "./video-analysis/xxx_summary.md"
+    },
+    "feishu_publish": {
+        "enabled": true,
+        "success": true,
+        "doc_token": "doccnxxxx",
+        "doc_url": "https://feishu.cn/docx/doccnxxxx"
     },
     "summary": "Analyzed in 145.3s | 3245 chars | 2 analyses"
 }
@@ -99,9 +114,15 @@ result = skill_main(
     "provider": "openai",
     "api_key": "your-api-key",
     "model": "gpt-4o-mini"
+  },
+  "feishu": {
+    "space_id": "your_space_id",
+    "parent_node_token": "your_parent_node_token"
   }
 }
 ```
+
+飞书 appId/appSecret 不存放在技能 `config.json`，默认从 OpenClaw 的 `openclaw.json`（`channels.feishu`）读取，也可通过环境变量 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 指定。
 
 ## 故障排除
 

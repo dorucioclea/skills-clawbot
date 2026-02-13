@@ -12,11 +12,10 @@ SKILL_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SKILL_DIR))
 
 try:
-    from .main import skill_main
-    from .models import SummaryStyle
-except ImportError:
     from main import skill_main
     from models import SummaryStyle
+except ImportError as exc:
+    raise ImportError(f"Failed to import video-analyzer modules: {exc}") from exc
 
 
 STYLE_MAP = {
@@ -42,6 +41,11 @@ def main():
         "--whisper-model",
         default="large-v2",
         help="tiny/base/small/medium/large-v2/large-v3/turbo/distil-large-v2/distil-large-v3/distil-large-v3.5",
+    )
+    parser.add_argument(
+        "--language",
+        default=None,
+        help="Whisper language code (e.g. zh/en/ja). Default: auto-detect.",
     )
     parser.add_argument(
         "--analysis-types",
@@ -71,6 +75,27 @@ def main():
         action="store_true",
         help="Disable keyframe screenshot extraction.",
     )
+    parser.add_argument(
+        "--publish-to-feishu",
+        dest="publish_to_feishu",
+        action="store_true",
+        default=True,
+        help="Publish generated content to Feishu wiki (default enabled).",
+    )
+    parser.add_argument(
+        "--no-publish-feishu",
+        dest="publish_to_feishu",
+        action="store_false",
+        help="Disable Feishu wiki publishing.",
+    )
+    parser.add_argument(
+        "--feishu-space-id",
+        help="Target Feishu wiki space id (required when publishing is enabled).",
+    )
+    parser.add_argument(
+        "--feishu-parent-node-token",
+        help="Target Feishu wiki parent node token (required when publishing is enabled).",
+    )
 
     args = parser.parse_args()
 
@@ -88,12 +113,16 @@ def main():
     result = skill_main(
         url=args.url,
         whisper_model=args.whisper_model,
+        transcribe_language=args.language,
         analysis_types=analysis_types,
         output_dir=args.output_dir,
         save_transcript=args.save_transcript,
         config_path=args.config,
         summary_style=summary_style,
         enable_screenshots=enable_screenshots,
+        publish_to_feishu=args.publish_to_feishu,
+        feishu_space_id=args.feishu_space_id,
+        feishu_parent_node_token=args.feishu_parent_node_token,
     )
 
     print(json.dumps(result, ensure_ascii=False, indent=2))

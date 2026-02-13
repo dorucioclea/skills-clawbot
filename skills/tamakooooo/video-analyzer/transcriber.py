@@ -39,10 +39,14 @@ class Transcriber:
     }
 
     def __init__(
-        self, model_size: str = "large-v2", model_dir: str = "./models/whisper"
+        self,
+        model_size: str = "large-v2",
+        model_dir: str = "./models/whisper",
+        language: Optional[str] = None,
     ):
         self.model_size = model_size
         self.model_dir = Path(model_dir)
+        self.language = (language or "").strip() or None
         self.model_dir.mkdir(exist_ok=True, parents=True)
         self._model: Optional[WhisperModel] = None
 
@@ -88,7 +92,10 @@ class Transcriber:
         if model is None:
             raise RuntimeError("Whisper model failed to initialize")
 
-        segments_generator, info = model.transcribe(audio_path, language="zh")
+        transcribe_kwargs = {}
+        if self.language is not None:
+            transcribe_kwargs["language"] = self.language
+        segments_generator, info = model.transcribe(audio_path, **transcribe_kwargs)
 
         full_text = ""
         for segment in segments_generator:
@@ -119,7 +126,10 @@ class Transcriber:
         if model is None:
             raise RuntimeError("Whisper model failed to initialize")
 
-        segments_generator, info = model.transcribe(audio_path, language="zh")
+        transcribe_kwargs = {}
+        if self.language is not None:
+            transcribe_kwargs["language"] = self.language
+        segments_generator, info = model.transcribe(audio_path, **transcribe_kwargs)
 
         timestamped_segments = []
         for segment in segments_generator:

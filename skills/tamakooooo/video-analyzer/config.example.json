@@ -11,5 +11,9 @@
     "model_size": "large-v2",
     "cpu_threads": 4,
     "auto_optimize": true
+  },
+  "feishu": {
+    "space_id": "your-feishu-space-id",
+    "parent_node_token": "your-feishu-parent-node-token"
   }
 }

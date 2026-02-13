@@ -8,14 +8,9 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 import shutil
 
-try:
-    from .core import VideoAnalyzer
-    from .dependency_manager import check_and_install_dependencies
-    from .models import SummaryStyle
-except ImportError:
-    from core import VideoAnalyzer
-    from dependency_manager import check_and_install_dependencies
-    from models import SummaryStyle
+from core import VideoAnalyzer
+from dependency_manager import check_and_install_dependencies
+from models import SummaryStyle
 
 SKILL_DIR = Path(__file__).resolve().parent
 
@@ -30,12 +25,16 @@ def _resolve_from_skill_dir(path_value: str) -> Path:
 def skill_main(
     url: str,
     whisper_model: str = "large-v2",
+    transcribe_language: Optional[str] = None,
     analysis_types: Optional[List[str]] = None,
     output_dir: str = "./video-analysis",
     save_transcript: bool = True,
     config_path: Optional[str] = None,
     summary_style: Optional[SummaryStyle] = None,
-    enable_screenshots: bool = False,
+    enable_screenshots: bool = True,
+    publish_to_feishu: bool = True,
+    feishu_space_id: Optional[str] = None,
+    feishu_parent_node_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Analyze video and generate transcript/evaluation/summary.
@@ -43,25 +42,31 @@ def skill_main(
     Args:
         url: Video URL or local file path
         whisper_model: tiny/base/small/medium/large-v2/large-v3/turbo/distil-large-v2/distil-large-v3/distil-large-v3.5 (default: large-v2)
+        transcribe_language: Whisper language code (e.g. zh/en/ja). None means auto-detect (default).
         analysis_types: List of analysis types [evaluation, summary, format] (default: [evaluation, summary])
         output_dir: Output directory for results (default: ./video-analysis)
         save_transcript: Whether to save raw transcript (default: True)
         config_path: Path to config.json (default: None)
         summary_style: Summary style (brief_points, deep_longform, social_media, study_notes) (default: None -> deep_longform)
-        enable_screenshots: Enable screenshot extraction from video key moments (default: False)
+        enable_screenshots: Enable screenshot extraction from video key moments (default: True)
+        publish_to_feishu: Publish final content to Feishu wiki doc (default: True)
+        feishu_space_id: Feishu wiki space id (required when publish_to_feishu=True)
+        feishu_parent_node_token: Feishu parent node token (required when publish_to_feishu=True)
 
     Returns:
         dict with success status, video info, and output files:
         {
             "success": True/False,
             "video_title": str,
-            "duration_seconds": float,
+            "duration_seconds": float,  # original video duration
+            "processing_seconds": float,  # pipeline elapsed time
             "transcript_length": int,
             "output_files": {
                 "transcript": str,
                 "evaluation": str,
                 "summary": str
             },
+            "feishu_publish": dict,
             "summary": str,
             "error": str (if failed)
         }
@@ -106,12 +111,16 @@ def skill_main(
 
     analyzer = VideoAnalyzer(
         whisper_model=whisper_model,
+        transcribe_language=transcribe_language,
         analysis_types=effective_analysis_types,
         output_dir=str(resolved_output_dir),
         save_transcript=save_transcript,
         config_path=str(resolved_config_path) if resolved_config_path else None,
         summary_style=summary_style,
         enable_screenshots=enable_screenshots,
+        publish_to_feishu=publish_to_feishu,
+        feishu_space_id=feishu_space_id,
+        feishu_parent_node_token=feishu_parent_node_token,
     )
 
     # Run analysis

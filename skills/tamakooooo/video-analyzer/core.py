@@ -9,12 +9,9 @@ import time
 import re
 import logging
 
-try:
-    from .utils.temp_manager import temp_manager
-    from .models import SummaryStyle, calculate_screenshot_count
-except ImportError:
-    from utils.temp_manager import temp_manager
-    from models import SummaryStyle, calculate_screenshot_count
+from utils.temp_manager import temp_manager
+from models import SummaryStyle, calculate_screenshot_count
+from feishu_publisher import FeishuPublisher
 
 
 logger = logging.getLogger(__name__)
@@ -26,15 +23,20 @@ class VideoAnalyzer:
     def __init__(
         self,
         whisper_model: str = "large-v2",
+        transcribe_language: Optional[str] = None,
         analysis_types: Optional[List[str]] = None,
         output_dir: str = "./video-analysis",
         save_transcript: bool = True,
         config_path: Optional[str] = None,
         summary_style: Optional[SummaryStyle] = None,
-        enable_screenshots: bool = False,
+        enable_screenshots: bool = True,
+        publish_to_feishu: bool = True,
+        feishu_space_id: Optional[str] = None,
+        feishu_parent_node_token: Optional[str] = None,
     ):
         self.skill_dir = Path(__file__).resolve().parent
         self.whisper_model = whisper_model
+        self.transcribe_language = (transcribe_language or "").strip() or None
         self.analysis_types = (
             ["evaluation", "summary"] if analysis_types is None else analysis_types
         )
@@ -43,6 +45,9 @@ class VideoAnalyzer:
         self.config_path = config_path
         self.summary_style = summary_style
         self.enable_screenshots = enable_screenshots
+        self.publish_to_feishu = publish_to_feishu
+        self.feishu_space_id = feishu_space_id
+        self.feishu_parent_node_token = feishu_parent_node_token
 
         # Lazy imports
         self._transcriber = None
@@ -60,22 +65,20 @@ class VideoAnalyzer:
     def transcriber(self):
         """Lazy load transcriber."""
         if self._transcriber is None:
-            try:
-                from .transcriber import Transcriber
-            except ImportError:
-                from transcriber import Transcriber
+            from transcriber import Transcriber
 
-            self._transcriber = Transcriber(model_size=self.whisper_model)
+            self._transcriber = Transcriber(
+                model_size=self.whisper_model,
+                model_dir=str(self.skill_dir / "models" / "whisper"),
+                language=self.transcribe_language,
+            )
         return self._transcriber
 
     @property
     def llm_processor(self):
         """Lazy load LLM processor."""
         if self._llm_processor is None:
-            try:
-                from .llm_processor import LLMProcessor
-            except ImportError:
-                from llm_processor import LLMProcessor
+            from llm_processor import LLMProcessor
 
             self._llm_processor = LLMProcessor(config_path=self.config_path)
         return self._llm_processor
@@ -84,22 +87,16 @@ class VideoAnalyzer:
     def downloader(self):
         """Lazy load downloader."""
         if self._downloader is None:
-            try:
-                from .downloader import Downloader
-            except ImportError:
-                from downloader import Downloader
+            from downloader import Downloader
 
-            self._downloader = Downloader()
+            self._downloader = Downloader(data_dir=str(self.skill_dir / "data"))
         return self._downloader
 
     @property
     def screenshot_extractor(self):
         """Lazy load screenshot extractor."""
         if self._screenshot_extractor is None:
-            try:
-                from .screenshot_extractor import ScreenshotExtractor
-            except ImportError:
-                from screenshot_extractor import ScreenshotExtractor
+            from screenshot_extractor import ScreenshotExtractor
 
             self._screenshot_extractor = ScreenshotExtractor()
         return self._screenshot_extractor
@@ -110,38 +107,61 @@ class VideoAnalyzer:
         media_path = None
 
         try:
-            # 1. Get media (video if screenshots enabled, audio otherwise)
-            if self.enable_screenshots:
-                print(f"[1/5] Downloading video: {url}")
-                media_path, video_info = self.downloader.get_video(url)
-                temp_manager.add(media_path)
-            else:
-                print(f"[1/4] Downloading: {url}")
-                media_path, video_info = self.downloader.get_audio(url)
-                temp_manager.add(media_path)
+            # 1. Try platform subtitles first for online videos.
+            subtitle_text = None
+            subtitle_segments = None
+            video_info = None
+            is_online = str(url).startswith(("http://", "https://"))
+            if is_online:
+                print("[1/5] Checking subtitles...")
+                subtitle_text, subtitle_segments, subtitle_info = self.downloader.get_subtitles(url)
+                if subtitle_info:
+                    video_info = subtitle_info
+                if subtitle_text:
+                    print("[INFO] Subtitles found. Using subtitles as transcript.")
+                else:
+                    print("[INFO] No subtitles found. Falling back to speech transcription.")
 
-            # 2. Transcribe
+            # 2. Get media when needed.
             if self.enable_screenshots:
+                print(f"[2/6] Downloading video: {url}")
+                media_path, media_info = self.downloader.get_video(url)
+                video_info = video_info or media_info
+                temp_manager.add(media_path)
+            elif subtitle_text is None:
+                print(f"[2/5] Downloading audio: {url}")
+                media_path, media_info = self.downloader.get_audio(url)
+                video_info = video_info or media_info
+                temp_manager.add(media_path)
+            elif video_info is None:
+                # Fallback metadata for unusual subtitle-only cases.
+                _, media_info = self.downloader.get_audio(url)
+                video_info = media_info
+
+            # 3. Transcript: subtitles first, Whisper second.
+            if subtitle_text is not None:
+                transcript = subtitle_text
+                timestamped_transcript = subtitle_segments
+            elif self.enable_screenshots:
                 print(
-                    f"[2/5] Transcribing with timestamps (model: {self.whisper_model})..."
+                    f"[3/6] Transcribing with timestamps (model: {self.whisper_model})..."
                 )
                 timestamped_transcript = self.transcriber.transcribe_with_timestamps(
                     media_path
                 )
-                # Also get plain text transcript for compatibility
                 transcript = " ".join(
                     segment["text"] for segment in timestamped_transcript
                 )
             else:
-                print(f"[2/4] Transcribing (model: {self.whisper_model})...")
+                print(f"[3/5] Transcribing (model: {self.whisper_model})...")
                 transcript = self.transcriber.transcribe(media_path)
                 timestamped_transcript = None
 
-            # 3. Screenshot extraction (if enabled)
+            # 4. Screenshot extraction (if enabled)
             key_nodes = []
             screenshot_paths = []
             if self.enable_screenshots:
-                print(f"[3/5] Extracting screenshots...")
+                print("[4/6] Extracting screenshots...")
                 try:
                     # Get video duration
                     duration = video_info.get("duration", 0)
@@ -199,11 +219,10 @@ class VideoAnalyzer:
                     logger.error(f"Screenshot extraction failed: {e}")
                     # Non-fatal: continue without screenshots
 
-            # 4. LLM analysis
-            step_num = 4 if self.enable_screenshots else 3
-            print(
-                f"[{step_num}/{5 if self.enable_screenshots else 4}] Analyzing ({len(self.analysis_types)} types)..."
-            )
+            # 5. LLM analysis
+            step_num = 5 if self.enable_screenshots else 4
+            total_steps = 6 if self.enable_screenshots else 5
+            print(f"[{step_num}/{total_steps}] Analyzing ({len(self.analysis_types)} types)...")
             analyses = {}
             for analysis_type in self.analysis_types:
                 if analysis_type == "summary" and self.summary_style:
@@ -233,21 +252,27 @@ class VideoAnalyzer:
                     screenshot_paths=screenshot_paths,
                 )
 
-            # 5. Save results
-            step_num = 5 if self.enable_screenshots else 4
-            print(
-                f"[{step_num}/{5 if self.enable_screenshots else 4}] Saving results..."
-            )
+            # 6. Save results
+            step_num = 6 if self.enable_screenshots else 5
+            print(f"[{step_num}/{total_steps}] Saving results...")
             output_files = self._save_results(video_info, transcript, analyses)
+            feishu_publish = self._publish_to_feishu_if_needed(
+                video_info=video_info,
+                transcript=transcript,
+                analyses=analyses,
+                output_files=output_files,
+            )
 
             elapsed = time.time() - start_time
 
             return {
                 "success": True,
                 "video_title": video_info["title"],
-                "duration_seconds": round(elapsed, 1),
+                "duration_seconds": round(float(video_info.get("duration", 0) or 0), 1),
+                "processing_seconds": round(elapsed, 1),
                 "transcript_length": len(transcript),
                 "output_files": output_files,
+                "feishu_publish": feishu_publish,
                 "summary": f"Analyzed in {elapsed:.1f}s | {len(transcript)} chars | {len(analyses)} analyses",
             }
 
@@ -337,3 +362,97 @@ class VideoAnalyzer:
                 output_files[analysis_type] = str(analysis_file)
 
         return output_files
+
+    def _publish_to_feishu_if_needed(
+        self,
+        video_info: Dict[str, Any],
+        transcript: str,
+        analyses: Dict[str, str],
+        output_files: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Publish all generated content to Feishu wiki doc when enabled."""
+        if not self.publish_to_feishu:
+            return {"enabled": False, "success": False, "skipped": True}
+
+        try:
+            markdown_content = self._build_feishu_markdown(
+                video_info=video_info,
+                transcript=transcript,
+                analyses=analyses,
+                output_files=output_files,
+            )
+            publisher = FeishuPublisher(
+                space_id=self.feishu_space_id,
+                parent_node_token=self.feishu_parent_node_token,
+                config_path=self.config_path,
+            )
+            return publisher.publish(
+                video_title=video_info.get("title", ""),
+                markdown_content=markdown_content,
+            )
+        except Exception as exc:
+            logger.error(f"Feishu publish failed: {exc}")
+            return {"enabled": True, "success": False, "error": str(exc)}
+
+    def _build_feishu_markdown(
+        self,
+        video_info: Dict[str, Any],
+        transcript: str,
+        analyses: Dict[str, str],
+        output_files: Dict[str, str],
+    ) -> str:
+        """Build a single markdown body containing summary/evaluation/transcript."""
+        video_title = str(video_info.get("title", "视频分析结果")).strip() or "视频分析结果"
+
+        summary_content = self._read_output_file(output_files.get("summary")) or analyses.get(
+            "summary", ""
+        )
+        evaluation_content = self._read_output_file(
+            output_files.get("evaluation")
+        ) or analyses.get("evaluation", "")
+        transcript_content = self._read_output_file(
+            output_files.get("transcript")
+        ) or transcript
+
+        sections = [
+            ("Summary", summary_content),
+            ("Evaluation", evaluation_content),
+            ("Transcript", transcript_content),
+        ]
+
+        lines = [f"# {video_title}", ""]
+        video_url = str(video_info.get("url", "")).strip()
+        if video_url:
+            lines.append(f"**URL**: {video_url}")
+            lines.append("")
+        lines.append(f"**Date**: {datetime.now().isoformat()}")
+        lines.append("")
+
+        for section_name, section_content in sections:
+            content = (section_content or "").strip()
+            if not content:
+                continue
+            lines.append(f"## {section_name}")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
+
+        content = "\n".join(lines).strip()
+        if not content:
+            return f"# {video_title}\n\n(Empty content)"
+        return content
+
+    @staticmethod
+    def _read_output_file(file_path: Optional[str]) -> str:
+        """Best effort read markdown output file content."""
+        if not file_path:
+            return ""
+
+        path = Path(file_path)
+        if not path.exists():
+            return ""
+
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception:
+            return ""

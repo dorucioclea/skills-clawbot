@@ -1,6 +1,6 @@
 ﻿---
 name: video-analyzer
-version: 2.0.2
+version: 1.0.10
 description: 鏅鸿兘鍒嗘瀽 Bilibili/YouTube/鏈湴瑙嗛锛岀敓鎴愯浆鍐欍€佽瘎浼板拰鎬荤粨銆傛敮鎸佸叧閿抚鎴浘鑷姩宓屽叆銆?
 author: user
 tags: [video, transcription, analysis, bilibili, youtube, ai]
@@ -127,3 +127,26 @@ A: 纭繚 FFmpeg 宸插畨瑁咃紝涓斾娇鐢ㄧ殑鏄棰?URL锛堜�
 - 瑙嗛涓存椂涓嬭浇鍒扮郴缁熶复鏃剁洰褰曪紝鍒嗘瀽瀹屾垚鍚庤嚜鍔ㄦ竻鐞?
 - 澶фā鍨嬶紙large-v2锛夌簿搴﹂珮浣嗛€熷害鎱紝灏忔ā鍨嬶紙small锛夐€熷害蹇絾绮惧害杈冧綆
 - 鍚敤鎴浘闇€瑕佷笅杞藉畬鏁磋棰戯紙鑰岄潪浠呴煶棰戯級
+
+## Code-level Feishu Publishing (Required)
+
+Do not store Feishu app credentials in this skill config.
+Publishing is handled by built-in Python flow (`feishu_publisher.py`) after analysis.
+
+After analysis succeeds:
+1. Use `video_title` as Feishu doc title exactly.
+2. Merge all generated content into one markdown body (summary + evaluation + transcript).
+3. Create a wiki docx node under configured `space_id` + `parent_node_token`.
+4. Write the full markdown body into the created doc token.
+5. Return publish result (`doc_token`/`doc_url`) in output field `feishu_publish`.
+
+Credential/target resolution priority:
+- `feishu_space_id` / `feishu_parent_node_token` parameters
+- `FEISHU_SPACE_ID` / `FEISHU_PARENT_NODE_TOKEN` env
+- `config.json` -> `feishu.space_id` / `feishu.parent_node_token`
+
+App credentials are loaded from:
+- `FEISHU_APP_ID` / `FEISHU_APP_SECRET` env, or
+- OpenClaw `openclaw.json` -> `channels.feishu`
+
+If publish fails, keep analysis result and return `feishu_publish.success=false` with error details.

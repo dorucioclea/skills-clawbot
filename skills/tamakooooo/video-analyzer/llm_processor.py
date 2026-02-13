@@ -5,6 +5,7 @@ LLM Processor - Text analysis using OpenAI/Anthropic APIs
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
+import os
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -95,7 +96,11 @@ class LLMProcessor:
             print("❌ OpenAI package not installed")
             return None
 
-        api_key = config.get("api_key")
+        api_key = (
+            config.get("api_key")
+            or os.getenv("VIDEO_ANALYZER_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+        )
         base_url = config.get("base_url", "https://api.openai.com/v1")
         model = config.get("model", "gpt-4o-mini")
 
@@ -357,7 +362,11 @@ class LLMProcessor:
             print("❌ Anthropic package not installed")
             return None
 
-        api_key = config.get("api_key")
+        api_key = (
+            config.get("api_key")
+            or os.getenv("VIDEO_ANALYZER_API_KEY")
+            or os.getenv("ANTHROPIC_API_KEY")
+        )
         model = config.get("model", "claude-3-5-sonnet-20241022")
 
         if not api_key:
