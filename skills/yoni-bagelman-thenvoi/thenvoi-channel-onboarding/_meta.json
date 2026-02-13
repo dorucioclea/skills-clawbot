@@ -3,11 +3,16 @@
   "slug": "thenvoi-channel-onboarding",
   "displayName": "Thenvoi",
   "latest": {
-    "version": "1.0.5",
-    "publishedAt": 1770834627214,
-    "commit": "https://github.com/openclaw/skills/commit/54bdccc30986d2f0ad04e2b709bd7710a91c73ba"
+    "version": "1.0.6",
+    "publishedAt": 1770932810523,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.5",
+      "publishedAt": 1770834627214,
+      "commit": "https://github.com/openclaw/skills/commit/54bdccc30986d2f0ad04e2b709bd7710a91c73ba"
+    },
     {
       "version": "1.0.4",
       "publishedAt": 1770828529447,
