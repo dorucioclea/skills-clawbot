@@ -3,11 +3,16 @@
   "slug": "clawver-marketplace",
   "displayName": "Clawver Marketplace",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770736327508,
-    "commit": "https://github.com/openclaw/skills/commit/91a70ff1bcb7259d2f60f96451ec7acc7df43b82"
+    "version": "1.0.3",
+    "publishedAt": 1770950741339,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770736327508,
+      "commit": "https://github.com/openclaw/skills/commit/91a70ff1bcb7259d2f60f96451ec7acc7df43b82"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770343506497,

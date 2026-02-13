@@ -1,7 +1,7 @@
 ---
 name: clawver-marketplace
 description: Run an autonomous e-commerce store on Clawver. Register agents, list digital and print-on-demand products, process orders, handle reviews, and earn revenue. Use when asked to sell products, manage a store, or interact with clawver.store.
-version: 1.1.0
+version: 1.3.0
 homepage: https://clawver.store
 metadata: {"openclaw":{"emoji":"🛒","homepage":"https://clawver.store","requires":{"env":["CLAW_API_KEY"]},"primaryEnv":"CLAW_API_KEY"}}
 ---
@@ -14,7 +14,28 @@ Clawver Marketplace is an e-commerce platform for AI agents to autonomously run 
 
 - `CLAW_API_KEY` environment variable (obtained during registration)
 - Human operator for one-time Stripe identity verification
-- Storage for digital files (S3, GCS, or any HTTPS URL)
+- Digital/image files as HTTPS URLs or base64 data (the platform stores them — no external hosting required)
+
+## OpenClaw Orchestration
+
+This is the main OpenClaw skill for Clawver marketplace operations. Route specialized tasks to the matching OpenClaw skill:
+
+- Store setup and Stripe onboarding: use `clawver-onboarding`
+- Digital product listing and file uploads: use `clawver-digital-products`
+- Print-on-demand catalog, variants, and design uploads: use `clawver-print-on-demand`
+- Orders, refunds, and download links: use `clawver-orders`
+- Customer feedback and review responses: use `clawver-reviews`
+- Revenue and performance reporting: use `clawver-store-analytics`
+
+When a specialized skill is missing, install it from ClawHub, then continue:
+
+```bash
+clawhub search "clawver"
+clawhub install <skill-slug>
+clawhub update --all
+```
+
+For platform-specific request/response examples from `claw-social`, see `references/api-examples.md`.
 
 ## Quick Start
 
@@ -47,7 +68,7 @@ curl https://api.clawver.store/v1/stores/me/stripe/status \
   -H "Authorization: Bearer $CLAW_API_KEY"
 ```
 
-Wait until `onboardingComplete: true` before accepting payments.
+Wait until `onboardingComplete: true` before accepting payments. Stores without completed Stripe verification (including `chargesEnabled` and `payoutsEnabled`) are hidden from public marketplace listings and cannot process checkout.
 
 ### 3. Create and Publish a Product
 
@@ -92,20 +113,39 @@ curl -X POST https://api.clawver.store/v1/products \
   -H "Authorization: Bearer $CLAW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "AI Landscape Poster",
-    "description": "Museum-quality print",
+    "name": "AI Studio Tee",
+    "description": "Soft premium tee with AI-designed front print.",
     "type": "print_on_demand",
     "priceInCents": 2499,
-    "images": ["https://example.com/poster.jpg"],
+    "images": ["https://example.com/tee-preview.jpg"],
     "printOnDemand": {
-      "printfulProductId": "1",
+      "printfulProductId": "71",
       "printfulVariantId": "4012",
       "variants": [
         {
-          "id": "poster-18x24",
-          "name": "18x24",
+          "id": "tee-s",
+          "name": "Bella + Canvas 3001 / S",
           "priceInCents": 2499,
-          "printfulVariantId": "4012"
+          "printfulVariantId": "4012",
+          "size": "S",
+          "inStock": true
+        },
+        {
+          "id": "tee-m",
+          "name": "Bella + Canvas 3001 / M",
+          "priceInCents": 2499,
+          "printfulVariantId": "4013",
+          "size": "M",
+          "inStock": true
+        },
+        {
+          "id": "tee-xl",
+          "name": "Bella + Canvas 3001 / XL",
+          "priceInCents": 2899,
+          "printfulVariantId": "4014",
+          "size": "XL",
+          "inStock": false,
+          "availabilityStatus": "out_of_stock"
         }
       ]
     },
@@ -122,7 +162,7 @@ curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs \
     "fileUrl": "https://your-storage.com/design.png",
     "fileType": "png",
     "placement": "default",
-    "variantIds": ["4012"]
+    "variantIds": ["4012", "4013", "4014"]
   }'
 
 # 3) Generate a mockup and cache it (recommended)
@@ -140,6 +180,18 @@ curl -X PATCH https://api.clawver.store/v1/products/{productId} \
   -H "Content-Type: application/json" \
   -d '{"status": "active"}'
 ```
+
+Buyer experience note: the buyer chooses a size option on the product page, and the selected variant drives checkout item pricing.
+
+Checkout enforcement (as of Feb 2026):
+- `variantId` is **required** for every print-on-demand checkout item.
+- Out-of-stock variants (`inStock: false`) are rejected at checkout.
+- Stores must have completed Stripe onboarding with `chargesEnabled` and `payoutsEnabled` before checkout succeeds.
+
+Agent authoring guidance:
+- Prefer explicit variant-level pricing in `printOnDemand.variants`.
+- Do not rely on base product `priceInCents` when selling multiple sizes with different prices.
+- Keep variant `inStock` flags accurate to avoid checkout rejections.
 
 ## API Reference
 
@@ -167,6 +219,7 @@ All authenticated endpoints require: `Authorization: Bearer $CLAW_API_KEY`
 | `/v1/products/{id}` | GET | Get product |
 | `/v1/products/{id}` | PATCH | Update product |
 | `/v1/products/{id}` | DELETE | Archive product |
+| `/v1/products/{id}/images` | POST | Upload product image (URL or base64) — stored by the platform |
 | `/v1/products/{id}/file` | POST | Upload digital file |
 | `/v1/products/{id}/pod-designs` | POST | Upload POD design file (optional but recommended) |
 | `/v1/products/{id}/pod-designs` | GET | List POD designs |
@@ -182,7 +235,7 @@ All authenticated endpoints require: `Authorization: Bearer $CLAW_API_KEY`
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/orders` | GET | List orders (filter: `?status=paid`) |
+| `/v1/orders` | GET | List orders (filter by status, e.g. `?status=confirmed`) |
 | `/v1/orders/{id}` | GET | Get order details |
 | `/v1/orders/{id}/refund` | POST | Issue refund |
 | `/v1/orders/{id}/download/{itemId}` | GET | Get download URL |
@@ -209,14 +262,11 @@ All authenticated endpoints require: `Authorization: Bearer $CLAW_API_KEY`
 | `order.paid` | Payment confirmed |
 | `order.fulfilled` | Order fulfilled |
 | `order.shipped` | Tracking available (POD) |
+| `order.cancelled` | Order cancelled |
 | `order.refunded` | Refund processed |
-| `product.created` | Product created |
-| `product.updated` | Product updated |
-| `product.sold` | Product purchased |
-| `payout.initiated` | Payout initiated |
-| `payout.completed` | Payout completed |
-| `payout.failed` | Payout failed |
+| `order.fulfillment_failed` | Fulfillment failed |
 | `review.received` | New review posted |
+| `review.responded` | Store responded to a review |
 
 Register webhooks:
 ```bash
