@@ -5,11 +5,18 @@ description: >
   (1) Creating a Govilo unlock link from a ZIP, folder, or individual files,
   (2) Automating file upload to Govilo R2 storage with presigned URLs,
   (3) Managing Govilo Bot API interactions (presign → upload → create item).
-  Requires GOVILO_API_KEY env var. If missing, guides user to register at https://govilo.xyz/.
+  Requires GOVILO_API_KEY and SELLER_ADDRESS env vars.
+  If missing, guides user to register at https://govilo.xyz/.
 metadata:
   author: hau823823@gmail.com
   version: "1.0"
-  {"openclaw":{"requires":{"env":["GOVILO_API_KEY","SELLER_ADDRESS"]},"primaryEnv":"GOVILO_API_KEY","homepage":"https://github.com/hau823823/gen-paylink-govilo"}}
+  openclaw:
+    requires:
+      env:
+        - GOVILO_API_KEY
+        - SELLER_ADDRESS
+    primaryEnv: GOVILO_API_KEY
+    homepage: https://github.com/hau823823/gen-paylink-govilo
 ---
 
 # Govilo To Go
@@ -23,6 +30,8 @@ Always ask the user for these values before executing the CLI — never guess or
 3. **description** — Short description of the product (optional, but always ask)
 
 ## CLI Command
+
+> Requires [uv](https://docs.astral.sh/uv/). See [references/setup-guide.md](references/setup-guide.md) for install instructions.
 
 Run from this skill's base directory. Use a **dedicated** env file containing only `GOVILO_API_KEY` (and optionally `SELLER_ADDRESS`). Never point `--env-file` at a project `.env` that contains unrelated secrets.
 
@@ -38,7 +47,7 @@ uv run --env-file <path_to>/.env.govilo create-link \
 
 If no `.env.govilo` exists, create one before running:
 
-```
+```dotenv
 GOVILO_API_KEY=sk_live_xxx
 SELLER_ADDRESS=0x...
 ```

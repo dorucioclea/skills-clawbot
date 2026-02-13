@@ -1,5 +1,24 @@
 # Setup Guide
 
+## Prerequisites
+
+This skill requires [uv](https://docs.astral.sh/uv/) — a fast Python package manager and runner.
+
+### Install uv
+
+    # macOS / Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Windows
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+    # Or via Homebrew
+    brew install uv
+
+`uv run` automatically resolves Python >=3.11 and the `requests` dependency from `pyproject.toml` — no manual `pip install` needed.
+
+## Required Values
+
 Two values are required before using this tool:
 - `GOVILO_API_KEY` — Bot API authentication token
 - `SELLER_ADDRESS` — Your wallet address on Base chain
@@ -16,16 +35,18 @@ Two values are required before using this tool:
 
 ### Configure
 
-Add to project root `.env`:
+Create a **dedicated** env file (e.g. `.env.govilo`) containing only Govilo credentials:
 
+    # .env.govilo
     GOVILO_API_KEY=sk_live_xxx
 
-The CLI loads `.env` via `--env-file ../../.env` (relative to `skills/govilo-to-go/`).
+> **Important:** Do not use a shared project `.env` that may contain unrelated secrets.
+> Always use a dedicated file like `.env.govilo` to avoid accidental leakage.
 
 ### Verify
 
-    cd skills/govilo-to-go
-    uv run --env-file ../../.env create-link --help
+    cd skills/gen-paylink-govilo
+    uv run --env-file .env.govilo create-link --help
 
 If the key is missing or invalid, the tool outputs:
 
@@ -59,7 +80,7 @@ If the key is missing or invalid, the tool outputs:
 
 **Option A — Environment variable** (recommended for repeated use):
 
-Add to project root `.env`:
+Add to your `.env.govilo` file:
 
     SELLER_ADDRESS=0xYourWalletAddress
 
