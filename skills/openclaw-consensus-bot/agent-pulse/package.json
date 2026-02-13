@@ -1,6 +1,6 @@
 {
   "name": "@clawhub/agent-pulse",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "On-chain liveness signaling for autonomous agents on Base via the Agent Pulse protocol",
   "author": "consensus-hq",
   "license": "MIT",
@@ -34,7 +34,9 @@
         "PULSE_AMOUNT",
         "TTL_THRESHOLD",
         "PULSE_REGISTRY_ADDRESS",
-        "PULSE_TOKEN_ADDRESS"
+        "PULSE_TOKEN_ADDRESS",
+        "X402_PAYMENT_HEADER",
+        "X402_HEADER_NAME"
       ]
     },
     "security": {

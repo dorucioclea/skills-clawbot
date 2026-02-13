@@ -7,6 +7,21 @@ description: >
   agents, (4) view the global pulse feed, (5) auto-configure wallet and PULSE balance,
   (6) run scheduled heartbeat pulses, or (7) read protocol health and config.
   Supports both API and direct on-chain (cast) modes.
+requiredEnv:
+  - PRIVATE_KEY
+optionalEnv:
+  - BASE_RPC_URL
+  - API_BASE
+  - PULSE_AMOUNT
+  - TTL_THRESHOLD
+  - PULSE_REGISTRY_ADDRESS
+  - PULSE_TOKEN_ADDRESS
+  - X402_PAYMENT_HEADER
+  - X402_HEADER_NAME
+requiredBins:
+  - cast
+  - curl
+  - jq
 ---
 
 # Agent Pulse 💓
@@ -192,6 +207,8 @@ These commands work without `PRIVATE_KEY` — no wallet or signing required:
 | `TTL_THRESHOLD` | Auto-pulse skip threshold | `21600` (6 hours) |
 | `PULSE_REGISTRY_ADDRESS` | Override registry | `0xe61C...` |
 | `PULSE_TOKEN_ADDRESS` | Override token | `0x2111...` |
+| `X402_PAYMENT_HEADER` | x402 payment proof for API pulse | *(none — use direct on-chain mode without it)* |
+| `X402_HEADER_NAME` | Custom x402 header name | `X-402-Payment` |
 
 ### Approval Behavior
 
