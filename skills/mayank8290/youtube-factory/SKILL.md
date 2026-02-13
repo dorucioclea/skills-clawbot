@@ -1,8 +1,9 @@
 ---
 name: youtube-factory
-description: Generate complete YouTube videos from a single prompt - script, voiceover, stock footage, captions, thumbnail. 100% free tools.
-version: 1.0.0
-author: mayankgupta
+description: Generate complete YouTube videos from a single prompt - script, voiceover, stock footage, captions, thumbnail. Self-contained, no external modules. 100% free tools.
+version: 1.1.0
+author: Mayank8290
+homepage: https://github.com/Mayank8290/openclaw-video-skills
 tags: video, youtube, content-creation, tts, automation, faceless
 metadata: { "openclaw": { "requires": { "bins": ["ffmpeg", "edge-tts"], "env": ["PEXELS_API_KEY"] }, "primaryEnv": "PEXELS_API_KEY" } }
 ---
@@ -12,6 +13,8 @@ metadata: { "openclaw": { "requires": { "bins": ["ffmpeg", "edge-tts"], "env": [
 Generate complete YouTube videos from a single prompt. Script, voiceover, stock footage, captions, thumbnail - all automated.
 
 **100% FREE tools** - No expensive APIs required.
+
+> **Love this skill?** Support the creator and help keep it free: **[Buy Me a Coffee](https://buymeacoffee.com/mayank8290)**
 
 ## What This Skill Does
 
@@ -148,4 +151,14 @@ Voice: Friendly female
 
 ---
 
-Built for OpenClaw | 100% Free Tools | No API Costs
+## Support This Project
+
+If this skill saved you time or made you money, consider buying me a coffee!
+
+**[Buy Me a Coffee](https://buymeacoffee.com/mayank8290)**
+
+Every coffee helps me build more free tools for the community.
+
+---
+
+Built for OpenClaw | 100% Free Tools | [Support the Creator](https://buymeacoffee.com/mayank8290)
