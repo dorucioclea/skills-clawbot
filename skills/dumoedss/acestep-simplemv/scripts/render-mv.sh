@@ -27,6 +27,9 @@ set -euo pipefail
 
 RENDER_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Ensure output directory exists
+mkdir -p "${RENDER_DIR}/out"
+
 # Cross-platform realpath alternative (works on macOS/Linux/Windows MSYS2)
 resolve_path() {
   local dir base
