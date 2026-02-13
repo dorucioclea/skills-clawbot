@@ -1,0 +1,11 @@
+{
+  "owner": "paulgnz",
+  "slug": "xpr-agent-operator",
+  "displayName": "XPR Agent Operator",
+  "latest": {
+    "version": "0.2.11",
+    "publishedAt": 1771017966630,
+    "commit": null
+  },
+  "history": []
+}
