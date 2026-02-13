@@ -1,11 +1,17 @@
 {
   "owner": "swancho",
   "slug": "clawaifu-selfie",
-  "displayName": "Clawaifu - Open Claw Waifu",
+  "displayName": "clawaifu - OpenClaw Waifu",
   "latest": {
-    "version": "1.0.8",
-    "publishedAt": 1770802068176,
-    "commit": "https://github.com/openclaw/skills/commit/eeff0185b66297cfbf0fe194d806d6078788ed90"
+    "version": "1.0.14",
+    "publishedAt": 1770913624631,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.8",
+      "publishedAt": 1770802068176,
+      "commit": "https://github.com/openclaw/skills/commit/eeff0185b66297cfbf0fe194d806d6078788ed90"
+    }
+  ]
 }
