@@ -1,17 +1,21 @@
 # AI Features for KSeF
 
-**GENERAL NOTE:** All AI/ML features are supportive in nature and require supervision by accounting personnel. Performance indicators are project goals and may vary. AI systems do not make binding tax decisions.
+**GENERAL NOTE:** All code in this document is **conceptual reference architecture** — implementation patterns for the user to adapt in their own system. This skill does NOT run ML models, does NOT perform inference and does NOT require Python, sklearn, pandas or any other runtime dependencies. The agent uses these patterns solely as a knowledge base for explaining algorithms, designing pipelines and helping write code.
+
+**Dependencies required for implementation (NOT dependencies of this skill):** sklearn, pandas, numpy — to be installed by the user in their environment.
+
+All AI/ML features are supportive in nature and require supervision by accounting staff. Performance metrics are design goals and may vary. AI systems do not make binding tax decisions.
 
 ---
 
-## Cost Classification
+## Expense Classification
 
-### Algorithm (high-level)
+### Algorithm (High-Level)
 
 ```python
 def classify_expense(invoice_data):
     """
-    Cost classification based on multiple data sources
+    Expense classification based on multiple data sources
     """
     features = {
         'seller_name': invoice_data.seller_name,
@@ -31,7 +35,7 @@ def classify_expense(invoice_data):
     if keyword_match and keyword_match.confidence > 0.85:
         return keyword_match.category, keyword_match.confidence
 
-    # 3. ML Model (Random Forest / Neural Network)
+    # 3. ML model (Random Forest / Neural Network)
     ml_prediction = ml_model.predict(features)
 
     # 4. Flag for review if low confidence
@@ -41,7 +45,7 @@ def classify_expense(invoice_data):
     return ml_prediction.category, ml_prediction.confidence
 ```
 
-### Cost Categories (Examples)
+### Expense Categories (Examples)
 
 ```python
 COST_CATEGORIES = {
@@ -55,14 +59,14 @@ COST_CATEGORIES = {
     406: "Accounting services",
     407: "Consulting services",
 
-    # Materials and supplies
-    500: "Materials and supplies (general)",
+    # Materials and raw materials
+    500: "Materials and raw materials (general)",
     501: "Energy, water, fuel",
     502: "Office supplies",
     503: "Spare parts",
 
     # Other
-    600: "Salaries and related",
+    600: "Salaries and related costs",
     700: "Depreciation",
 }
 ```
@@ -179,11 +183,11 @@ class FraudDetector:
         return {'anomaly': False}
 
     def _analyze_reasons(self, invoice):
-        """Anomaly reason analysis"""
+        """Analyze anomaly reasons"""
         reasons = []
 
         if invoice.total_gross > invoice.seller_avg_amount * 3:
-            reasons.append("Amount 3x larger than average from this seller")
+            reasons.append("Amount 3x greater than average from this seller")
 
         if invoice.is_weekend and invoice.hour_of_day < 6:
             reasons.append("Issued at night on weekend (unusual)")
@@ -255,12 +259,12 @@ def detect_vat_carousel(invoices, time_window_days=30):
     # Build transaction graph
     graph = build_transaction_graph(invoices)
 
-    # Search for cycles (A → B → C → A)
+    # Look for cycles (A -> B -> C -> A)
     cycles = find_cycles(graph)
 
     suspicious = []
     for cycle in cycles:
-        # Check suspicious features
+        # Check suspicious characteristics
         if is_suspicious_cycle(cycle):
             suspicious.append({
                 'cycle': cycle,
@@ -274,17 +278,17 @@ def detect_vat_carousel(invoices, time_window_days=30):
     return suspicious
 
 def is_suspicious_cycle(cycle):
-    """Is cycle suspicious?"""
-    # 1. Cycle closes in <30 days
+    """Is the cycle suspicious?"""
+    # 1. Cycle closes within <30 days
     if get_cycle_duration(cycle) > 30:
         return False
 
-    # 2. Similar amounts (±10%)
+    # 2. Similar amounts (+/-10%)
     amounts = [edge.amount for edge in cycle]
     if max(amounts) / min(amounts) > 1.1:
         return False
 
-    # 3. Same goods/service
+    # 3. Same goods/services
     items = [edge.item_description for edge in cycle]
     if not all_similar(items):
         return False
@@ -308,7 +312,7 @@ class CashFlowPredictor:
 
     def prepare_training_data(self, historical_data):
         """
-        Prepare training data
+        Training data preparation
         DataFrame with columns:
         - invoice_due_date, invoice_amount, contractor_nip
         - payment_term_days, actual_payment_date, days_late
@@ -360,7 +364,7 @@ class CashFlowPredictor:
         predicted_income = 0
         for invoice in sales_invoices:
             prediction = self.predict_payment_date(invoice)
-            # Only if predicted payment in this month
+            # Only if predicted payment is in this month
             if prediction['predicted_payment_date'].month == month:
                 predicted_income += invoice.total_gross
 
@@ -382,7 +386,7 @@ class CashFlowPredictor:
 ```python
 def get_contractor_stats(nip):
     """
-    Calculate payment statistics for contractor
+    Calculate payment statistics for a contractor
     """
     invoices = get_all_invoices_for_contractor(nip)
 
@@ -429,7 +433,7 @@ def retrain_models_monthly():
 
     historical_data = get_invoices(start_date, end_date)
 
-    # Retrain cost classifier
+    # Retrain expense classifier
     expense_classifier.train(historical_data)
 
     # Retrain anomaly detector
@@ -446,12 +450,12 @@ def retrain_models_monthly():
 ```python
 def classify_with_review(invoice):
     """
-    Classification with review flagging
+    Classification with flagging for review
     """
     prediction = expense_classifier.predict(invoice)
 
     if prediction['confidence'] < 0.8:
-        # Low confidence → human review
+        # Low confidence -> human review
         task = create_review_task(
             invoice=invoice,
             suggested_category=prediction['category'],
@@ -464,7 +468,7 @@ def classify_with_review(invoice):
             'task_id': task.id
         }
 
-    # High confidence → auto-classify
+    # High confidence -> auto-classify
     return {
         'category': prediction['category'],
         'status': 'AUTO_CLASSIFIED',
@@ -493,4 +497,6 @@ def log_ai_decision(invoice, prediction, action):
 
 ---
 
-**Final warning:** All AI features require regular monitoring, validation, and supervision by qualified personnel. Do not rely solely on automated decisions in tax and accounting matters.
+**Final warning:** All AI features require regular monitoring, validation and supervision by qualified staff. Do not rely solely on automated decisions in tax and accounting matters.
+
+**Reminder:** The code examples above are reference architecture. This skill does not contain trained models, ML artifacts or executable files. Implementation requires installing dependencies (sklearn, pandas, numpy) and training models on user data in their own environment.

@@ -1,10 +1,10 @@
-# Troubleshooting KSeF
+# KSeF Troubleshooting
 
-Guide to resolving the most common KSeF system issues.
+Guide for resolving the most common problems with the KSeF system.
 
 ---
 
-## Authentication Issues
+## Authentication Problems
 
 ### Error 401: Unauthorized
 
@@ -12,14 +12,14 @@ Guide to resolving the most common KSeF system issues.
 ```json
 {
   "processingCode": 401,
-  "processingDescription": "No authorization"
+  "processingDescription": "Unauthorized"
 }
 ```
 
 **Causes:**
 - Session expired (token valid only ~30 min)
 - Invalid token
-- Token lacks required permissions
+- Token does not have required permissions
 
 **Solution:**
 ```python
@@ -44,24 +44,24 @@ def handle_401_error():
 ```json
 {
   "processingCode": 403,
-  "processingDescription": "No permissions"
+  "processingDescription": "Forbidden"
 }
 ```
 
 **Causes:**
-- Token lacks permissions for this operation
-- NIP in token doesn't match NIP in invoice
+- Token does not have permissions for this operation
+- NIP in token does not match NIP in invoice
 
 **Solution:**
 1. Check token permissions in KSeF portal
-2. Ensure token is for correct NIP
-3. Check if token has scope for given operation (read/write)
+2. Make sure the token is for the correct NIP
+3. Check if the token has scope for the given operation (read/write)
 
 ---
 
-## Invoice Validation Issues
+## Invoice Validation Problems
 
-### Error 100: Invalid XML format
+### Error 100: Invalid XML Format
 
 **Symptoms:**
 ```json
@@ -89,7 +89,7 @@ xml_content = xml_content.lstrip('\ufeff')
 
 ---
 
-### Error 101: Schema validation error
+### Error 101: Schema Validation Error
 
 **Symptoms:**
 ```json
@@ -121,9 +121,9 @@ for field, expected in checks.items():
 ```
 
 **Common errors:**
-- `kodSystemowy="FA(2)"` → Change to `FA(3)`
-- `wersjaSchemy="1-0"` → Change to `1-0E`
-- Old namespace from 2021 → Use namespace from 2023
+- `kodSystemowy="FA(2)"` -> Change to `FA(3)`
+- `wersjaSchemy="1-0"` -> Change to `1-0E`
+- Old namespace from 2021 -> Use 2023 namespace
 
 ---
 
@@ -158,7 +158,7 @@ def validate_nip(nip):
 
     return check_digit == int(nip[9])
 
-# 4. Check VAT white list
+# 4. Check in VAT White List
 response = requests.get(f"https://wl-api.mf.gov.pl/api/search/nip/{nip}")
 if response.status_code != 200:
     print("NIP does not exist in MF database")
@@ -166,7 +166,7 @@ if response.status_code != 200:
 
 ---
 
-### Error 103: Future date
+### Error 103: Future Date
 
 **Symptoms:**
 ```json
@@ -180,13 +180,13 @@ if response.status_code != 200:
 ```python
 from datetime import datetime, timedelta
 
-# DataWytworzeniaFa cannot be in future
+# DataWytworzeniaFa cannot be in the future
 now = datetime.now()
 data_wytworzenia = now.strftime('%Y-%m-%dT%H:%M:%S')
 
 # ERROR: Tomorrow's date
 tomorrow = now + timedelta(days=1)
-data_wytworzenia = tomorrow.strftime(...)  # ❌
+data_wytworzenia = tomorrow.strftime(...)  # wrong
 
 # Note on time zones
 # KSeF uses Polish time (UTC+1/UTC+2)
@@ -194,7 +194,7 @@ data_wytworzenia = tomorrow.strftime(...)  # ❌
 
 ---
 
-### Error 104: Duplicate invoice number
+### Error 104: Duplicate Invoice Number
 
 **Symptoms:**
 ```json
@@ -221,14 +221,14 @@ def generate_unique_invoice_number():
 # Check if number already exists in KSeF
 existing = ksef_client.check_invoice_number(invoice_number)
 if existing:
-    print("Number already used - generate new")
+    print("Number already used - generate a new one")
 ```
 
 ---
 
-## Performance Issues
+## Performance Problems
 
-### Timeout API / No Response
+### API Timeout / No Response
 
 **Symptoms:**
 - Request timeout (>30s)
@@ -256,7 +256,7 @@ def diagnose_timeout():
     # 3. Check load (peak hours)
     hour = datetime.now().hour
     if hour in [15, 16, 17]:  # 15:00-18:00
-        print("Peak hours - high KSeF load")
+        print("Peak hours - heavy KSeF load")
         return "HIGH_LOAD"
 
     return "UNKNOWN"
@@ -304,14 +304,14 @@ import time
 from functools import wraps
 
 def rate_limit(max_per_hour=100):
-    """Decorator limiting number of requests"""
+    """Decorator limiting the number of requests"""
     calls = []
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             now = time.time()
-            # Remove old calls (from hour ago)
+            # Remove old calls (from over an hour ago)
             calls[:] = [c for c in calls if c > now - 3600]
 
             if len(calls) >= max_per_hour:
@@ -331,36 +331,36 @@ def send_invoice(invoice):
 
 ---
 
-## Payment Issues
+## Payment Problems
 
 ### Cannot Match Payment
 
 **Causes:**
-- Mismatched amount (error in transfer amount)
+- Amount mismatch (error in transfer amount)
 - Missing invoice number in title
 - Split payment (MPP) - partial payment
-- Bulk payment (multiple invoices at once)
+- Batch payment (multiple invoices at once)
 
 **Solution:**
 ```python
 def handle_unmatched_payment(payment):
-    # 1. Extended search (tolerance ±2%)
+    # 1. Extended search (tolerance +/-2%)
     matches = search_invoices_extended(
         amount_min=payment.amount * 0.98,
         amount_max=payment.amount * 1.02,
-        date_range_days=14  # ±14 days instead of ±7
+        date_range_days=14  # +/-14 days instead of +/-7
     )
 
     if matches:
         return present_to_user_for_confirmation(matches)
 
-    # 2. Check if split payment (VAT portion)
+    # 2. Check if it's a split payment (VAT portion)
     if is_likely_vat_payment(payment):
         net_payment = find_net_payment(payment)
         if net_payment:
             return match_mpp(net_payment, payment)
 
-    # 3. Check bulk payment
+    # 3. Check batch payment
     invoice_numbers = extract_invoice_numbers_from_title(payment.title)
     if len(invoice_numbers) > 1:
         return split_payment_to_invoices(payment, invoice_numbers)
@@ -371,28 +371,28 @@ def handle_unmatched_payment(payment):
 
 ---
 
-## Environment Issues
+## Environment Problems
 
 ### Test Invoices on Production
 
-**Problem:** Sent test invoices to production environment
+**Problem:** Test invoices were sent to the production environment
 
-**⚠️ NOTE:** Production invoices are legally binding!
+**WARNING:** Invoices on production are legally binding!
 
 **What to do:**
 1. DO NOT delete invoices (impossible in KSeF)
 2. Issue corrective invoices to zero
-3. Contact contractor
-4. Report to accounting
+3. Contact the counterparty
+4. Report to the accounting department
 
 **Prevention:**
 ```python
-# Always check environment
+# Always check the environment
 class KSefClient:
     def __init__(self, environment='demo'):
         if environment == 'production':
-            # Require confirmation
-            confirm = input("⚠️  PRODUCTION! Continue? (yes/no): ")
+            # Force confirmation
+            confirm = input("WARNING: PRODUCTION! Continue? (yes/no): ")
             if confirm != 'yes':
                 raise Exception("Cancelled - use DEMO for testing")
 
@@ -411,7 +411,7 @@ class KSefClient:
 ```python
 def setup_monitoring():
     monitors = [
-        # 1. Alert on high error rate
+        # 1. Alert on high rejection rate
         {
             'name': 'High rejection rate',
             'condition': lambda: get_rejection_rate_last_hour() > 0.2,
@@ -425,7 +425,7 @@ def setup_monitoring():
             'action': send_sms_alert
         },
 
-        # 3. Alert on payment issues
+        # 3. Alert on payment matching problems
         {
             'name': 'Too many unmatched payments',
             'condition': lambda: count_unmatched_payments() > 10,
@@ -444,7 +444,7 @@ def setup_monitoring():
 ### KSeF Latarnia (System Status)
 
 ```bash
-# Check KSeF status in real-time
+# Check KSeF status in real time
 git clone https://github.com/CIRFMF/ksef-latarnia
 cd ksef-latarnia
 python check_status.py
@@ -456,7 +456,7 @@ python check_status.py
 from lxml import etree
 
 def validate_fa3_xsd(xml_content):
-    """Validate against XSD schema"""
+    """Validation against XSD schema"""
     xsd_url = "https://ksef.podatki.gov.pl/xsd/FA3_1-0E.xsd"
 
     # Download schema

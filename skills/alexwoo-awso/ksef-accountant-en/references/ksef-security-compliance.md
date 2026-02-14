@@ -1,14 +1,51 @@
 # Security & Compliance for KSeF
 
-Security requirements, compliance, and best practices.
+Security requirements, compliance and best practices.
 
-**⚠️ SECURITY WARNING:**
-All code examples in this document are **educational and conceptual**. Before production use:
-1. Conduct security review
+**SECURITY WARNING:**
+All code examples in this document are **educational and conceptual** — architectural patterns for the user to implement in their own system. This skill does NOT implement these mechanisms, does NOT store tokens, does NOT connect to Vault and does NOT manage encryption keys.
+
+**Environment variables** mentioned in this document (e.g., `KSEF_TOKEN`, `KSEF_ENCRYPTION_KEY`) are declared in the skill metadata as optional. The skill does not implicitly request them — if the user provides them, the agent can use them in suggested code. All variables are described in the `env` section of the SKILL.md file.
+
+**NEVER paste tokens, encryption keys, certificates or other credentials directly in the conversation with the agent.** Use only:
+- Platform environment variables (env vars)
+- Secrets manager (e.g., HashiCorp Vault, AWS Secrets Manager)
+- Ephemeral session variables (ephemeral env vars)
+
+Before using patterns in a production environment:
+1. Conduct a security review
 2. Use dedicated, tested tools instead of custom implementations
 3. Never run unverified code from external sources
 4. Implement principle of least privilege
 5. Regularly update dependencies and conduct security audits
+6. Test exclusively on the DEMO environment (`https://ksef-demo.mf.gov.pl`) — never on production
+
+---
+
+## Platform vs. Skill Guarantees — Pre-installation Verification
+
+This skill declares security flags in **two sources**:
+- **SKILL.md frontmatter** — contains `disableModelInvocation: true` (camelCase) and `disable-model-invocation: true` (kebab-case), as well as env var declarations with `secret: true` for variables containing credentials.
+- **Manifest [`skill.json`](../skill.json)** — a dedicated machine-readable file with full security metadata, env var declarations (with `secret` and `scope` fields) and constraints. It is the source of truth for registries and scanners that may not parse YAML frontmatter.
+
+However, **both of these sources are skill declarations, not platform guarantees**. Enforcement of these flags depends solely on the hosting platform.
+
+**Known issue:** Registry metadata displayed by the platform may not reflect values from the frontmatter or `skill.json`. If the platform shows `disable-model-invocation: not set` (or omits this flag), or does not display environment variables as registered — the protection **is not active**, regardless of what the skill files declare.
+
+**Mandatory pre-installation verification:**
+
+1. **Compare registry metadata with frontmatter and `skill.json`** — after adding the skill to the platform, open the registry metadata view. Verify that:
+   - `disable-model-invocation` = `true`
+   - Environment variables `KSEF_TOKEN` and `KSEF_ENCRYPTION_KEY` are visible as registered secrets
+   - Other platform-level security flags (if any) are correctly set
+   - If ANY field does not match frontmatter/`skill.json` — treat the skill as higher risk
+2. **Confirm environment variable isolation** — variables (`KSEF_TOKEN`, `KSEF_ENCRYPTION_KEY`, `KSEF_BASE_URL`) must not be logged, displayed in conversation or accessible to other skills
+3. **If the platform does NOT enforce the `disableModelInvocation` flag:**
+   - DO NOT configure any environment variables with credentials
+   - DO NOT provide tokens, certificates or encryption keys
+   - DO NOT allow autonomous use of the skill
+   - Use only in manual mode (explicit user action) and only with the DEMO environment (`https://ksef-demo.mf.gov.pl`)
+4. **Report discrepancy** — if registry metadata does not match frontmatter/`skill.json`, report it to the platform provider as a security issue requiring a fix. Provide the `skill.json` filename as an alternative metadata source if the platform does not parse YAML frontmatter
 
 ---
 
@@ -22,7 +59,7 @@ from datetime import datetime
 
 def verify_contractor_white_list(nip, bank_account, date=None):
     """
-    Checks contractor on VAT white list
+    Checks the contractor on the VAT White List
     API: https://wl-api.mf.gov.pl/
     """
     if date is None:
@@ -47,7 +84,7 @@ def verify_contractor_white_list(nip, bank_account, date=None):
     if subject['statusVat'] != 'Czynny':
         return {
             'valid': False,
-            'reason': f"Contractor VAT: {subject['statusVat']}",
+            'reason': f"Contractor VAT status: {subject['statusVat']}",
             'risk': 'HIGH',
             'details': subject
         }
@@ -67,24 +104,24 @@ def verify_contractor_white_list(nip, bank_account, date=None):
                 'verified_account': acc
             }
 
-    # Account not on list
+    # Account not on the list
     return {
         'valid': False,
-        'reason': 'Bank account not on white list',
+        'reason': 'Bank account is not on the White List',
         'risk': 'HIGH',
         'valid_accounts': accounts,
         'details': subject
     }
 ```
 
-### Payment Integration
+### Integration with Payments
 
 ```python
 def before_payment_check(invoice, payment):
     """
-    Verification before executing transfer
+    Verification before executing a transfer
     """
-    # 1. Check white list
+    # 1. Check White List
     verification = verify_contractor_white_list(
         nip=invoice.seller_nip,
         bank_account=payment.to_account,
@@ -110,12 +147,12 @@ def before_payment_check(invoice, payment):
 
         return False
 
-    # 2. Check if requires MPP
+    # 2. Check if MPP is required
     if invoice.total_gross > 15000 and invoice.has_attachment_15_goods:
         if payment.type != 'MPP':
             send_warning_alert(
                 title='Invoice requires MPP',
-                message=f"Invoice {invoice.number} requires split payment mechanism"
+                message=f"Invoice {invoice.number} requires the split payment mechanism"
             )
             return False
 
@@ -138,7 +175,7 @@ class SecureTokenStorage:
     """
     def __init__(self, encryption_key=None):
         if encryption_key is None:
-            # Load from environment variable
+            # Read from environment variable
             encryption_key = os.environ.get('KSEF_ENCRYPTION_KEY')
 
         if encryption_key is None:
@@ -174,11 +211,11 @@ class SecureTokenStorage:
             'archived_at': datetime.now()
         })
 
-        # Store new
+        # Store new one
         self.store_token(token_name, new_token_value)
 ```
 
-### Vault Integration (HashiCorp)
+### Integration with Vault (HashiCorp)
 
 ```python
 import hvac
@@ -306,48 +343,48 @@ def audit_report(start_date, end_date, user=None):
 
 ### 3-2-1 Strategy
 
-**Business Requirement:** Accounting data must be protected with redundant backups following the 3-2-1 rule:
+**Business requirements:** Accounting data must be protected with redundant backups following the 3-2-1 rule:
 - **3 copies** of data (production + 2 backups)
 - **2 different media types** (e.g., local SSD + external storage)
-- **1 off-site copy** (cloud or remote location)
+- **1 copy offsite** (cloud or remote location)
 
-**Implementation Approach:**
-1. Use your database provider's built-in backup solutions (managed backups, automated snapshots)
-2. Schedule daily automated backups during low-activity hours
-3. Store backups in multiple locations (local fast storage + remote cloud storage)
-4. Implement automated backup verification to ensure data integrity
-5. Retain backups according to legal requirements (minimum 10 years for accounting data)
+**Implementation approach:**
+1. Use built-in backup solutions from your database provider (managed backups, automated snapshots)
+2. Schedule daily automatic backups during low-activity hours
+3. Store backups in multiple locations (local fast storage + remote cloud)
+4. Implement automatic backup verification for data integrity assurance
+5. Retain backups per legal requirements (minimum 10 years for accounting data)
 6. Document and regularly test disaster recovery procedures
 
-**For Production Systems:**
-- Leverage managed database services (AWS RDS, Azure Database, Google Cloud SQL) with automated backup features
+**For production systems:**
+- Leverage managed database services (AWS RDS, Azure Database, Google Cloud SQL) with automatic backup features
 - Use enterprise backup solutions designed for accounting/financial data
-- Implement monitoring and alerts for backup failures
-- Ensure backup processes don't interfere with accounting operations
+- Implement monitoring and alerting for backup failures
+- Ensure backup processes do not disrupt accounting operations
 
 ### KSeF Synchronization for Disaster Recovery
 
-**Key Principle:** KSeF is the source of truth for all invoices. If local data is lost, it can be reconstructed from KSeF.
+**Key principle:** KSeF is the source of truth for all invoices. If local data is lost, it can be reconstructed from KSeF.
 
-**Recovery Process:**
+**Recovery process:**
 1. **Restore from backup** - Use your infrastructure provider's restore procedures
-2. **Sync with KSeF** - Query KSeF API for invoices from the last 7-30 days (depending on backup age)
-3. **Verify data integrity** - Compare local invoice records with KSeF to identify any discrepancies
+2. **Synchronize with KSeF** - Download invoices from KSeF API for the last 7-30 days (depending on backup age)
+3. **Verify data integrity** - Compare local invoice records with KSeF to identify discrepancies
 4. **Reconcile differences** - Update local database with authoritative KSeF data
-5. **Notify stakeholders** - Alert accounting team when recovery is complete and system status
+5. **Notify stakeholders** - Inform accounting team when recovery is complete and system is operational
 
 **Important:** Test disaster recovery procedures quarterly to ensure they work when needed.
 
 ---
 
-## GDPR / RODO
+## GDPR
 
 ### Personal Data in Invoices
 
 ```python
 def anonymize_invoice_for_archive(invoice, retention_years=10):
     """
-    Anonymization after retention period
+    Anonymization after retention period expires
     """
     retention_date = invoice.issue_date + timedelta(days=365 * retention_years)
 
@@ -358,7 +395,7 @@ def anonymize_invoice_for_archive(invoice, retention_years=10):
         invoice.buyer_email = None
         invoice.buyer_phone = None
 
-        # Keep NIP (fiscally required)
+        # Keep NIP (required for fiscal purposes)
         # invoice.buyer_nip - KEEP
 
         invoice.anonymized_at = datetime.now()
@@ -370,8 +407,8 @@ def anonymize_invoice_for_archive(invoice, retention_years=10):
 ```python
 def handle_gdpr_deletion_request(contractor_nip):
     """
-    ⚠️ NOTE: Invoices are subject to retention obligation (5-10 years)
-    Cannot be deleted during retention period!
+    WARNING: Invoices are subject to mandatory retention (5-10 years)
+    They cannot be deleted during the retention period!
     """
     # 1. Check if retention period has passed
     invoices = get_all_invoices_for_contractor(contractor_nip)
@@ -382,11 +419,11 @@ def handle_gdpr_deletion_request(contractor_nip):
         if datetime.now() < retention_date:
             return {
                 'status': 'REJECTED',
-                'reason': 'Invoices subject to retention obligation',
+                'reason': 'Invoices are subject to mandatory retention',
                 'retention_until': retention_date
             }
 
-    # 2. If period passed - anonymize
+    # 2. If period has passed - anonymize
     for invoice in invoices:
         anonymize_invoice_for_archive(invoice)
 
@@ -433,7 +470,7 @@ def check_permission(user, permission):
             entity_type='PERMISSION',
             entity_id=permission
         )
-        raise PermissionError(f"User {user.username} lacks permission: {permission}")
+        raise PermissionError(f"User {user.username} does not have permission: {permission}")
 
     return True
 ```
@@ -442,7 +479,7 @@ def check_permission(user, permission):
 
 ## SSL/TLS Certificates
 
-### KSeF Connections
+### Connections to KSeF
 
 ```python
 import ssl
@@ -473,16 +510,16 @@ def secure_ksef_connection():
 
 ---
 
-## Secure Coding Practices
+## Secure Development Practices
 
 ### 1. Avoid Dynamic Code Execution
 
-**❌ NEVER use:**
+**NEVER use:**
 - `eval()` or `exec()` on user input or external data
 - Shell command execution with string concatenation
-- Dynamic SQL queries built with string concatenation
+- Dynamic SQL queries built through string concatenation
 
-**✅ INSTEAD use:**
+**INSTEAD use:**
 - Parameterized database queries (prevents SQL injection)
 - Validated, type-checked input data
 - Structured API calls with proper argument handling
@@ -492,8 +529,8 @@ def secure_ksef_connection():
 
 ```python
 def validate_invoice_number(number):
-    """Validate before use in queries"""
-    # Only alphanumeric, dashes, slashes
+    """Validate before using in queries"""
+    # Only alphanumeric, hyphens, slashes
     import re
     if not re.match(r'^[A-Z0-9/-]+$', number):
         raise ValueError("Invalid invoice number")
@@ -505,9 +542,9 @@ def validate_invoice_number(number):
 ### 3. Principle of Least Privilege
 
 ```python
-# Database user with minimal permissions
+# Database user with minimum permissions
 DB_CONFIG = {
-    'user': 'ksef_readonly',  # Only SELECT for reports
+    'user': 'ksef_readonly',  # SELECT only for reports
     'user': 'ksef_app',       # SELECT + INSERT + UPDATE for app
     'user': 'ksef_admin',     # All permissions (admin only)
 }
@@ -516,7 +553,7 @@ DB_CONFIG = {
 ### 4. Use Enterprise-Grade Solutions
 
 For production accounting systems:
-- **Database:** Managed database services with automated backups and point-in-time recovery
+- **Databases:** Managed database services with automatic backups and point-in-time recovery
 - **Monitoring:** Professional monitoring platforms with alerting capabilities
 - **Security:** Enterprise identity management and access control systems
 - **Compliance:** Audit logging solutions designed for financial data
@@ -526,7 +563,7 @@ For production accounting systems:
 ## Security Checklist
 
 - [ ] KSeF tokens encrypted (Fernet/Vault)
-- [ ] VAT white list checked before each payment
+- [ ] VAT White List checked before every payment
 - [ ] Audit trail of all operations
 - [ ] 3-2-1 backup (daily)
 - [ ] HTTPS with certificate verification
@@ -538,22 +575,8 @@ For production accounting systems:
 
 ---
 
-## Secure Coding Practices Summary
-
-- No `os.system()` - use `subprocess.run()` with argument lists
-- No `eval()` or `exec()` - never execute dynamic code
-- No `shell=True` - prevents shell injection
-- Path validation to prevent traversal attacks
-- Timeout settings to prevent hanging processes
-- No hardcoded credentials - use environment variables or vaults
-- Parameterized queries only (never string concatenation for SQL)
-- Input validation on all user inputs
-- Least privilege principle for all service accounts
-
----
-
-**Compliance:** Implementation of above practices supports compliance with:
+**Compliance:** Implementing the above practices supports compliance with:
 - VAT Act
-- GDPR / RODO
+- GDPR
 - Accounting Act
 - ISO 27001 standards (optional)

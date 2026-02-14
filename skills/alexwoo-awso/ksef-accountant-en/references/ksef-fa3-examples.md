@@ -1,6 +1,6 @@
 # FA(3) XML Examples
 
-**NOTE:** All examples are for illustrative purposes only and simplified. They do not guarantee correct validation against the XSD schema. Before use in production environment, compliance with current FA(3) technical specification must be verified and validation tests conducted.
+**NOTE:** All examples are purely illustrative and simplified. They do not guarantee correct validation against the XSD schema. Before using in a production environment, verify compliance with the current FA(3) technical specification and perform validation tests.
 
 ---
 
@@ -21,12 +21,12 @@
     <Podmiot1>
         <DaneIdentyfikacyjne>
             <NIP>1234567890</NIP>
-            <Nazwa>My Company Ltd.</Nazwa>
+            <Nazwa>Moja Firma Sp. z o.o.</Nazwa>
         </DaneIdentyfikacyjne>
         <Adres>
             <KodKraju>PL</KodKraju>
-            <AdresL1>Example St. 1</AdresL1>
-            <AdresL2>00-001 Warsaw</AdresL2>
+            <AdresL1>ul. Przykladowa 1</AdresL1>
+            <AdresL2>00-001 Warszawa</AdresL2>
         </Adres>
     </Podmiot1>
 
@@ -34,11 +34,11 @@
     <Podmiot2>
         <DaneIdentyfikacyjne>
             <NIP>0987654321</NIP>
-            <Nazwa>Client Ltd.</Nazwa>
+            <Nazwa>Klient Sp. z o.o.</Nazwa>
         </DaneIdentyfikacyjne>
         <Adres>
             <KodKraju>PL</KodKraju>
-            <AdresL1>Test St. 10</AdresL1>
+            <AdresL1>ul. Testowa 10</AdresL1>
             <AdresL2>02-222 Krakow</AdresL2>
         </Adres>
     </Podmiot2>
@@ -50,11 +50,11 @@
         <P_2>FV/2026/02/0008</P_2> <!-- Invoice number -->
         <P_6>2026-02-08</P_6> <!-- Sale date -->
 
-        <!-- Invoice items -->
+        <!-- Invoice line items -->
         <FaWiersz>
             <NrWierszaFa>1</NrWierszaFa>
             <P_7>Programming service</P_7>
-            <P_8A>hrs.</P_8A>
+            <P_8A>hrs</P_8A>
             <P_8B>100</P_8B>
             <P_9A>100.00</P_9A>
             <P_11>10000.00</P_11> <!-- Net value -->
@@ -72,7 +72,7 @@
         <Platnosc>
             <Zaplacono>0</Zaplacono>
             <DataZaplaty>2026-02-22</DataZaplaty>
-            <FormaPlatnosci>6</FormaPlatnosci> <!-- Transfer -->
+            <FormaPlatnosci>6</FormaPlatnosci> <!-- Bank transfer -->
             <RachunekBankowy>12 3456 7890 1234 5678 9012 3456</RachunekBankowy>
         </Platnosc>
     </Fa>
@@ -93,8 +93,8 @@
     <!-- Item 1: VAT 23% -->
     <FaWiersz>
         <NrWierszaFa>1</NrWierszaFa>
-        <P_7>Dell XPS 15 Laptop</P_7>
-        <P_8A>pcs.</P_8A>
+        <P_7>Laptop Dell XPS 15</P_7>
+        <P_8A>pcs</P_8A>
         <P_8B>2</P_8B>
         <P_9A>5000.00</P_9A>
         <P_11>10000.00</P_11>
@@ -105,7 +105,7 @@
     <FaWiersz>
         <NrWierszaFa>2</NrWierszaFa>
         <P_7>Technical books</P_7>
-        <P_8A>pcs.</P_8A>
+        <P_8A>pcs</P_8A>
         <P_8B>10</P_8B>
         <P_9A>50.00</P_9A>
         <P_11>500.00</P_11>
@@ -116,7 +116,7 @@
     <FaWiersz>
         <NrWierszaFa>3</NrWierszaFa>
         <P_7>Consulting services (export)</P_7>
-        <P_8A>hrs.</P_8A>
+        <P_8A>hrs</P_8A>
         <P_8B>40</P_8B>
         <P_9A>200.00</P_9A>
         <P_11>8000.00</P_11>
@@ -161,8 +161,8 @@
     <!-- Data AFTER correction -->
     <FaWiersz>
         <NrWierszaFa>1</NrWierszaFa>
-        <P_7>Programming service (corrected price)</P_7>
-        <P_8A>hrs.</P_8A>
+        <P_7>Programming service (price corrected)</P_7>
+        <P_8A>hrs</P_8A>
         <P_8B>100</P_8B>
         <P_9A>50.00</P_9A> <!-- New price: 50 instead of 100 -->
         <P_11>5000.00</P_11>
@@ -178,9 +178,9 @@
 
 ---
 
-## Invoice with EMPLOYEE Contractor (Delegation)
+## Invoice with EMPLOYEE Contractor Type (Business Trip)
 
-**FA(3) Feature:** New contractor type for delegation settlements
+**New in FA(3):** New contractor type for business trip settlements
 
 ```xml
 <Podmiot2>
@@ -191,8 +191,8 @@
     </DaneIdentyfikacyjne>
     <Adres>
         <KodKraju>PL</KodKraju>
-        <AdresL1>Employee St. 5</AdresL1>
-        <AdresL2>03-333 Warsaw</AdresL2>
+        <AdresL1>ul. Pracownicza 5</AdresL1>
+        <AdresL2>03-333 Warszawa</AdresL2>
     </Adres>
 </Podmiot2>
 
@@ -219,17 +219,17 @@
     <KodFormularza kodSystemowy="FA(3)" wersjaSchemy="1-0E">FA</KodFormularza>
     <WariantFormularza>3</WariantFormularza>
     <DataWytworzeniaFa>2026-02-10T08:00:00</DataWytworzeniaFa>
-    <SystemInfo>Offline24</SystemInfo> <!-- Offline marking -->
+    <SystemInfo>Offline24</SystemInfo> <!-- Offline designation -->
 </Naglowek>
 ```
 
-**Note:** Must be sent to KSeF within 24h of regaining connectivity. Receipt date = KSeF number assignment date.
+**Note:** Must be sent to KSeF within 24h of connectivity restoration. Receipt date = date of KSeF number assignment.
 
 ---
 
 ## Invoice with Attachments
 
-**FA(3) Feature:** Ability to attach files
+**New in FA(3):** Ability to include attachments
 
 ```xml
 <Fa>
@@ -286,7 +286,7 @@
 
 ---
 
-## Validation Before Sending
+## Validation before Sending
 
 ```python
 def validate_fa3_before_send(xml_content):

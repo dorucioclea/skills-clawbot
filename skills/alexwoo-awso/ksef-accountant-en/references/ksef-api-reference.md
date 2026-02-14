@@ -65,7 +65,7 @@ Authorization: SessionToken {token}
   "referenceNumber": "20260208-SE-1234567890AB-CD",
   "timestamp": "2026-02-08T23:45:00.000Z",
   "processingCode": 200,
-  "processingDescription": "Active session"
+  "processingDescription": "Session active"
 }
 ```
 
@@ -110,7 +110,7 @@ Content-Type: application/octet-stream
   "referenceNumber": "20260208-IV-1234567890AB-CD",
   "timestamp": "2026-02-08T23:41:00.000Z",
   "processingCode": 200,
-  "processingDescription": "Invoice accepted for processing"
+  "processingDescription": "Invoice has been accepted for processing"
 }
 ```
 
@@ -160,7 +160,7 @@ Authorization: SessionToken {token}
 
 ---
 
-### 7. Retrieving UPO
+### 7. Downloading UPO
 
 **Endpoint:**
 ```http
@@ -169,11 +169,11 @@ Authorization: SessionToken {token}
 Accept: application/xml
 ```
 
-**Response (200 OK):** XML with official confirmation of receipt
+**Response (200 OK):** XML with Official Acknowledgement of Receipt
 
 ---
 
-## Retrieving Invoices
+## Downloading Invoices
 
 ### 8. Invoice Search (Synchronous)
 
@@ -210,7 +210,7 @@ Content-Type: application/json
   "invoiceHeaderList": [
     {
       "ksefReferenceNumber": "9876543210-20260205-ZYXWVU9876543210-01",
-      "invoiceNumber": "ZAKUP/123/2026",
+      "invoiceNumber": "PURCHASE/123/2026",
       "acquisitionTimestamp": "2026-02-05T10:30:00.000Z",
       "netAmount": "5000.00",
       "vatAmount": "1150.00",
@@ -237,7 +237,7 @@ Authorization: SessionToken {token}
 Content-Type: application/json
 ```
 
-**Use:** For large datasets (>100 invoices)
+**Usage:** For large datasets (>100 invoices)
 
 **Workflow:**
 1. `POST /api/online/Query/Invoice/Async/Init` - initialization
@@ -246,7 +246,7 @@ Content-Type: application/json
 
 ---
 
-### 10. Retrieving Full Invoice
+### 10. Downloading Full Invoice
 
 **Endpoint:**
 ```http
@@ -261,7 +261,7 @@ Accept: application/xml
 
 ## Offline Mode
 
-### 11. Send Offline Invoice
+### 11. Sending Offline Invoice
 
 **Endpoint:**
 ```http
@@ -270,7 +270,7 @@ Authorization: SessionToken {token}
 Content-Type: application/octet-stream
 ```
 
-**FA(3) XML with Offline24 marking:**
+**FA(3) XML with Offline24 designation:**
 ```xml
 <Faktura>
   <Naglowek>
@@ -280,7 +280,7 @@ Content-Type: application/octet-stream
 </Faktura>
 ```
 
-**Submission deadline:** 24h from regaining connectivity
+**Submission deadline:** 24h after connectivity is restored
 
 ---
 
@@ -291,12 +291,12 @@ Content-Type: application/octet-stream
 | Code | Description | Solution |
 |------|-------------|----------|
 | 100 | Invalid XML format | Check UTF-8 encoding |
-| 101 | Schema validation error | Ensure FA(3) is used |
-| 102 | Invalid NIP | Check VAT white list |
+| 101 | Schema validation error | Make sure you are using FA(3) |
+| 102 | Invalid NIP | Check in VAT White List |
 | 103 | Future date | Correct DataWytworzeniaFa |
 | 104 | Duplicate invoice number | Check uniqueness |
-| 401 | No authorization | Session expired, refresh token |
-| 403 | No permissions | Check token permissions |
+| 401 | Unauthorized | Session expired, refresh token |
+| 403 | Forbidden | Check token permissions |
 | 500 | Server error | Retry with exponential backoff |
 | 503 | Service unavailable | Check KSeF status (Latarnia) |
 
@@ -304,7 +304,7 @@ Content-Type: application/octet-stream
 
 ## Rate Limiting
 
-**NOTE:** Details may vary. Check current documentation.
+**NOTE:** Details may vary. Check the current documentation.
 
 **Typical limits (estimated):**
 - Sessions: ~100 sessions/hour per token
@@ -312,19 +312,19 @@ Content-Type: application/octet-stream
 - Queries: ~100 queries/hour per session
 
 **Best practices:**
-- Use single session for multiple invoices
-- Implement exponential backoff at 429/503
-- Cache query results (don't query every second)
+- Use a single session for multiple invoices
+- Implement exponential backoff on 429/503
+- Cache query results (do not query every second)
 
 ---
 
 ## Environments
 
-### DEMO (testing)
+### DEMO (test)
 ```
 Base URL: https://ksef-demo.mf.gov.pl
 Purpose: Integration testing, development
-Data: Test (not production)
+Data: Test (non-production)
 ```
 
 ### PRODUCTION
@@ -334,7 +334,7 @@ Purpose: Production invoices
 Data: Legally binding
 ```
 
-**NOTE:** DO NOT test on production! Always use DEMO for development.
+**WARNING:** Do NOT test on production! Always use DEMO for development.
 
 ---
 
@@ -359,7 +359,7 @@ for i in range(10):
         break
     time.sleep(2)  # Wait 2s before next check
 
-# 4. Retrieve UPO
+# 4. Download UPO
 upo_xml = ksef_client.get_upo(session, ksef_number)
 
 # 5. Terminate session
