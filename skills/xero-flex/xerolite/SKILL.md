@@ -1,6 +1,7 @@
 ---
 name: xerolite
 description: "Integrate OpenClaw with Xerolite trading platform. Use when: querying Xerolite API, placing orders, searching contracts, or processing Xerolite webhooks."
+metadata: {"openclaw":{"requires":{"bins":["node"],"env":["XEROLITE_API_URL","XEROLITE_API_KEY"]}}}
 ---
 
 # Xerolite
