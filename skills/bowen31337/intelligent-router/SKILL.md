@@ -1,7 +1,7 @@
 ---
 name: intelligent-router
 description: Intelligent model routing for sub-agent task delegation. Choose the optimal model based on task complexity, cost, and capability requirements. Reduces costs by routing simple tasks to cheaper models while preserving quality for complex work.
-version: 2.0.0
+version: 2.2.0
 ---
 
 # Intelligent Router
@@ -29,6 +29,38 @@ version: 2.0.0
 
 ---
 
+## 🆕 What's New in v2.2
+
+**Major enhancements inspired by ClawRouter:**
+
+1. **🧮 REASONING Tier** - New dedicated tier for formal proofs, mathematical derivations, and step-by-step logic
+   - Primary: DeepSeek R1 32B ($0.20/$0.20)
+   - Fallback: QwQ 32B, DeepSeek Reasoner
+   - Confidence threshold: 0.97 (requires strong reasoning signals)
+
+2. **🔁 Automatic Fallback Chains** - Models now have 2-3 fallback options with automatic retry
+   - SIMPLE: GLM-4.7 → GLM-4.5-Air → Ollama qwen2.5:32b
+   - MEDIUM: DeepSeek V3.2 → Llama 3.3 70B → Ollama
+   - COMPLEX: Sonnet 4.5 → Gemini 3 Pro → Nemotron 253B
+   - REASONING: R1 32B → QwQ 32B → DeepSeek Reasoner
+   - Max 3 attempts per request
+
+3. **🤖 Agentic Task Detection** - Automatically detects multi-step tasks and bumps tier appropriately
+   - Keywords: "run", "test", "fix", "deploy", "edit", "build", "create", "implement"
+   - Multi-step patterns: "first...then", "step 1", numbered lists
+   - Tool presence detection
+
+4. **⚖️ Weighted Scoring (15 Dimensions)** - Replaces simple keyword matching with sophisticated scoring
+   - 15 weighted dimensions (reasoning markers, code presence, multi-step patterns, etc.)
+   - Confidence formula: `confidence = 1 / (1 + exp(-8 * (score - 0.5)))`
+   - More accurate tier classification with confidence scores
+
+**New CLI commands:**
+- `python scripts/router.py score "task"` - Show detailed scoring breakdown
+- Confidence scores now shown in all classifications
+
+---
+
 ## Overview
 
 This skill teaches AI agents how to intelligently route sub-agent tasks to different LLM models based on task complexity, cost, and capability requirements. The goal is to **reduce costs by routing simple tasks to cheaper models while preserving quality for complex work**.
@@ -44,15 +76,16 @@ Use this skill whenever you:
 
 ## Core Routing Logic
 
-### 1. Four-Tier Classification System
+### 1. Five-Tier Classification System
 
-Tasks are classified into four tiers based on complexity and risk:
+Tasks are classified into five tiers based on complexity and risk:
 
 | Tier | Description | Example Tasks | Model Characteristics |
 |------|-------------|---------------|----------------------|
 | **🟢 SIMPLE** | Routine, low-risk operations | Monitoring, status checks, API calls, summarization | Cheapest available, good for repetitive tasks |
 | **🟡 MEDIUM** | Moderate complexity work | Code fixes, research, small patches, data analysis | Balanced cost/quality, good general purpose |
 | **🟠 COMPLEX** | Multi-component development | Feature builds, debugging, architecture, multi-file changes | High-quality reasoning, excellent code generation |
+| **🧮 REASONING** | Formal logic and proofs | Mathematical proofs, theorem derivation, step-by-step verification | Specialized reasoning models with chain-of-thought |
 | **🔴 CRITICAL** | High-stakes operations | Security audits, production deploys, financial operations | Best available model, maximum reliability |
 
 ### 2. Model Selection Strategy
@@ -82,7 +115,102 @@ Configure your available models in `config.json` and assign them to tiers. The r
 - **SIMPLE tier**: Models under $0.50/M input, optimized for speed/cost
 - **MEDIUM tier**: Models $0.50-$3.00/M input, good at coding/analysis
 - **COMPLEX tier**: Models $3.00-$5.00/M input, excellent reasoning
+- **REASONING tier**: Models $0.20-$2.00/M, specialized for mathematical/logical reasoning
 - **CRITICAL tier**: Best available models, cost secondary to quality
+
+### 2a. Weighted Scoring System (15 Dimensions)
+
+The router uses a sophisticated 15-dimension weighted scoring system to classify tasks accurately:
+
+**Scoring Dimensions (weights shown):**
+1. **Reasoning Markers** (0.18) - Keywords like "prove", "theorem", "derive", "verify", "logic"
+2. **Code Presence** (0.15) - Code blocks, function definitions, file extensions
+3. **Multi-Step Patterns** (0.12) - "first...then", "step 1", numbered lists
+4. **Agentic Task** (0.10) - Action verbs: "run", "test", "fix", "deploy", "build"
+5. **Technical Terms** (0.10) - "algorithm", "architecture", "optimization", "security"
+6. **Token Count** (0.08) - Estimated complexity based on length
+7. **Creative Markers** (0.05) - "creative", "story", "compose", "brainstorm"
+8. **Question Complexity** (0.05) - Multiple questions, complex queries
+9. **Constraint Count** (0.04) - "must", "require", "only", "exactly"
+10. **Imperative Verbs** (0.03) - "analyze", "evaluate", "compare", "assess"
+11. **Output Format** (0.03) - Structured output requests (JSON, tables, markdown)
+12. **Simple Indicators** (0.02) - "check", "get", "show", "status" (inverted)
+13. **Domain Specificity** (0.02) - Acronyms, technical notation
+14. **Reference Complexity** (0.02) - Cross-references, contextual dependencies
+15. **Negation Complexity** (0.01) - Negations, exceptions, exclusions
+
+**Confidence Calculation:**
+```
+weighted_score = Σ(dimension_score × weight)
+confidence = 1 / (1 + exp(-8 × (weighted_score - 0.5)))
+```
+
+This creates a smooth S-curve where:
+- Score 0.0 → Confidence ~2%
+- Score 0.5 → Confidence ~50%
+- Score 1.0 → Confidence ~98%
+
+**View detailed scoring:**
+```bash
+python scripts/router.py score "prove that sqrt(2) is irrational step by step"
+# Shows breakdown of all 15 dimensions and top contributors
+```
+
+### 2b. Agentic Task Detection
+
+Tasks are automatically flagged as "agentic" if they involve:
+- **Action keywords**: run, test, fix, deploy, edit, build, create, implement
+- **Multi-step patterns**: "first...then", "step 1", numbered instructions
+- **Tool array presence** (when used programmatically)
+
+**Impact on routing:**
+- Agentic tasks are automatically bumped to at least MEDIUM tier
+- Models with `"agentic": true` flag are preferred for these tasks
+- Simple monitoring tasks won't be incorrectly classified as agentic
+
+**Example:**
+```bash
+router.py classify "Build a React component with tests, then deploy it"
+# → COMPLEX tier (agentic task detected)
+
+router.py classify "Check the server status"
+# → SIMPLE tier (not agentic)
+```
+
+### 2c. Automatic Fallback Chains
+
+Each tier now has a fallback chain (2-3 models) for automatic retry on failure:
+
+**Configured fallback chains:**
+```json
+{
+  "SIMPLE": {
+    "primary": "glm-4.7",
+    "fallback_chain": ["glm-4.7-backup", "glm-4.5-air", "ollama-qwen"]
+  },
+  "MEDIUM": {
+    "primary": "deepseek-v3.2",
+    "fallback_chain": ["llama-3.3-70b", "ollama-llama"]
+  },
+  "COMPLEX": {
+    "primary": "claude-sonnet-4.5",
+    "fallback_chain": ["gemini-3-pro", "nemotron-253b"]
+  },
+  "REASONING": {
+    "primary": "deepseek-r1-32b",
+    "fallback_chain": ["qwq-32b", "deepseek-reasoner"]
+  },
+  "CRITICAL": {
+    "primary": "claude-opus-4.6",
+    "fallback_chain": ["claude-opus-oauth", "claude-sonnet-4.5"]
+  }
+}
+```
+
+**Usage:**
+- Maximum 3 attempts per request (1 primary + 2 fallbacks)
+- Automatic retry with next model in chain on failure
+- Preserves cost efficiency by trying cheaper options first (within same tier)
 
 ### 3. Coding Task Routing (Important!)
 
@@ -186,25 +314,37 @@ SIMPLE → MEDIUM → COMPLEX → CRITICAL
 
 ### 7. Decision Heuristics
 
-Quick classification rules for common patterns:
+Quick classification rules for common patterns (now automated via weighted scoring):
 
 **SIMPLE tier indicators:**
 - Keywords: check, monitor, fetch, get, status, list, summarize
 - High-frequency operations (heartbeats, polling)
 - Well-defined API calls with minimal logic
 - Data extraction without analysis
+- **Example**: "What is 2+2?"
 
 **MEDIUM tier indicators:**
 - Keywords: fix, patch, update, research, analyze, test
 - Code changes under ~50 lines
 - Single-file modifications
 - Research and documentation tasks
+- **Example**: "Write a Python function to sort a list"
 
 **COMPLEX tier indicators:**
 - Keywords: build, create, architect, debug, design, integrate
 - Multi-file changes or new features
 - Complex debugging or troubleshooting
 - System design and architecture work
+- Agentic tasks with multiple steps
+- **Example**: "Build a React component with tests, then deploy it"
+
+**REASONING tier indicators** (requires confidence ≥ 0.97):
+- Keywords: prove, theorem, derive, formal, verify, logic, step by step
+- Mathematical proofs and derivations
+- Formal verification tasks
+- Step-by-step logical reasoning
+- Theorem proving and lemmas
+- **Example**: "Prove that sqrt(2) is irrational step by step"
 
 **CRITICAL tier indicators:**
 - Keywords: security, production, deploy, financial, audit
@@ -212,6 +352,9 @@ Quick classification rules for common patterns:
 - Production deployments
 - Financial or legal analysis
 - High-stakes decision-making
+- **Example**: "Security audit of authentication code for vulnerabilities"
+
+**Classification is automatic:** The weighted scoring system analyzes all 15 dimensions. These heuristics are for understanding what triggers each tier.
 
 **When in doubt:** Go one tier up. Under-speccing costs more in retries than over-speccing costs in model quality.
 
