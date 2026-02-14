@@ -2,7 +2,7 @@
 # OpenClaw skill definition
 
 name: "curated-search"
-version: "1.0.0"
+version: "1.0.4"
 description: "Domain-restricted full-text search over curated whitelist"
 author: "Qrusher"
 license: "MIT"

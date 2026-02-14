@@ -235,7 +235,9 @@ curated-search/
 ├── src/
 │   ├── indexer.js        # MiniSearch wrapper, persistence
 │   ├── crawler.js        # Domain-restricted crawler with politeness
-│   └── search-api.js     # (legacy) HTTP server — not used
+│   ├── content-extractor.js
+│   ├── url-normalizer.js
+│   └── rate-limiter.js
 ├── test/
 │   ├── unit/
 │   ├── integration/
