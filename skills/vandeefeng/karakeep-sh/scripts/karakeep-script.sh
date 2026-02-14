@@ -40,7 +40,19 @@ kb-create() {
     return 1
   fi
 
-  local json="{\"type\":\"$type\",\"content\":\"$content\"}"
+  # Build JSON using jq for proper escaping
+  # For link type: use 'url' field
+  # For text type: use 'text' field
+  local field="url"
+  if [ "$type" = "text" ]; then
+    field="text"
+  fi
+
+  local json=$(echo '{}' | jq \
+    --arg t "$type" \
+    --arg c "$content" \
+    --arg f "$field" \
+    '{type: $t} | . + {($f): $c}')
 
   if [ -n "$title" ]; then
     json=$(echo "$json" | jq --arg t "$title" '. + {title: $t}')
@@ -69,8 +81,8 @@ kb-update-note() {
     return 1
   fi
 
-  local json="{\"note\":\"$note\"}"
-  json=$(echo "$json" | jq --arg n "$note" '.note = $n')
+  # Use jq to properly escape the note content (handles newlines, quotes, etc.)
+  local json=$(echo '{}' | jq --arg n "$note" '{note: $n}')
 
   curl -s -X PATCH "$KARAKEEP_API_URL/bookmarks/$bookmark_id" \
        -H "Authorization: Bearer $KARAKEEP_API_KEY" \
@@ -173,8 +185,8 @@ kb-content() {
     return 1
   fi
 
-  curl -s -X GET "$KARAKEEP_API_URL/bookmarks/$bookmark_id/content" \
-       -H "Authorization: Bearer $KARAKEEP_API_KEY"
+  curl -s -X GET "$KARAKEEP_API_URL/bookmarks/$bookmark_id?includeContent=true" \
+       -H "Authorization: Bearer $KARAKEEP_API_KEY" | jq -r '.content.htmlContent'
 }
 
 # List all lists
@@ -218,10 +230,8 @@ kb-add-to-list() {
     return 1
   fi
 
-  curl -s -X POST "$KARAKEEP_API_URL/lists/$list_id/bookmarks" \
-       -H "Authorization: Bearer $KARAKEEP_API_KEY" \
-       -H "Content-Type: application/json" \
-       -d "{\"bookmarkId\":\"$bookmark_id\"}"
+  curl -s -X PUT "$KARAKEEP_API_URL/lists/$list_id/bookmarks/$bookmark_id" \
+       -H "Authorization: Bearer $KARAKEEP_API_KEY"
 }
 
 # Remove bookmark from list
@@ -254,7 +264,7 @@ kb-attach-tags() {
     return 1
   fi
 
-  local tags=$(printf '%s\n' "$@" | jq -R . | jq -cs .)
+  local tags=$(printf '%s\n' "$@" | jq -R . | jq -s 'map({tagName: .})')
 
   curl -s -X POST "$KARAKEEP_API_URL/bookmarks/$bookmark_id/tags" \
        -H "Authorization: Bearer $KARAKEEP_API_KEY" \
@@ -275,7 +285,7 @@ kb-detach-tags() {
     return 1
   fi
 
-  local tags=$(printf '%s\n' "$@" | jq -R . | jq -cs .)
+  local tags=$(printf '%s\n' "$@" | jq -R . | jq -s 'map({tagName: .})')
 
   curl -s -X DELETE "$KARAKEEP_API_URL/bookmarks/$bookmark_id/tags" \
        -H "Authorization: Bearer $KARAKEEP_API_KEY" \
