@@ -1,0 +1,32 @@
+{
+  "name": "monet-ai",
+  "version": "1.0.1",
+  "description": "Monet AI - AI content generation API for video, image, music and lip-sync",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "ai",
+    "video",
+    "image",
+    "music",
+    "generation",
+    "monet-ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}
