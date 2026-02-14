@@ -1,0 +1,11 @@
+{
+  "owner": "enderfga",
+  "slug": "openclaw-claude-code",
+  "displayName": "Claude Code Agent",
+  "latest": {
+    "version": "0.3.0",
+    "publishedAt": 1771076231423,
+    "commit": null
+  },
+  "history": []
+}
