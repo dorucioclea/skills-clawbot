@@ -3,9 +3,15 @@
   "slug": "dwg-to-excel",
   "displayName": "Dwg To Excel",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770474831225,
-    "commit": "https://github.com/openclaw/skills/commit/2f7299a59a612fb89e69d5b56d56a3066f488690"
+    "version": "2.0.0",
+    "publishedAt": 1770999196025,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770474831225,
+      "commit": "https://github.com/openclaw/skills/commit/2f7299a59a612fb89e69d5b56d56a3066f488690"
+    }
+  ]
 }

@@ -1,6 +1,5 @@
 ---
-slug: "dwg-to-excel"
-display_name: "DWG To Excel"
+name: "dwg-to-excel"
 description: "Convert AutoCAD DWG files (1983-2026) to Excel databases using DwgExporter CLI. Extract layers, blocks, attributes, and geometry data without Autodesk licenses."
 ---
 
