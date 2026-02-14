@@ -1,10 +1,53 @@
 ---
 name: keyword-research
-description: Discovers high-value keywords with search intent analysis, difficulty assessment, and content opportunity mapping. Essential for starting any SEO or GEO content strategy.
-geo-relevance: "medium"
+description: 'Use when the user asks to "find keywords", "keyword research", "what should I write about", "identify ranking opportunities", "topic ideas", "what are people searching for", "which keywords should I target", or "give me keyword ideas". Discovers high-value keywords with search intent analysis, difficulty assessment, and content opportunity mapping. Essential for starting any SEO or GEO content strategy. For analyzing competitor keywords specifically, see competitor-analysis. For content topic gaps, see content-gap-analysis.'
+license: Apache-2.0
+metadata:
+  author: aaron-he-zhu
+  version: "2.0.0"
+  geo-relevance: "medium"
+  tags:
+    - seo
+    - geo
+    - keywords
+    - search intent
+    - content strategy
+    - topic research
+    - content planning
+    - search volume
+    - long-tail keywords
+  triggers:
+    - "find keywords"
+    - "keyword research"
+    - "what should I write about"
+    - "identify ranking opportunities"
+    - "topic ideas"
+    - "search volume"
+    - "content opportunities"
+    - "what are people searching for"
+    - "which keywords should I target"
+    - "give me keyword ideas"
 ---
 
 # Keyword Research
+
+
+> **[SEO & GEO Skills Library](https://skills.sh/aaron-he-zhu/seo-geo-claude-skills)** · 20 skills for SEO + GEO · Install all: `npx skills add aaron-he-zhu/seo-geo-claude-skills`
+
+<details>
+<summary>Browse all 20 skills</summary>
+
+**Research** · **keyword-research** · [competitor-analysis](../competitor-analysis/) · [serp-analysis](../serp-analysis/) · [content-gap-analysis](../content-gap-analysis/)
+
+**Build** · [seo-content-writer](../../build/seo-content-writer/) · [geo-content-optimizer](../../build/geo-content-optimizer/) · [meta-tags-optimizer](../../build/meta-tags-optimizer/) · [schema-markup-generator](../../build/schema-markup-generator/)
+
+**Optimize** · [on-page-seo-auditor](../../optimize/on-page-seo-auditor/) · [technical-seo-checker](../../optimize/technical-seo-checker/) · [internal-linking-optimizer](../../optimize/internal-linking-optimizer/) · [content-refresher](../../optimize/content-refresher/)
+
+**Monitor** · [rank-tracker](../../monitor/rank-tracker/) · [backlink-analyzer](../../monitor/backlink-analyzer/) · [performance-reporter](../../monitor/performance-reporter/) · [alert-manager](../../monitor/alert-manager/)
+
+**Cross-cutting** · [content-quality-auditor](../../cross-cutting/content-quality-auditor/) · [domain-authority-auditor](../../cross-cutting/domain-authority-auditor/) · [entity-optimizer](../../cross-cutting/entity-optimizer/) · [memory-management](../../cross-cutting/memory-management/)
+
+</details>
 
 This skill helps you discover, analyze, and prioritize keywords for SEO and GEO content strategies. It identifies high-value opportunities based on search volume, competition, intent, and business relevance.
 
