@@ -12,6 +12,7 @@ const {
   appendCandidateJsonl,
   readRecentCandidates,
   readRecentExternalCandidates,
+  ensureAssetFiles,
 } = require('./gep/assetStore');
 const { selectGeneAndCapsule, matchPatternToSignals } = require('./gep/selector');
 const { buildGepPrompt, buildReusePrompt, buildHubMatchedBlock } = require('./gep/prompt');
@@ -541,6 +542,17 @@ function sleepMs(ms) {
   return new Promise(resolve => setTimeout(resolve, n));
 }
 
+// Check system load average via os.loadavg().
+// Returns { load1m, load5m, load15m }. Used for load-aware throttling.
+function getSystemLoad() {
+  try {
+    const loadavg = os.loadavg();
+    return { load1m: loadavg[0], load5m: loadavg[1], load15m: loadavg[2] };
+  } catch (e) {
+    return { load1m: 0, load5m: 0, load15m: 0 };
+  }
+}
+
 // Check how many agent sessions are actively being processed (modified in the last N minutes).
 // If the agent is busy with user conversations, evolver should back off.
 function getRecentActiveSessionCount(windowMs) {
@@ -560,6 +572,22 @@ async function run() {
   const bridgeEnabled = String(process.env.EVOLVE_BRIDGE || '').toLowerCase() !== 'false';
   const loopMode = ARGS.includes('--loop') || ARGS.includes('--mad-dog') || String(process.env.EVOLVE_LOOP || '').toLowerCase() === 'true';
 
+  // SAFEGUARD: If another evolver Hand Agent is already running, back off.
+  // Prevents race conditions when a wrapper restarts while the old Hand Agent
+  // is still executing. The Core yields instead of starting a competing cycle.
+  try {
+    const _psRace = require('child_process').execSync(
+      'ps aux | grep "evolver_hand_" | grep "openclaw.*agent" | grep -v grep',
+      { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    if (_psRace && _psRace.length > 0) {
+      console.log('[Evolver] Another evolver Hand Agent is already running. Yielding this cycle.');
+      return;
+    }
+  } catch (_) {
+    // grep exit 1 = no match = no conflict, safe to proceed
+  }
+
   // SAFEGUARD: If the agent has too many active user sessions, back off.
   // Evolver must not starve user conversations by consuming model concurrency.
   const QUEUE_MAX = Number.parseInt(process.env.EVOLVE_AGENT_QUEUE_MAX || '10', 10);
@@ -567,6 +595,18 @@ async function run() {
   const activeUserSessions = getRecentActiveSessionCount(10 * 60 * 1000);
   if (activeUserSessions > QUEUE_MAX) {
     console.log(`[Evolver] Agent has ${activeUserSessions} active user sessions (max ${QUEUE_MAX}). Backing off ${QUEUE_BACKOFF_MS}ms to avoid starving user conversations.`);
+    await sleepMs(QUEUE_BACKOFF_MS);
+    return;
+  }
+
+  // SAFEGUARD: System load awareness.
+  // When system load is too high (e.g. too many concurrent processes, heavy I/O),
+  // back off to prevent the evolver from contributing to load spikes.
+  // Echo-MingXuan's Cycle #55 saw load spike from 0.02-0.50 to 1.30 before crash.
+  const LOAD_MAX = parseFloat(process.env.EVOLVE_LOAD_MAX || '2.0');
+  const sysLoad = getSystemLoad();
+  if (sysLoad.load1m > LOAD_MAX) {
+    console.log(`[Evolver] System load ${sysLoad.load1m.toFixed(2)} exceeds max ${LOAD_MAX}. Backing off ${QUEUE_BACKOFF_MS}ms.`);
     await sleepMs(QUEUE_BACKOFF_MS);
     return;
   }
@@ -594,11 +634,49 @@ async function run() {
     }
   }
 
+  // Reset per-cycle env flags to prevent state leaking between cycles.
+  // In --loop mode, process.env persists across cycles. The circuit breaker
+  // below will re-set FORCE_INNOVATION if the condition still holds.
+  delete process.env.FORCE_INNOVATION;
+
   const startTime = Date.now();
   console.log('Scanning session logs...');
 
+  // Ensure all GEP asset files exist before any operation.
+  // This prevents "No such file or directory" errors when external tools
+  // (grep, cat, etc.) reference optional append-only files like genes.jsonl.
+  try { ensureAssetFiles(); } catch (e) {
+    console.error(`[AssetInit] ensureAssetFiles failed (non-fatal): ${e.message}`);
+  }
+
   // Maintenance: Clean up old logs to keep directory scan fast
   performMaintenance();
+
+  // --- Repair Loop Circuit Breaker ---
+  // Detect when the evolver is stuck in a "repair -> fail -> repair" cycle.
+  // If the last N events are all failed repairs with the same gene, force
+  // innovation intent to break out of the loop instead of retrying the same fix.
+  const REPAIR_LOOP_THRESHOLD = 3;
+  try {
+    const allEvents = readAllEvents();
+    const recent = Array.isArray(allEvents) ? allEvents.slice(-REPAIR_LOOP_THRESHOLD) : [];
+    if (recent.length >= REPAIR_LOOP_THRESHOLD) {
+      const allRepairFailed = recent.every(e =>
+        e && e.intent === 'repair' &&
+        e.outcome && e.outcome.status === 'failed'
+      );
+      if (allRepairFailed) {
+        const geneIds = recent.map(e => (e.genes_used && e.genes_used[0]) || 'unknown');
+        const sameGene = geneIds.every(id => id === geneIds[0]);
+        console.warn(`[CircuitBreaker] Detected ${REPAIR_LOOP_THRESHOLD} consecutive failed repairs${sameGene ? ` (gene: ${geneIds[0]})` : ''}. Forcing innovation intent to break the loop.`);
+        // Set env flag that downstream code reads to force innovation
+        process.env.FORCE_INNOVATION = 'true';
+      }
+    }
+  } catch (e) {
+    // Non-fatal: if we can't read events, proceed normally
+    console.error(`[CircuitBreaker] Check failed (non-fatal): ${e.message}`);
+  }
 
   const recentMasterLog = readRealSessionLog();
   const todayLog = readRecentLog(TODAY_LOG);
@@ -1123,6 +1201,19 @@ Notes:
 Recent Evolution History (last 8 cycles -- DO NOT repeat the same intent+signal+gene):
 ${recentHistorySummary}
 IMPORTANT: If you see 3+ consecutive "repair" cycles with the same gene, you MUST switch to "innovate" intent.
+${(() => {
+  // Compute consecutive failure count from recent events for context injection
+  let cfc = 0;
+  const evts = Array.isArray(recentEvents) ? recentEvents : [];
+  for (let i = evts.length - 1; i >= 0; i--) {
+    if (evts[i] && evts[i].outcome && evts[i].outcome.status === 'failed') cfc++;
+    else break;
+  }
+  if (cfc >= 3) {
+    return `\nFAILURE STREAK WARNING: The last ${cfc} cycles ALL FAILED. You MUST change your approach.\n- Do NOT repeat the same gene/strategy. Pick a completely different approach.\n- If the error is external (API down, binary missing), mark as FAILED and move on.\n- Prefer a minimal safe innovate cycle over yet another failing repair.`;
+  }
+  return '';
+})()}
 
 External candidates (A2A receive zone; staged only, never execute directly):
 ${externalCandidatesPreview}

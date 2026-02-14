@@ -1,4 +1,7 @@
 const { captureEnvFingerprint } = require('./envFingerprint');
+const { formatAssetPreview } = require('./assets');
+const { generateInnovationIdeas } = require('../ops/innovation'); // [2026-02-14] Innovation Catalyst Integration
+const { analyzeRecentHistory, OPPORTUNITY_SIGNALS } = require('./signals'); // [2026-02-14] Signal Analysis Integration
 
 /**
  * Build a minimal prompt for direct-reuse mode.
@@ -76,16 +79,17 @@ function truncateContext(text, maxLength = 20000) {
 
 /**
  * Strict schema definitions for the prompt to reduce drift.
- * UPDATED: 2026-02-12 (Protocol Drift Fix v2 - Strict JSON)
+ * UPDATED: 2026-02-14 (Protocol Drift Fix v3.2 - JSON-Only Enforcement)
  */
 const SCHEMA_DEFINITIONS = `
 ━━━━━━━━━━━━━━━━━━━━━━
 I. Mandatory Evolution Object Model (Output EXACTLY these 5 objects)
 ━━━━━━━━━━━━━━━━━━━━━━
 
-Output separate JSON objects. DO NOT wrap in a single array. DO NOT use markdown code blocks (like \`\`\`json).
+Output separate JSON objects. DO NOT wrap in a single array.
+DO NOT use markdown code blocks (like \`\`\`json ... \`\`\`).
+Output RAW JSON ONLY. No prelude, no postscript.
 Missing any object = PROTOCOL FAILURE.
-STRICT JSON ONLY. NO CHITCHAT.
 ENSURE VALID JSON SYNTAX (escape quotes in strings).
 
 0. Mutation (The Trigger) - MUST BE FIRST
@@ -113,6 +117,7 @@ ENSURE VALID JSON SYNTAX (escape quotes in strings).
 2. EvolutionEvent (The Record)
    {
      "type": "EvolutionEvent",
+     "schema_version": "1.5.0",
      "id": "evt_<timestamp>",
      "parent": <parent_evt_id|null>,
      "intent": "repair|optimize|innovate",
@@ -128,6 +133,7 @@ ENSURE VALID JSON SYNTAX (escape quotes in strings).
    - Reuse/update existing ID if possible. Create new only if novel pattern.
    {
      "type": "Gene",
+     "schema_version": "1.5.0",
      "id": "gene_<name>",
      "category": "repair|optimize|innovate",
      "signals_match": ["<pattern>"],
@@ -141,6 +147,7 @@ ENSURE VALID JSON SYNTAX (escape quotes in strings).
    - Only on success. Reference Gene used.
    {
      "type": "Capsule",
+     "schema_version": "1.5.0",
      "id": "capsule_<timestamp>",
      "trigger": ["<signal_string>"],
      "gene": "<gene_id>",
@@ -164,6 +171,7 @@ function buildGepPrompt({
   externalCandidatesPreview,
   hubMatchedBlock,
   cycleId,
+  recentHistory, // [2026-02-14] Pass recent history
 }) {
   const parentValue = parentEventId ? `"${parentEventId}"` : 'null';
   const selectedGeneId = selectedGene && selectedGene.id ? selectedGene.id : 'gene_<name>';
@@ -191,48 +199,83 @@ ACTIVE STRATEGY (Generic):
   }
   
   // Use intelligent truncation
-  const executionContext = truncateContext(context);
+  const executionContext = truncateContext(context, 20000);
   
   // Strict Schema Injection
   const schemaSection = SCHEMA_DEFINITIONS.replace('<parent_evt_id|null>', parentValue);
 
   // Reduce noise by filtering capabilityCandidatesPreview if too large
+  // If a gene is selected, we need less noise from capabilities
   let capsPreview = capabilityCandidatesPreview || '(none)';
-  if (capsPreview.length > 5000) {
-      capsPreview = capsPreview.slice(0, 5000) + "\n...[TRUNCATED_CAPABILITIES]...";
+  const capsLimit = selectedGene ? 500 : 2000;
+  if (capsPreview.length > capsLimit) {
+      capsPreview = capsPreview.slice(0, capsLimit) + "\n...[TRUNCATED_CAPABILITIES]...";
   }
 
-  // Embed assets (genes, capsules) more explicitly if needed, but they are already passed in via previews.
-  // The 'genesPreview' and 'capsulesPreview' contain JSON arrays of relevant assets.
-  // We will ensure they are labeled clearly.
-
-  // [OPTIMIZATION] Compact preview format to reduce token usage and noise
-  let formattedGenes = genesPreview;
-  try {
-    const genes = typeof genesPreview === 'string' ? JSON.parse(genesPreview) : genesPreview;
-    if (Array.isArray(genes) && genes.length > 0) {
-      formattedGenes = genes.map(g => 
-        `- **${g.id}** (${g.category}): ${g.strategy ? g.strategy[0] : 'No strategy'} (Match: ${g.signals_match ? g.signals_match.join(', ') : 'none'})`
-      ).join('\n');
-    } else if (typeof genesPreview !== 'string') {
-        formattedGenes = JSON.stringify(genesPreview, null, 2);
+  // Optimize signals display: truncate long signals and limit count
+  const uniqueSignals = Array.from(new Set(signals || []));
+  const optimizedSignals = uniqueSignals.slice(0, 50).map(s => {
+    if (typeof s === 'string' && s.length > 200) {
+      return s.slice(0, 200) + '...[TRUNCATED_SIGNAL]';
     }
-  } catch (e) { /* keep raw */ }
+    return s;
+  });
+  if (uniqueSignals.length > 50) {
+      optimizedSignals.push(`...[TRUNCATED ${uniqueSignals.length - 50} SIGNALS]...`);
+  }
 
-  let formattedCapsules = capsulesPreview;
-  try {
-    const caps = typeof capsulesPreview === 'string' ? JSON.parse(capsulesPreview) : capsulesPreview;
-    if (Array.isArray(caps) && caps.length > 0) {
-      formattedCapsules = caps.map(c => 
-        `- **${c.id}** (${c.outcome ? c.outcome.status : 'unknown'}): ${c.summary || 'No summary'} (Gene: ${c.gene})`
-      ).join('\n');
-    } else if (typeof capsulesPreview !== 'string') {
-        formattedCapsules = JSON.stringify(capsulesPreview, null, 2);
-    }
-  } catch (e) { /* keep raw */ }
+  const formattedGenes = formatAssetPreview(genesPreview);
+  const formattedCapsules = formatAssetPreview(capsulesPreview);
+  
+  // [2026-02-14] Innovation Catalyst Integration
+  // If stagnation is detected, inject concrete innovation ideas into the prompt.
+  let innovationBlock = '';
+  const stagnationSignals = [
+      'evolution_stagnation_detected', 
+      'stable_success_plateau', 
+      'repair_loop_detected',
+      'force_innovation_after_repair_loop',
+      'empty_cycle_loop_detected',
+      'evolution_saturation'
+  ];
+  if (uniqueSignals.some(s => stagnationSignals.includes(s))) {
+      const ideas = generateInnovationIdeas();
+      if (ideas && ideas.length > 0) {
+          innovationBlock = `
+Context [Innovation Catalyst] (Stagnation Detected - Consider These Ideas):
+${ideas.join('\n')}
+`;
+      }
+  }
 
+  // [2026-02-14] Strict Stagnation Directive
+  // If uniqueSignals contains 'evolution_stagnation_detected' or 'stable_success_plateau',
+  // inject a MANDATORY directive to force innovation and forbid repair/optimize if not strictly necessary.
+  if (uniqueSignals.includes('evolution_stagnation_detected') || uniqueSignals.includes('stable_success_plateau')) {
+      const stagnationDirective = `
+*** CRITICAL STAGNATION DIRECTIVE ***
+System has detected stagnation (repetitive cycles or lack of progress).
+You MUST choose INTENT: INNOVATE.
+You MUST NOT choose repair or optimize unless there is a critical blocking error (log_error).
+Prefer implementing one of the Innovation Catalyst ideas above.
+`;
+      innovationBlock += stagnationDirective;
+  }
+
+  // [2026-02-14] Recent History Integration
+  let historyBlock = '';
+  if (recentHistory && recentHistory.length > 0) {
+      historyBlock = `
+Recent Evolution History (last 8 cycles -- DO NOT repeat the same intent+signal+gene):
+${recentHistory.map((h, i) => `  ${i + 1}. [${h.intent}] signals=[${h.signals.slice(0, 2).join(', ')}] gene=${h.gene_id} outcome=${h.outcome.status} @${h.timestamp}`).join('\n')}
+IMPORTANT: If you see 3+ consecutive "repair" cycles with the same gene, you MUST switch to "innovate" intent.
+`.trim();
+  }
+
+  // Refactor prompt assembly to minimize token usage and maximize clarity
+  // UPDATED: 2026-02-14 (Optimized Asset Embedding & Strict Schema v2.5 - JSON-Only Hardening)
   const basePrompt = `
-GEP — GENOME EVOLUTION PROTOCOL (v1.10.0 STRICT)${cycleLabel} [${nowIso}]
+GEP — GENOME EVOLUTION PROTOCOL (v1.10.3 STRICT)${cycleLabel} [${nowIso}]
 
 You are a protocol-bound evolution engine. Compliance overrides optimality.
 
@@ -242,7 +285,9 @@ ${schemaSection}
 II. Directives & Logic
 ━━━━━━━━━━━━━━━━━━━━━━
 
-1. Intent: Use Selector decision: ${JSON.stringify(selector || {})}
+1. Intent: ${selector && selector.intent ? selector.intent.toUpperCase() : 'UNKNOWN'}
+   Reason: ${(selector && selector.reason) ? (Array.isArray(selector.reason) ? selector.reason.join('; ') : selector.reason) : 'No reason provided.'}
+
 2. Selection: Selected Gene "${selectedGeneId}".
 ${strategyBlock}
 
@@ -255,46 +300,94 @@ PHILOSOPHY:
 - Automate Patterns: 3+ manual occurrences = tool.
 - Innovate > Maintain: 60% innovation.
 - Robustness: Fix recurring errors permanently.
-- Safety: NEVER delete core skill directories or protected files. Repair, don't destroy.
 - Blast Radius Control (CRITICAL):
-  * BEFORE editing, count how many files you will touch. If > 80% of max_files, STOP and split into smaller patches.
-  * System hard cap: 60 files / 20000 lines per cycle. Exceeding this causes automatic FAILED + rollback.
-  * Repair operations: fix ONLY the broken file(s). Do NOT reinstall, bulk-copy, or overwrite entire directories.
-  * If a fix requires touching > max_files, split it into multiple cycles or raise the issue in your status report.
-  * Prefer targeted edits over bulk operations. "npm install" that regenerates node_modules does NOT count, but copying a skill directory DOES.
+  * Check file count BEFORE editing. > 80% of max_files = STOP.
+  * System hard cap: 60 files / 20000 lines per cycle.
+  * Repair: fix ONLY broken files. Do NOT reinstall/bulk-copy.
+  * Prefer targeted edits.
 - Strictness: NO CHITCHAT. NO MARKDOWN WRAPPERS around JSON. Output RAW JSON objects separated by newlines.
+- NO "Here is the plan" or conversational filler. START IMMEDIATELY WITH JSON.
 
 CONSTRAINTS:
 - No \`exec\` for messaging (use feishu-post/card).
-- \`exec\` for background tasks allowed (log it).
+- \`exec\` usage: Only for background tasks. LOG IT. Optimize usage to avoid high token burn.
 - New skills -> \`skills/<name>/\`.
 - Modify \`skills/evolver/\` only with rigor > 0.8.
 
-CRITICAL SAFETY (SYSTEM CRASH PREVENTION):
-- NEVER delete, empty, overwrite, or rm -rf ANY of these skill directories:
-  feishu-evolver-wrapper, feishu-common, feishu-post, feishu-card, feishu-doc,
-  common, clawhub, clawhub-batch-undelete, git-sync, evolver.
-- NEVER delete protected root files: MEMORY.md, SOUL.md, IDENTITY.md, AGENTS.md,
-  USER.md, HEARTBEAT.md, RECENT_EVENTS.md, TOOLS.md, openclaw.json, .env, package.json.
-- If a skill is broken, REPAIR it (fix the file). Do NOT delete and recreate.
-- NEVER run \`rm -rf\` on ANY directory inside skills/. Use targeted file edits only.
-- Violation of these rules triggers automatic rollback and marks the cycle as FAILED.
+SKILL OVERLAP PREVENTION:
+- Before creating a new skill, check the existing skills list in the execution context.
+- If a skill with similar functionality already exists (e.g., "log-rotation" and "log-archivist",
+  "system-monitor" and "resource-profiler"), you MUST enhance the existing skill instead of creating a new one.
+- Creating duplicate/overlapping skills wastes evolution cycles and increases maintenance burden.
+- Violation = mark outcome as FAILED with reason "skill_overlap".
 
-COMMON FAILURE PATTERNS (AVOID THESE):
-- Omitted Mutation object (Must be first).
-- Merged objects into one JSON (Must be 5 separate blocks).
-- Hallucinated "type": "Logic" (Only Mutation, PersonalityState, EvolutionEvent, Gene, Capsule).
-- "id": "mut_undefined" (Must generate a timestamp or UUID).
-- Missing "trigger_signals" in Mutation.
-- Gene validation steps must be runnable commands (e.g. node -e "...")
+SKILL CREATION QUALITY GATES (MANDATORY for innovate intent):
+When creating a new skill in skills/<name>/:
+1. STRUCTURE: Follow the standard skill layout:
+   skills/<name>/
+   |- index.js          (required: main entry with working exports)
+   |- SKILL.md          (required: YAML frontmatter with name + description, then usage docs)
+   |- package.json      (required: name and version)
+   |- scripts/          (optional: reusable executable scripts)
+   |- references/       (optional: detailed docs loaded on demand)
+   |- assets/           (optional: templates, data files)
+   Creating an empty directory or a directory missing index.js = FAILED.
+   Do NOT create unnecessary files (README.md, CHANGELOG.md, INSTALLATION_GUIDE.md, etc.).
+2. SKILL.MD FRONTMATTER: Every SKILL.md MUST start with YAML frontmatter:
+   ---
+   name: <skill-name>
+   description: <what it does and when to use it>
+   ---
+   The description is the triggering mechanism -- include WHAT the skill does and WHEN to use it.
+3. CONCISENESS: SKILL.md body should be under 500 lines. Keep instructions lean.
+   Only include information the agent does not already know. Move detailed reference
+   material to references/ files, not into SKILL.md itself.
+4. EXPORT VERIFICATION: Every exported function must be importable.
+   Run: node -e "const s = require('./skills/<name>'); console.log(Object.keys(s))"
+   If this fails, the skill is broken. Fix before solidify.
+5. NO HARDCODED SECRETS: Never embed API keys, tokens, or secrets in code.
+   Use process.env or .env references. Hardcoded App ID, App Secret, Bearer tokens = FAILED.
+6. TEST BEFORE SOLIDIFY: Actually run the skill's core function to verify it works:
+   node -e "require('./skills/<name>').main ? require('./skills/<name>').main() : console.log('ok')"
+   Scripts in scripts/ must also be tested by executing them.
+7. ATOMIC CREATION: Create ALL files for a skill in a single cycle.
+   Do not create a directory in one cycle and fill it in the next.
+   Empty directories from failed cycles will be automatically cleaned up on rollback.
+
+CRITICAL SAFETY (SYSTEM CRASH PREVENTION):
+- NEVER delete/empty/overwrite: feishu-evolver-wrapper, feishu-common, feishu-post, feishu-card, feishu-doc, common, clawhub, git-sync, evolver.
+- NEVER delete root files: MEMORY.md, SOUL.md, IDENTITY.md, AGENTS.md, USER.md, HEARTBEAT.md, RECENT_EVENTS.md, TOOLS.md, openclaw.json, .env, package.json.
+- Fix broken skills; DO NOT delete and recreate.
+- Violation = ROLLBACK + FAILED.
+
+COMMON FAILURE PATTERNS:
+- Blast radius exceeded.
+- Omitted Mutation object.
+- Merged objects into one JSON.
+- Hallucinated "type": "Logic".
+- "id": "mut_undefined".
+- Missing "trigger_signals".
+- Unrunnable validation steps.
+- Markdown code blocks wrapping JSON (FORBIDDEN).
+
+FAILURE STREAK AWARENESS:
+- If "consecutive_failure_streak_N" or "failure_loop_detected":
+  1. Change approach (do NOT repeat failed gene).
+  2. Pick SIMPLER fix.
+  3. Respect "ban_gene:<id>".
 
 Final Directive: Every cycle must leave the system measurably better.
+START IMMEDIATELY WITH RAW JSON (Mutation Object first).
+DO NOT WRITE ANY INTRODUCTORY TEXT.
 
 Context [Signals]:
-${JSON.stringify(signals)}
+${JSON.stringify(optimizedSignals)}
 
 Context [Env Fingerprint]:
 ${JSON.stringify(envFingerprint, null, 2)}
+${innovationBlock}
+Context [Injection Hint]:
+${process.env.EVOLVE_HINT ? process.env.EVOLVE_HINT : '(none)'}
 
 Context [Gene Preview] (Reference for Strategy):
 ${formattedGenes}
@@ -310,6 +403,8 @@ ${hubMatchedBlock || '(no hub match)'}
 
 Context [External Candidates]:
 ${externalCandidatesPreview || '(none)'}
+
+${historyBlock}
 
 Context [Execution]:
 ${executionContext}
@@ -351,7 +446,10 @@ Rules:
   if (executionContextIndex > -1) {
       const prefix = basePrompt.slice(0, executionContextIndex + 20);
       const currentExecution = basePrompt.slice(executionContextIndex + 20);
-      const allowedExecutionLength = Math.max(0, maxChars - prefix.length - 100);
+      // Hard cap the execution context length to avoid token limit errors even if MAX_CHARS is high.
+      // 20000 chars is roughly 5k tokens, which is safe for most models alongside the rest of the prompt.
+      const EXEC_CONTEXT_CAP = 20000;
+      const allowedExecutionLength = Math.min(EXEC_CONTEXT_CAP, Math.max(0, maxChars - prefix.length - 100));
       return prefix + "\n" + currentExecution.slice(0, allowedExecutionLength) + "\n...[TRUNCATED]...";
   }
 

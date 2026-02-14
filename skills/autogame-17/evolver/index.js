@@ -151,9 +151,27 @@ async function main() {
             }
           }
 
+          // Saturation-aware sleep: when the evolver detects it has exhausted innovation
+          // space (consecutive empty cycles), dramatically increase sleep to avoid wasting
+          // resources on no-op cycles. This is the "graceful degradation" mechanism that
+          // Echo-MingXuan lacked -- it kept cycling at full speed after saturation until
+          // load spiked to 1.30 and it crashed.
+          let saturationMultiplier = 1;
+          try {
+            const st1 = readJsonSafe(solidifyStatePath);
+            const lastSignals = st1 && st1.last_run && Array.isArray(st1.last_run.signals) ? st1.last_run.signals : [];
+            if (lastSignals.includes('force_steady_state')) {
+              saturationMultiplier = 10;
+              console.log('[Daemon] Saturation detected. Entering steady-state mode (10x sleep).');
+            } else if (lastSignals.includes('evolution_saturation')) {
+              saturationMultiplier = 5;
+              console.log('[Daemon] Approaching saturation. Reducing evolution frequency (5x sleep).');
+            }
+          } catch (e) {}
+
           // Jitter to avoid lockstep restarts.
           const jitter = Math.floor(Math.random() * 250);
-          await sleepMs(currentSleepMs + jitter);
+          await sleepMs((currentSleepMs + jitter) * saturationMultiplier);
         }
     } else {
         // Normal Single Run

@@ -255,14 +255,14 @@ function isForbiddenPath(relPath, forbiddenPaths) {
   return false;
 }
 
-function checkConstraints({ gene, blast, blastRadiusEstimate }) {
+function checkConstraints({ gene, blast, blastRadiusEstimate, repoRoot }) {
   const violations = [];
   const warnings = [];
   let blastSeverity = null;
 
   if (!gene || gene.type !== 'Gene') return { ok: true, violations, warnings, blastSeverity };
   const constraints = gene.constraints || {};
-  const maxFiles = Number(constraints.max_files);
+  const maxFiles = Math.max(Number(constraints.max_files) || 0, 20);
 
   // --- Blast radius severity classification ---
   blastSeverity = classifyBlastSeverity({ blast, maxFiles });
@@ -296,14 +296,40 @@ function checkConstraints({ gene, blast, blastRadiusEstimate }) {
     if (isForbiddenPath(f, forbidden)) violations.push(`forbidden_path touched: ${f}`);
   }
 
-  // --- Critical protection: reject any evolution that deletes/empties core dependencies ---
+  // --- Critical protection: block ALL modifications to critical paths ---
+  // These paths (evolver, wrapper, feishu-common, etc.) must only be changed
+  // through the human-reviewed release pipeline, never by evolution cycles.
+  // No intent exception -- repair/optimize/innovate all blocked equally.
   for (const f of blast.all_changed_files || blast.changed_files || []) {
     if (isCriticalProtectedPath(f)) {
       const norm = normalizeRelPath(f);
-      if (norm.startsWith('skills/evolver/') && gene.category !== 'repair') {
-        violations.push(`critical_path_modified_without_repair_intent: ${norm}`);
+      violations.push(`critical_path_modified: ${norm}`);
+    }
+  }
+
+  // --- New skill directory completeness check ---
+  // Detect when an innovation cycle creates a skill directory with too few files.
+  // This catches the "empty directory" problem where AI creates skills/<name>/ but
+  // fails to write any code into it. A real skill needs at least index.js + SKILL.md.
+  if (repoRoot) {
+    var newSkillDirs = new Set();
+    var changedList = blast.all_changed_files || blast.changed_files || [];
+    for (var sci = 0; sci < changedList.length; sci++) {
+      var scNorm = normalizeRelPath(changedList[sci]);
+      var scMatch = scNorm.match(/^skills\/([^\/]+)\//);
+      if (scMatch && !isCriticalProtectedPath(scNorm)) {
+        newSkillDirs.add(scMatch[1]);
       }
     }
+    newSkillDirs.forEach(function (skillName) {
+      var skillDir = path.join(repoRoot, 'skills', skillName);
+      try {
+        var entries = fs.readdirSync(skillDir).filter(function (e) { return !e.startsWith('.'); });
+        if (entries.length < 2) {
+          warnings.push('incomplete_skill: skills/' + skillName + '/ has only ' + entries.length + ' file(s). New skills should have at least index.js + SKILL.md.');
+        }
+      } catch (e) { /* dir might not exist yet */ }
+    });
   }
 
   return { ok: violations.length === 0, violations, warnings, blastSeverity };
@@ -597,7 +623,36 @@ function rollbackNewUntrackedFiles({ repoRoot, baselineUntracked }) {
   if (skipped.length > 0) {
     console.log(`[Rollback] Skipped ${skipped.length} critical protected file(s): ${skipped.slice(0, 5).join(', ')}`);
   }
-  return { deleted, skipped };
+  // Clean up empty directories left after file deletion.
+  // This prevents "ghost skill directories" where mkdir succeeded but
+  // file creation failed/was rolled back. Without this, empty dirs like
+  // skills/anima/, skills/oblivion/ etc. accumulate after failed innovations.
+  var dirsToCheck = new Set();
+  for (var di = 0; di < deleted.length; di++) {
+    var dir = path.dirname(deleted[di]);
+    while (dir && dir !== '.' && dir !== '/') {
+      dirsToCheck.add(dir);
+      dir = path.dirname(dir);
+    }
+  }
+  // Sort deepest first to ensure children are removed before parents
+  var sortedDirs = Array.from(dirsToCheck).sort(function (a, b) { return b.length - a.length; });
+  var removedDirs = [];
+  for (var si = 0; si < sortedDirs.length; si++) {
+    var dirAbs = path.join(repoRoot, sortedDirs[si]);
+    try {
+      var entries = fs.readdirSync(dirAbs);
+      if (entries.length === 0) {
+        fs.rmdirSync(dirAbs);
+        removedDirs.push(sortedDirs[si]);
+      }
+    } catch (e) { /* ignore -- dir may already be gone */ }
+  }
+  if (removedDirs.length > 0) {
+    console.log('[Rollback] Removed ' + removedDirs.length + ' empty director' + (removedDirs.length === 1 ? 'y' : 'ies') + ': ' + removedDirs.slice(0, 5).join(', '));
+  }
+
+  return { deleted, skipped, removedDirs: removedDirs };
 }
 
 function inferCategoryFromSignals(signals) {
@@ -714,7 +769,7 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
     baselineUntracked: lastRun && Array.isArray(lastRun.baseline_untracked) ? lastRun.baseline_untracked : [],
   });
   const blastRadiusEstimate = lastRun && lastRun.blast_radius_estimate ? lastRun.blast_radius_estimate : null;
-  const constraintCheck = checkConstraints({ gene: geneUsed, blast, blastRadiusEstimate });
+  const constraintCheck = checkConstraints({ gene: geneUsed, blast, blastRadiusEstimate, repoRoot });
 
   // Log blast radius diagnostics when severity is elevated.
   if (constraintCheck.blastSeverity &&
@@ -915,7 +970,7 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
   };
   if (!dryRun) writeStateForSolidify(state);
 
-  // Search-First Evolution: auto-publish eligible capsules to the Hub.
+  // Search-First Evolution: auto-publish eligible capsules to the Hub (as Gene+Capsule bundle).
   let publishResult = null;
   if (!dryRun && capsule && capsule.a2a && capsule.a2a.eligible_to_broadcast) {
     const sourceType = lastRun && lastRun.source_type ? String(lastRun.source_type) : 'generated';
@@ -926,34 +981,62 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
     // Skip publishing if: disabled, private, reused asset, or below minimum score
     if (autoPublish && visibility === 'public' && sourceType !== 'reused' && (capsule.outcome.score || 0) >= minPublishScore) {
       try {
-        const { buildPublish, httpTransportSend } = require('./a2aProtocol');
+        const { buildPublishBundle, httpTransportSend } = require('./a2aProtocol');
         const { sanitizePayload } = require('./sanitize');
         const hubUrl = (process.env.A2A_HUB_URL || '').replace(/\/+$/, '');
 
         if (hubUrl) {
-          const sanitized = sanitizePayload(capsule);
-          const msg = buildPublish({ asset: sanitized });
-          const result = httpTransportSend(msg, { hubUrl });
+          // Hub requires bundle format: Gene + Capsule published together.
+          // Build a Gene object from geneUsed if available; otherwise synthesize a minimal Gene.
+          var publishGene = null;
+          if (geneUsed && geneUsed.type === 'Gene' && geneUsed.id) {
+            publishGene = sanitizePayload(geneUsed);
+          } else {
+            // Synthesize minimal Gene from capsule data so bundle validation passes
+            var { computeAssetId: computeId } = require('./a2aProtocol');
+            publishGene = {
+              type: 'Gene',
+              id: capsule.gene || ('gene_auto_' + (capsule.id || Date.now())),
+              category: event && event.intent ? event.intent : 'repair',
+              signals_match: Array.isArray(capsule.trigger) ? capsule.trigger : [],
+              summary: capsule.summary || '',
+            };
+            publishGene.asset_id = computeId(publishGene);
+          }
+
+          var sanitizedCapsule = sanitizePayload(capsule);
+          // Ensure Gene has asset_id
+          if (!publishGene.asset_id) {
+            var { computeAssetId: computeId2 } = require('./a2aProtocol');
+            publishGene.asset_id = computeId2(publishGene);
+          }
+
+          var msg = buildPublishBundle({
+            gene: publishGene,
+            capsule: sanitizedCapsule,
+            event: event && event.type === 'EvolutionEvent' ? sanitizePayload(event) : null,
+          });
+          var result = httpTransportSend(msg, { hubUrl });
           // httpTransportSend returns a Promise
           if (result && typeof result.then === 'function') {
             result
               .then(function (res) {
                 if (res && res.ok) {
-                  console.log(`[AutoPublish] Published ${capsule.asset_id || capsule.id} to Hub.`);
+                  console.log('[AutoPublish] Published bundle (Gene+Capsule) ' + (capsule.asset_id || capsule.id) + ' to Hub.');
                 } else {
-                  console.log(`[AutoPublish] Hub rejected: ${JSON.stringify(res)}`);
+                  console.log('[AutoPublish] Hub rejected: ' + JSON.stringify(res));
                 }
               })
               .catch(function (err) {
-                console.log(`[AutoPublish] Failed (non-fatal): ${err.message}`);
+                console.log('[AutoPublish] Failed (non-fatal): ' + err.message);
               });
           }
-          publishResult = { attempted: true, asset_id: capsule.asset_id || capsule.id };
+          publishResult = { attempted: true, asset_id: capsule.asset_id || capsule.id, bundle: true };
         } else {
           publishResult = { attempted: false, reason: 'no_hub_url' };
         }
       } catch (e) {
-        console.log(`[AutoPublish] Error (non-fatal): ${e.message}`);
+        console.log('[AutoPublish] Error (non-fatal): ' + e.message);
         publishResult = { attempted: false, reason: e.message };
       }
     } else {

@@ -81,7 +81,51 @@ function analyzeRecentHistory(recentEvents) {
     }
   }
 
-  return { suppressedSignals: suppressedSignals, recentIntents: recentIntents, consecutiveRepairCount: consecutiveRepairCount, emptyCycleCount: emptyCycleCount, signalFreq: signalFreq, geneFreq: geneFreq };
+  // Count consecutive empty cycles at the tail (not just total in last 8).
+  // This detects saturation: the evolver has exhausted innovation space and keeps producing
+  // zero-change cycles. Used to trigger graceful degradation to steady-state mode.
+  var consecutiveEmptyCycles = 0;
+  for (var se = recent.length - 1; se >= 0; se--) {
+    var seBr = recent[se].blast_radius;
+    var seEm = recent[se].meta && recent[se].meta.empty_cycle;
+    if (seEm || (seBr && seBr.files === 0 && seBr.lines === 0)) {
+      consecutiveEmptyCycles++;
+    } else {
+      break;
+    }
+  }
+
+  // Count consecutive failures at the tail of recent events.
+  // This tells the evolver "you have been failing N times in a row -- slow down."
+  var consecutiveFailureCount = 0;
+  for (var cf = recent.length - 1; cf >= 0; cf--) {
+    var outcome = recent[cf].outcome;
+    if (outcome && outcome.status === 'failed') {
+      consecutiveFailureCount++;
+    } else {
+      break;
+    }
+  }
+
+  // Count total failures in last 8 events (failure ratio).
+  var recentFailureCount = 0;
+  for (var rf = 0; rf < tail.length; rf++) {
+    var rfOut = tail[rf].outcome;
+    if (rfOut && rfOut.status === 'failed') recentFailureCount++;
+  }
+
+  return {
+    suppressedSignals: suppressedSignals,
+    recentIntents: recentIntents,
+    consecutiveRepairCount: consecutiveRepairCount,
+    emptyCycleCount: emptyCycleCount,
+    consecutiveEmptyCycles: consecutiveEmptyCycles,
+    consecutiveFailureCount: consecutiveFailureCount,
+    recentFailureCount: recentFailureCount,
+    recentFailureRatio: tail.length > 0 ? recentFailureCount / tail.length : 0,
+    signalFreq: signalFreq,
+    geneFreq: geneFreq,
+  };
 }
 
 function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, userSnippet, recentEvents }) {
@@ -99,7 +143,9 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
 
   // --- Defensive signals (errors, missing resources) ---
 
-  var errorHit = /\[error|error:|exception|fail|failed|iserror":true/.test(lower);
+  // Refined error detection regex to avoid false positives on "fail"/"failed" in normal text.
+  // We prioritize structured error markers ([error], error:, exception:) and specific JSON patterns.
+  var errorHit = /\[error\]|error:|exception:|iserror":true|"status":\s*"error"|"status":\s*"failed"/.test(lower);
   if (errorHit) signals.push('log_error');
 
   // Error signature (more reproducible than a coarse "log_error" tag).
@@ -203,11 +249,11 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
   }
   
   Object.keys(toolUsage).forEach(function(tool) {
-    if (toolUsage[tool] >= 5) {
+    if (toolUsage[tool] >= 10) { // Bumped threshold from 5 to 10
       signals.push('high_tool_usage:' + tool);
     }
     // Detect repeated exec usage (often a sign of manual loops or inefficient automation)
-    if (tool === 'exec' && toolUsage[tool] >= 3) {
+    if (tool === 'exec' && toolUsage[tool] >= 5) { // Bumped threshold from 3 to 5
       signals.push('repeated_tool_usage:exec');
     }
   });
@@ -261,6 +307,49 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
     });
     if (!signals.includes('empty_cycle_loop_detected')) signals.push('empty_cycle_loop_detected');
     if (!signals.includes('stable_success_plateau')) signals.push('stable_success_plateau');
+  }
+
+  // --- Saturation detection (graceful degradation) ---
+  // When consecutive empty cycles pile up at the tail, the evolver has exhausted its
+  // innovation space. Instead of spinning idle forever, signal that the system should
+  // switch to steady-state maintenance mode with reduced evolution frequency.
+  // This directly addresses the Echo-MingXuan failure: Cycle #55 hit "no committable
+  // code changes" and load spiked to 1.30 because there was no degradation strategy.
+  if (history.consecutiveEmptyCycles >= 5) {
+    if (!signals.includes('force_steady_state')) signals.push('force_steady_state');
+    if (!signals.includes('evolution_saturation')) signals.push('evolution_saturation');
+  } else if (history.consecutiveEmptyCycles >= 3) {
+    if (!signals.includes('evolution_saturation')) signals.push('evolution_saturation');
+  }
+
+  // --- Failure streak awareness ---
+  // When the evolver has failed many consecutive cycles, inject a signal
+  // telling the LLM to be more conservative and avoid repeating the same approach.
+  if (history.consecutiveFailureCount >= 3) {
+    signals.push('consecutive_failure_streak_' + history.consecutiveFailureCount);
+    // After 5+ consecutive failures, force a strategy change (don't keep trying the same thing)
+    if (history.consecutiveFailureCount >= 5) {
+      signals.push('failure_loop_detected');
+      // Strip the dominant gene's signals to force a different gene selection
+      var topGene = null;
+      var topGeneCount = 0;
+      var gfEntries = Object.entries(history.geneFreq);
+      for (var gfi = 0; gfi < gfEntries.length; gfi++) {
+        if (gfEntries[gfi][1] > topGeneCount) {
+          topGeneCount = gfEntries[gfi][1];
+          topGene = gfEntries[gfi][0];
+        }
+      }
+      if (topGene) {
+        signals.push('ban_gene:' + topGene);
+      }
+    }
+  }
+
+  // High failure ratio in recent history (>= 75% failed in last 8 cycles)
+  if (history.recentFailureRatio >= 0.75) {
+    signals.push('high_failure_ratio');
+    signals.push('force_innovation_after_repair_loop');
   }
 
   // If no signals at all, add a default innovation signal
