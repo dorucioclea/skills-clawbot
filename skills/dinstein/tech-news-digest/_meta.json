@@ -3,11 +3,16 @@
   "slug": "tech-news-digest",
   "displayName": "Tech News Digest",
   "latest": {
-    "version": "2.4.1",
-    "publishedAt": 1771171338455,
-    "commit": "https://github.com/openclaw/skills/commit/e8b98abd801555172a11544aba5e870f22bbd2d4"
+    "version": "2.5.0",
+    "publishedAt": 1771173974990,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.4.1",
+      "publishedAt": 1771171338455,
+      "commit": "https://github.com/openclaw/skills/commit/e8b98abd801555172a11544aba5e870f22bbd2d4"
+    },
     {
       "version": "2.2.1",
       "publishedAt": 1771166187427,
