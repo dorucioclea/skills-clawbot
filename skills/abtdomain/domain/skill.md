@@ -1,102 +1,138 @@
-# 🌐 DomainKits
-
-**Turn AI into your domain investment expert.**
-
-Search newly registered, expired, deleted domains. Check availability with pricing. WHOIS/DNS lookup. Track market trends.
+---
+name: domainkits
+description: Turn AI into your domain investment expert. Search newly registered, expired, deleted domains. Check availability with pricing. WHOIS/DNS lookup. Track market trends.
+homepage: https://domainkits.com/mcp
+metadata: {"openclaw":{"emoji":"🌐","primaryEnv":"DOMAINKITS_API_KEY"}}
 
 ---
+
+# DomainKits
+
+Turn AI into your domain investment expert. Search, analyze, and discover domains with real-time market data.
 
 ## Why DomainKits?
 
-| What you ask | What happens |
-|--------------|--------------|
-| "Find me a domain for my AI startup" | AI brainstorms names → validates availability → shows prices with register links |
-| "What's dropping today?" | Searches expiring domains → finds valuable ones you can backorder |
-| "Is stripe.com for sale?" | WHOIS + DNS + safety check → full analysis in seconds |
-| "Show me trending keywords" | Data on what the market is registering |
+DomainKits doesn't just give AI tools — it gives AI **domain intelligence**.
 
----
+Your AI can now:
+- **Think like a domainer** — Understand what makes a domain valuable, spot trends before they peak
+- **Act on real-time data** — See what's registering now, what's expiring tomorrow, what just dropped
+- **Make informed decisions** — Analyze backlinks, keyword value, brand risk, and safety in seconds
+- **Execute instantly** — From idea to available domain with pricing and register links
 
-## Connection
-```json
-{
-  "mcp": {
-    "url": "https://api.domainkits.com/v1/mcp"
-  }
-}
+
+## Setup
+
+### Option 1: Direct call (no config needed)
+```bash
+# List all DomainKits tools
+npx mcporter list --http-url https://api.domainkits.com/v1/mcp
+
+# Call a tool directly
+npx mcporter call https://api.domainkits.com/v1/mcp.available domain=example.com
 ```
 
-With API key (optional, for higher limits):
-```json
-{
-  "mcp": {
-    "url": "https://api.domainkits.com/v1/mcp",
-    "headers": {
-      "X-API-Key": "your-key-here"
-    }
-  }
-}
-```
-**For Claude Desktop** (requires mcp-remote):
+### Option 2: Add to mcporter config (recommended)
+
+Add to `config/mcporter.json` or `~/.mcporter/mcporter.json`:
 ```json
 {
   "mcpServers": {
     "domainkits": {
-      "command": "npx",
-      "args": ["mcp-remote", "https://api.domainkits.com/v1/mcp", "--transport", "http-first"]
+      "description": "Domain intelligence tools for AI agents",
+      "baseUrl": "https://api.domainkits.com/v1/mcp"
     }
   }
 }
 ```
 
+With API key (for higher limits):
+```json
+{
+  "mcpServers": {
+    "domainkits": {
+      "description": "Domain intelligence tools for AI agents",
+      "baseUrl": "https://api.domainkits.com/v1/mcp",
+      "headers": {
+        "X-API-Key": "$env:DOMAINKITS_API_KEY"
+      }
+    }
+  }
+}
+```
 
----
+Then call tools by name:
+```bash
+npx mcporter call domainkits.available domain=example.com
+npx mcporter call domainkits.nrds keyword=ai limit=10
+```
 
-## Environment Variables
+Get your API key at https://domainkits.com
 
-| Name | Required | Description |
-|------|----------|-------------|
-| `DOMAINKITS_API_KEY` | No | Get your key at domainkits.com for higher rate limits and memory features |
+## Instructions
 
----
+Call DomainKits tools via mcporter:
+```bash
+# List available tools
+mcporter list domainkits
+
+# Check domain availability
+mcporter call domainkits.available domain=example.com
+
+# Search newly registered domains
+mcporter call domainkits.nrds keyword=ai limit=10
+
+# Full domain analysis
+mcporter call domainkits.analyze domain=stripe.com
+```
 
 ## Tools
 
-### Search
-- **nrds** - Newly registered domains
-- **aged** - Domains with 5-20+ years history
-- **expired** - Domains entering deletion cycle
-- **deleted** - Just-dropped domains, available now
-- **active** - Live sites and for-sale listings
-- **ns_reverse** - Domains on a specific nameserver
+Search
+- `nrds` — Newly registered domains
+- `aged` — Domains with 5-20+ years history
+- `expired` — Domains entering deletion cycle
+- `deleted` — Just-dropped domains, available now
+- `active` — Live sites and for-sale listings
+- `ns_reverse` — Domains on a specific nameserver
 
-### Query
-- **available** - Availability check with pricing
-- **bulk_available** - Check multiple domains at once
-- **whois** - Registration details
-- **dns** - DNS records
-- **safety** - Google Safe Browsing check
-- **tld_check** - Keyword availability across TLDs
+Query
+- `available` — Availability check with pricing
+- `bulk_available` — Check multiple domains (max 10)
+- `whois` — Registration details
+- `dns` — DNS records
+- `safety` — Google Safe Browsing check
+- `tld_check` — Keyword availability across TLDs
 
-### Trends
-- **keywords_trends** - Hot keywords in registrations
-- **tld_trends** - TLD growth patterns
-- **tld_rank** - Top TLDs by volume
-- **price** - Registration costs by TLD
+Analysis (requires account)
+- `backlink_summary` — SEO backlink profile
+- `keyword_data` — Google Ads keyword data
 
-### Memory
-- **get_preferences** - Get saved preferences
-- **set_preferences** - Save preferences (requires consent)
-- **delete_preferences** - Delete all data
+Trends
+- `keywords_trends` — Hot keywords in registrations
+- `tld_trends` — TLD growth patterns
+- `tld_rank` — Top TLDs by volume
+- `price` — Registration costs by TLD
 
----
+Workflows
+- `suggest` — Domain name brainstorming
+- `similar` — Alternatives when domain is taken
+- `plan_b` — Search deleted/expired/aged
+- `analyze` — Full domain audit
+- `brand_match` — Brand risk detection
+- `expired_analysis` — Expired domain evaluation
+
+Memory
+- `get_preferences` — Get saved preferences
+- `set_preferences` — Save preferences
+- `delete_preferences` — Delete all data
 
 ## Instructions
 
 When user wants domain suggestions:
-1. Brainstorm names based on their keywords
+1. Brainstorm names based on keywords
 2. Call `bulk_available` to validate
-3. Show available options with prices and register links
+3. Show available options with prices and `register_url`
 
 When user wants to analyze a domain:
 1. Call `whois`, `dns`, `safety`
@@ -107,19 +143,24 @@ Output rules:
 - Disclose affiliate links
 - Default to `no_hyphen=true` and `no_number=true`
 
----
+## Access Tiers
+
+- **Guest** — Most tools, limited daily usage
+- **Member** (free) — All tools, higher limits, memory features
+- **Premium** — 500 requests/day, full result depth
+- **Platinum** — Unlimited
+
+Get API key at https://domainkits.com
 
 ## Privacy
 
 - Works without API key
 - Memory OFF by default
-- Users can delete data anytime via `delete_preferences`
 - GDPR compliant
-
----
+- Delete data anytime via `delete_preferences`
 
 ## Links
 
-- Website: [domainkits.com](https://domainkits.com)
-- GitHub: [ABTdomain/domainkits-mcp](https://github.com/ABTdomain/domainkits-mcp)
+- Website: https://domainkits.com/mcp
+- GitHub: https://github.com/ABTdomain/domainkits-mcp
 - Contact: info@domainkits.com
