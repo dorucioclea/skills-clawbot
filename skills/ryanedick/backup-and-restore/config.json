@@ -1,0 +1,14 @@
+{
+  "mode": "full",
+  "encrypt": true,
+  "retainDays": 30,
+  "schedule": "daily",
+  "destinations": [
+    {
+      "type": "r2",
+      "bucket": "openclaw-bkup",
+      "accountId": "3a4b4066acb4a8fc0461840535ba7ffc",
+      "endpoint": "https://3a4b4066acb4a8fc0461840535ba7ffc.r2.cloudflarestorage.com"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "owner": "ryanedick",
+  "slug": "backup-and-restore",
+  "displayName": "Backup & Restore",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771136931573,
+    "commit": null
+  },
+  "history": []
+}
