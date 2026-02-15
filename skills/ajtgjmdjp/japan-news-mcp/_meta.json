@@ -1,11 +1,17 @@
 {
   "owner": "ajtgjmdjp",
   "slug": "japan-news-mcp",
-  "displayName": "Japan News MCP",
+  "displayName": "Japan News Mcp",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1771088691800,
-    "commit": "https://github.com/openclaw/skills/commit/f8e75ae3ab131b6bdc8ef3ddb146f3209e3d999d"
+    "version": "0.1.1",
+    "publishedAt": 1771100880444,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1771088691800,
+      "commit": "https://github.com/openclaw/skills/commit/f8e75ae3ab131b6bdc8ef3ddb146f3209e3d999d"
+    }
+  ]
 }

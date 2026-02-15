@@ -1,7 +1,7 @@
 ---
 name: japan-news-mcp
-description: "Get Japanese financial and business news from Yahoo News, NHK, Reuters Japan, and Toyo Keizai — search headlines, get article summaries, list sources."
-metadata: {"openclaw":{"emoji":"📰","requires":{"bins":["japan-news-mcp"]},"install":[{"id":"uv","kind":"uv","package":"japan-news-mcp","bins":["japan-news-mcp"],"label":"Install japan-news-mcp (uv)"}]}}
+description: "Get Japanese financial and business news from Yahoo News Japan, NHK, Reuters Japan, and Toyo Keizai (東洋経済) — search headlines by keyword, get article summaries. Japan stock market news, economic news, corporate news. No API key required."
+metadata: {"openclaw":{"emoji":"📰","requires":{"bins":["japan-news-mcp"]},"install":[{"id":"uv","kind":"uv","package":"japan-news-mcp","bins":["japan-news-mcp"],"label":"Install japan-news-mcp (uv)"}],"tags":["japan","news","finance","rss","mcp","business","economy","japanese"]}}
 ---
 
 # Japan News: Japanese Financial & Business News
