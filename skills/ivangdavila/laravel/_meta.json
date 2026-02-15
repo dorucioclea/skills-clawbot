@@ -3,9 +3,15 @@
   "slug": "laravel",
   "displayName": "Laravel",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770683127909,
-    "commit": "https://github.com/openclaw/skills/commit/bbbb2d15dfe5f6e2148289202bcd90177f7519cd"
+    "version": "1.0.1",
+    "publishedAt": 1771104778766,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770683127909,
+      "commit": "https://github.com/openclaw/skills/commit/bbbb2d15dfe5f6e2148289202bcd90177f7519cd"
+    }
+  ]
 }

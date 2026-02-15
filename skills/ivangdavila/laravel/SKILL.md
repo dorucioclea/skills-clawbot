@@ -1,54 +1,35 @@
 ---
 name: Laravel
-description: Avoid common Laravel mistakes — N+1 queries, mass assignment, cache gotchas, and queue serialization traps.
-metadata: {"clawdbot":{"emoji":"🔴","requires":{"bins":["php"]},"os":["linux","darwin","win32"]}}
+slug: laravel
+version: 1.0.1
+description: Build robust Laravel apps avoiding Eloquent traps, queue failures, and auth pitfalls.
+metadata: {"clawdbot":{"emoji":"🔴","requires":{"bins":["php","composer"]},"os":["linux","darwin","win32"]}}
 ---
 
-## Eloquent N+1
-- Accessing relationship in loop without eager load — `User::with('posts')->get()` not `User::all()` then `->posts`
-- Nested relationships need dot notation — `with('posts.comments')` for eager loading
-- `withCount('posts')` for counting without loading — adds `posts_count` attribute
-- `preventLazyLoading()` in AppServiceProvider — crashes on N+1 in dev, catches bugs early
+## Quick Reference
 
-## Mass Assignment
-- `$fillable` whitelist OR `$guarded` blacklist — not both
-- `$guarded = []` allows all fields — dangerous, prefer explicit `$fillable`
-- `create()` and `update()` respect mass assignment — `$model->field = x` bypasses it
-- Request validated data is not auto-safe — still filtered by fillable/guarded
+| Topic | File |
+|-------|------|
+| N+1 queries, eager loading, accessors, observers | `eloquent.md` |
+| Validation, middleware order, dependency injection | `controllers.md` |
+| Job serialization, retries, failed jobs | `queues.md` |
+| Guards, policies, gates, Sanctum tokens | `auth.md` |
+| XSS escaping, components, slots | `blade.md` |
+| Commands, scheduling, tinker | `artisan.md` |
 
-## Cache Pitfalls
-- `config:cache` bakes .env values — env() only works in config files after caching
-- `route:cache` requires all routes to be controller-based — no closures
-- `php artisan optimize` combines config, route, view cache — run after deploy
-- Local changes not reflecting — `php artisan cache:clear && config:clear && route:clear`
+## Critical Rules
 
-## Queue Jobs
-- Job class properties serialized — models serialize as ID, re-fetched on process
-- Closure can't be queued — must be invocable class
-- Failed jobs go to `failed_jobs` table — check there for errors
-- `$tries`, `$timeout`, `$backoff` as job properties — or in config
-- Connection vs queue: connection is driver, queue is named channel on that driver
-
-## Middleware
-- Order matters — earlier middleware wraps later
-- `$middleware` global on every request — `$middlewareGroups` for web/api
-- Terminate middleware runs after response sent — for logging, cleanup
-- Route middleware can have parameters — `role:admin` passes 'admin' to middleware
-
-## Database
-- `migrate:fresh` drops ALL tables — `migrate:refresh` rolls back then migrates
-- `DB::transaction()` auto-rolls back on exception — but not on manual `exit` or timeout
-- Soft deletes excluded by default — `withTrashed()` to include
-- `firstOrCreate` vs `firstOrNew` — first persists, second doesn't
-
-## Testing
-- `RefreshDatabase` is faster than `DatabaseMigrations` — uses transactions
-- Factories: `create()` persists, `make()` doesn't — use make for unit tests
-- `$this->withoutExceptionHandling()` shows actual errors — helpful for debugging
-- Queue fake: `Queue::assertPushed()` — check job was queued without running it
-
-## Common Mistakes
-- `find()` returns null, `findOrFail()` throws 404 — use OrFail to avoid null checks
-- `env()` in cached config returns null — only use env() inside config files
-- Validation `required` doesn't mean non-empty — use `required|filled` for strings
-- Route model binding uses `id` by default — `getRouteKeyName()` to change
+- Eager load relationships — `with('posts')` not lazy `->posts` in loop (N+1)
+- `preventLazyLoading()` in dev AppServiceProvider — crashes on N+1, catches early
+- `env()` only in config files — returns null after `config:cache`
+- `$fillable` whitelist fields — `$guarded = []` allows mass assignment attacks
+- `find()` returns null — use `findOrFail()` to avoid null checks
+- Job properties serialize models as ID — re-fetched on process, may be stale/deleted
+- `route:cache` requires controller routes — closures break cached routes
+- `DB::transaction()` doesn't catch `exit`/timeout — only exceptions roll back
+- `RefreshDatabase` uses transactions — faster than `DatabaseMigrations`
+- `{!! $html !!}` skips escaping — XSS vector, use `{{ }}` by default
+- Middleware order matters — earlier middleware wraps later execution
+- `required` validation passes empty string — use `required|filled` for content
+- `firstOrCreate` persists immediately — `firstOrNew` returns unsaved model
+- Route model binding uses `id` — override `getRouteKeyName()` for slug
