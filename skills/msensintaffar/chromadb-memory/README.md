@@ -1,80 +1,74 @@
 # chromadb-memory
 
-🧠 Long-term semantic memory plugin for [OpenClaw](https://github.com/openclaw/openclaw) — backed by ChromaDB and local Ollama embeddings. Zero cloud dependencies.
+Long-term memory via ChromaDB with local Ollama embeddings. Auto-recall injects relevant context every turn. No cloud APIs required — fully self-hosted.
 
-## Features
+## ⚠️ Important: Upgrade to v1.1.1
 
-- **Auto-recall**: Before every agent turn, queries ChromaDB with the user's message and injects relevant context automatically
-- **`chromadb_search` tool**: Manual semantic search over your ChromaDB collection
-- **100% local**: Ollama (nomic-embed-text) for embeddings, ChromaDB for vector storage
-- **No OpenAI** — your memories stay on your hardware
+**v1.0.0 had a critical silent failure bug.** If your indexer/reindexer deletes and recreates the ChromaDB collection (which most do), the collection UUID changes — and v1.0.0 used a hardcoded UUID in the config. This meant **auto-recall silently stopped working** after the first reindex, with no error message. You'd have no idea your long-term memory was gone.
 
-## Prerequisites
+**v1.1.0** fixes this by resolving collections by **name** instead of UUID. It survives reindexing automatically.
 
-1. **ChromaDB** running (Docker recommended):
-   ```bash
-   docker run -d --name chromadb -p 8100:8000 chromadb/chroma:latest
-   ```
+**v1.1.1** adds error surfacing — if ChromaDB is unreachable or the collection is missing, the agent now sees a warning in its context instead of silent failure.
 
-2. **Ollama** with an embedding model:
-   ```bash
-   ollama pull nomic-embed-text
-   ```
+**To upgrade:** Update the plugin files and optionally add `collectionName` to your config (default: `longterm_memory`). The `collectionId` field is no longer required.
 
-3. Indexed documents in ChromaDB (use any ChromaDB-compatible indexer to populate your collection)
+## Setup
 
-## Install via ClawdHub
+### Requirements
+- ChromaDB v2 server (local or remote)
+- Ollama with `nomic-embed-text` model (or any embedding model)
+- An indexed collection in ChromaDB
 
-```bash
-clawdhub install chromadb-memory
-```
-
-Or manually — see [SKILL.md](SKILL.md) for full install and config instructions.
-
-## Quick Config
-
-Add to your OpenClaw config (`~/.openclaw/openclaw.json`):
+### Config
 
 ```json
 {
-  "plugins": {
-    "entries": {
-      "chromadb-memory": {
-        "enabled": true,
-        "config": {
-          "chromaUrl": "http://localhost:8100",
-          "collectionId": "YOUR_COLLECTION_ID",
-          "ollamaUrl": "http://localhost:11434",
-          "embeddingModel": "nomic-embed-text",
-          "autoRecall": true,
-          "autoRecallResults": 3,
-          "minScore": 0.5
-        }
-      }
+  "chromadb-memory": {
+    "enabled": true,
+    "config": {
+      "chromaUrl": "http://localhost:8100",
+      "collectionName": "longterm_memory",
+      "ollamaUrl": "http://localhost:11434",
+      "embeddingModel": "nomic-embed-text",
+      "autoRecall": true,
+      "autoRecallResults": 3,
+      "minScore": 0.5
     }
   }
 }
 ```
 
-## How It Works
+| Field | Default | Description |
+|-------|---------|-------------|
+| `chromaUrl` | `http://localhost:8100` | ChromaDB server URL |
+| `collectionName` | `longterm_memory` | Collection name (recommended — survives reindexing) |
+| `collectionId` | — | Collection UUID (optional, fallback if name fails) |
+| `ollamaUrl` | `http://localhost:11434` | Ollama server URL |
+| `embeddingModel` | `nomic-embed-text` | Embedding model name |
+| `autoRecall` | `true` | Inject relevant memories before each agent turn |
+| `autoRecallResults` | `3` | Number of memories to inject |
+| `minScore` | `0.5` | Minimum similarity score (0-1) |
 
-```
-User Message → Ollama (embed) → ChromaDB (query) → Context Injection → Agent Response
-```
+## Features
 
-Auto-recall adds ~275 tokens per turn worst case — negligible against a 200K+ context window.
+- **Auto-recall**: Relevant memories injected into agent context before each turn
+- **Manual search**: `chromadb_search` tool for explicit queries
+- **Name-based resolution**: Collection UUID auto-resolved from name (v1.1.0+)
+- **Error surfacing**: Agent sees warnings when ChromaDB is unavailable (v1.1.1+)
+- **Self-healing**: Cached collection ID auto-invalidates on failure and re-resolves
 
-## License
+## Changelog
 
-MIT
+### v1.1.1
+- Auto-recall failures now surface as warnings in agent context (no more silent memory loss)
+- Consecutive failure counter with escalating severity
+- Cache invalidation on failure forces collection re-resolve
 
-## Author
+### v1.1.0
+- New `collectionName` config option (default: `longterm_memory`)
+- Auto-resolves collection UUID from name — survives reindexing
+- `collectionId` no longer required (backwards compatible)
 
-matts — [git.matts.haus](https://git.matts.haus/matts/chromadb-memory)
-
-## v1.1.0 — Auto-resolve Collection by Name
-
-- **New:** `collectionName` config option (default: `longterm_memory`) — auto-resolves to UUID
-- Collections survive reindexing without config changes
-- `collectionId` still works but is no longer required
-- Resolved ID cached per session for performance
+### v1.0.0
+- Initial release
+- ⚠️ Hardcoded `collectionId` breaks silently after reindexing

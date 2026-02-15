@@ -79,6 +79,7 @@ const CHROMA_BASE = "/api/v2/tenants/default_tenant/databases/default_database/c
 
 // Resolve collection ID by name (survives reindexing)
 let _resolvedCollectionId: string | null = null;
+let _consecutiveFailures = 0;
 
 async function resolveCollectionId(
   chromaUrl: string,
@@ -116,22 +117,55 @@ async function resolveCollectionId(
   return match.id;
 }
 
-async function queryChromaDB(
+// Extract potential keywords (capitalized words, quoted phrases) for hybrid search
+function extractKeywords(query: string): string[] {
+  const keywords: string[] = [];
+
+  // Capitalized words (likely proper nouns) — exclude common sentence starters
+  const commonStarters = new Set(["what", "who", "where", "when", "how", "why", "the", "a", "an", "is", "are", "do", "does", "did", "can", "could", "would", "should", "my", "his", "her", "their", "search", "find", "tell", "remember", "about", "from"]);
+  const words = query.split(/\s+/);
+  for (const word of words) {
+    const clean = word.replace(/[^a-zA-Z]/g, "");
+    if (clean.length >= 3 && clean[0] === clean[0].toUpperCase() && clean[0] !== clean[0].toLowerCase()) {
+      if (!commonStarters.has(clean.toLowerCase())) {
+        keywords.push(clean);
+      }
+    }
+  }
+
+  // Quoted phrases
+  const quoted = query.match(/"([^"]+)"/g);
+  if (quoted) {
+    for (const q of quoted) {
+      keywords.push(q.replace(/"/g, ""));
+    }
+  }
+
+  return [...new Set(keywords)];
+}
+
+async function queryChromaDBRaw(
   chromaUrl: string,
   collectionId: string,
   embedding: number[],
   nResults: number,
+  whereDocument?: Record<string, string>,
 ): Promise<ChromaResult[]> {
   const url = `${chromaUrl}${CHROMA_BASE}/${collectionId}/query`;
+
+  const body: Record<string, unknown> = {
+    query_embeddings: [embedding],
+    n_results: nResults,
+    include: ["documents", "metadatas", "distances"],
+  };
+  if (whereDocument) {
+    body.where_document = whereDocument;
+  }
 
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query_embeddings: [embedding],
-      n_results: nResults,
-      include: ["documents", "metadatas", "distances"],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!resp.ok) {
@@ -151,10 +185,81 @@ async function queryChromaDB(
     source: data.metadatas[0][i]?.source || "unknown",
     text: data.documents[0][i] || "",
     distance: data.distances[0][i],
-    // Convert cosine distance to similarity score (0-1)
     score: 1 - data.distances[0][i],
     metadata: data.metadatas[0][i] || {},
   }));
+}
+
+async function queryChromaDB(
+  chromaUrl: string,
+  collectionId: string,
+  embedding: number[],
+  nResults: number,
+): Promise<ChromaResult[]> {
+  // Always do the vector search
+  const vectorResults = await queryChromaDBRaw(chromaUrl, collectionId, embedding, nResults);
+
+  // Extract keywords for hybrid boost
+  // We don't have the original query here, so hybrid is handled at the caller level
+  return vectorResults;
+}
+
+// Hybrid search: vector + keyword queries merged and deduplicated
+async function queryChromaDBHybrid(
+  chromaUrl: string,
+  collectionId: string,
+  embedding: number[],
+  nResults: number,
+  query: string,
+): Promise<ChromaResult[]> {
+  const keywords = extractKeywords(query);
+
+  // Always do vector search
+  const vectorResults = await queryChromaDBRaw(chromaUrl, collectionId, embedding, nResults);
+
+  if (keywords.length === 0) {
+    return vectorResults;
+  }
+
+  // Do keyword-filtered searches for each keyword
+  const keywordResults: ChromaResult[] = [];
+  for (const kw of keywords.slice(0, 3)) { // Limit to 3 keywords
+    try {
+      const kwResults = await queryChromaDBRaw(
+        chromaUrl, collectionId, embedding, nResults,
+        { "$contains": kw },
+      );
+      keywordResults.push(...kwResults);
+    } catch {
+      // Keyword filter failed, skip
+    }
+  }
+
+  // Merge and deduplicate — keyword matches get a score boost
+  const seen = new Map<string, ChromaResult>();
+
+  for (const r of vectorResults) {
+    const key = `${r.source}:${r.text.slice(0, 50)}`;
+    seen.set(key, r);
+  }
+
+  for (const r of keywordResults) {
+    const key = `${r.source}:${r.text.slice(0, 50)}`;
+    if (seen.has(key)) {
+      // Boost score for results found by both vector AND keyword
+      const existing = seen.get(key)!;
+      existing.score = Math.min(1, existing.score + 0.1);
+    } else {
+      // Keyword-only results get a small boost for exact match relevance
+      r.score = Math.min(1, r.score + 0.05);
+      seen.set(key, r);
+    }
+  }
+
+  // Sort by score descending and return top N
+  return [...seen.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, nResults);
 }
 
 // ============================================================================
@@ -207,11 +312,12 @@ export default function register(api: OpenClawPluginApi) {
           cfg.embeddingModel,
           query,
         );
-        const results = await queryChromaDB(
+        const results = await queryChromaDBHybrid(
           cfg.chromaUrl,
           collectionId,
           embedding,
           limit,
+          query,
         );
 
         if (results.length === 0) {
@@ -251,11 +357,12 @@ export default function register(api: OpenClawPluginApi) {
           ],
         };
       } catch (err) {
+        _resolvedCollectionId = null; // Force re-resolve on next attempt
         return {
           content: [
             {
               type: "text",
-              text: `ChromaDB search error: ${String(err)}`,
+              text: `ChromaDB search error: ${String(err)}\nHint: Collection ID may be stale. Will auto-resolve on next query.`,
             },
           ],
           isError: true,
@@ -279,11 +386,12 @@ export default function register(api: OpenClawPluginApi) {
           cfg.embeddingModel,
           event.prompt,
         );
-        const results = await queryChromaDB(
+        const results = await queryChromaDBHybrid(
           cfg.chromaUrl,
           collectionId,
           embedding,
           cfg.autoRecallResults,
+          event.prompt,
         );
 
         // Filter by minimum similarity
@@ -297,6 +405,7 @@ export default function register(api: OpenClawPluginApi) {
           )
           .join("\n");
 
+        _consecutiveFailures = 0; // Reset on success
         api.logger.info(
           `chromadb-memory: auto-recall injecting ${relevant.length} memories (best: ${relevant[0].score.toFixed(3)} from ${relevant[0].source})`,
         );
@@ -305,7 +414,16 @@ export default function register(api: OpenClawPluginApi) {
           prependContext: `<chromadb-memories>\nRelevant context from long-term memory (ChromaDB):\n${memoryContext}\n</chromadb-memories>`,
         };
       } catch (err) {
-        api.logger.warn(`chromadb-memory: auto-recall failed: ${String(err)}`);
+        _consecutiveFailures++;
+        _resolvedCollectionId = null; // Force re-resolve on next attempt
+        const errMsg = String(err);
+        api.logger.warn(`chromadb-memory: auto-recall failed (${_consecutiveFailures}x): ${errMsg}`);
+
+        // Surface the failure to the agent so it's not silently blind
+        const severity = _consecutiveFailures >= 3 ? "⚠️ PERSISTENT" : "⚠️";
+        return {
+          prependContext: `<chromadb-memory-error>\n${severity} ChromaDB long-term memory unavailable: ${errMsg}\n${_consecutiveFailures >= 3 ? "This has failed " + _consecutiveFailures + " times in a row. Collection may need reindexing or ChromaDB may be down.\n" : ""}Falling back to memory_search (local embeddings) only.\n</chromadb-memory-error>`,
+        };
       }
     });
   }
