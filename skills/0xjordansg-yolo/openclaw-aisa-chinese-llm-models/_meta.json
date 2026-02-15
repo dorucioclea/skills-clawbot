@@ -1,0 +1,11 @@
+{
+  "owner": "0xjordansg-yolo",
+  "slug": "openclaw-aisa-chinese-llm-models",
+  "displayName": "Leading Chinese LLM Models (Kimi 2.5, MiniMax 2.5, Qwen, DeepSeek) with One Key",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771137007589,
+    "commit": null
+  },
+  "history": []
+}
