@@ -3,11 +3,16 @@
   "slug": "wa-relay-skill",
   "displayName": "Wa Relay",
   "latest": {
-    "version": "0.2.0",
-    "publishedAt": 1771179275998,
-    "commit": "https://github.com/openclaw/skills/commit/118a532b5de0bc721c1be756af763fb4ac02f2eb"
+    "version": "0.2.1",
+    "publishedAt": 1771273034056,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.2.0",
+      "publishedAt": 1771179275998,
+      "commit": "https://github.com/openclaw/skills/commit/118a532b5de0bc721c1be756af763fb4ac02f2eb"
+    },
     {
       "version": "0.1.2",
       "publishedAt": 1771163144345,
