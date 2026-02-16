@@ -1,9 +1,9 @@
 ---
-slug: "ontology-mapper"
-display_name: "Ontology Mapper"
+name: "ontology-mapper"
 description: "Map construction data to standard ontologies. Create semantic mappings between different data schemas"
+homepage: "https://datadrivenconstruction.io"
+metadata: {"openclaw": {"emoji": "🌐", "os": ["darwin", "linux", "win32"], "homepage": "https://datadrivenconstruction.io", "requires": {"bins": ["python3"]}}}
 ---
-
 # Ontology Mapper
 
 ## Overview
