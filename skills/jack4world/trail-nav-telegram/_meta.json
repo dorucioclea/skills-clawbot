@@ -1,0 +1,11 @@
+{
+  "owner": "jack4world",
+  "slug": "trail-nav-telegram",
+  "displayName": "Trail Nav via Telegram (low-token)",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1771236075053,
+    "commit": null
+  },
+  "history": []
+}
