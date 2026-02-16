@@ -1,0 +1,11 @@
+{
+  "owner": "teamolab",
+  "slug": "claude-sonnet-4-lite-agent",
+  "displayName": "Claude Sonnet 4 Lite Agent",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1771144432682,
+    "commit": null
+  },
+  "history": []
+}
