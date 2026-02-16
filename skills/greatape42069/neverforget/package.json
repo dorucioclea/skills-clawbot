@@ -1,0 +1,14 @@
+{
+  "name": "@degendoge/neverforget",
+  "version": "1.0.1",
+  "description": "Sovereign Local Memory for Degen Doge",
+  "openclaw": {
+    "type": "skill",
+    "category": "intelligence",
+    "permissions": {
+      "filesystem": ["~/.dogecoin", "~/.doginals-main", "~/.crabwalk"],
+      "config": ["agents.defaults.memorySearch"],
+      "network": ["pnpm.io", "huggingface.co"]
+    }
+  }
+}
