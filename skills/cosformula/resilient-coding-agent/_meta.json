@@ -3,11 +3,16 @@
   "slug": "resilient-coding-agent",
   "displayName": "Resilient Coding Agent",
   "latest": {
-    "version": "0.2.0",
-    "publishedAt": 1771206087480,
-    "commit": "https://github.com/openclaw/skills/commit/250453fd1a9d1cb58481113694514f2ddd58f247"
+    "version": "0.4.0",
+    "publishedAt": 1771208885144,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.2.0",
+      "publishedAt": 1771206087480,
+      "commit": "https://github.com/openclaw/skills/commit/250453fd1a9d1cb58481113694514f2ddd58f247"
+    },
     {
       "version": "0.1.0",
       "publishedAt": 1771200607437,

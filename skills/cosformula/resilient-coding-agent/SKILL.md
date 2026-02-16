@@ -1,6 +1,6 @@
 ---
 name: resilient-coding-agent
-description: "Run long-running coding agents (Codex, Claude Code, etc.) in tmux sessions that survive host restarts, with automatic resume on interruption."
+description: "Run long-running coding agents (Codex, Claude Code, etc.) in tmux sessions that survive orchestrator restarts, with automatic resume on interruption."
 metadata:
   openclaw:
     emoji: "🛡️"
@@ -11,7 +11,7 @@ metadata:
 
 # Resilient Coding Agent
 
-Long-running coding agent tasks (Codex CLI, Claude Code, OpenCode, Pi) are vulnerable to interruption: host restarts, process crashes, network drops. This skill decouples the coding agent process from the orchestrator using tmux, and leverages agent-native session resume for recovery.
+Long-running coding agent tasks (Codex CLI, Claude Code, OpenCode, Pi) are vulnerable to interruption: orchestrator restarts, process crashes, network drops. This skill decouples the coding agent process from the orchestrator using tmux, and leverages agent-native session resume for recovery.
 
 ## Prerequisites
 
@@ -34,36 +34,48 @@ Create a tmux session with a descriptive name. Use the agent prefix (`codex-`, `
 
 ```bash
 tmux new-session -d -s codex-<task-name>
-tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<task prompt>"' Enter
+tmux send-keys -t codex-<task-name> 'cd <project-dir> && set -o pipefail && codex exec --full-auto --json "<task prompt>" | tee /tmp/codex-<task-name>.events.jsonl && echo "__TASK_DONE__"' Enter
+
+# Capture this task's Codex session ID at start; resume --last is unsafe with concurrent tasks.
+until [ -s /tmp/codex-<task-name>.codex-session-id ]; do
+  sed -nE 's/.*"thread_id":"([^"]+)".*/\1/p' /tmp/codex-<task-name>.events.jsonl 2>/dev/null | head -n 1 > /tmp/codex-<task-name>.codex-session-id
+  sleep 1
+done
 ```
 
 ### Claude Code
 
 ```bash
 tmux new-session -d -s claude-<task-name>
-tmux send-keys -t claude-<task-name> 'cd <project-dir> && claude -p "<task prompt>"' Enter
+tmux send-keys -t claude-<task-name> 'cd <project-dir> && claude -p "<task prompt>" && echo "__TASK_DONE__"' Enter
 ```
 
 ### OpenCode / Pi
 
-Same pattern. Replace the command with `opencode run "<prompt>"` or `pi -p "<prompt>"`.
+```bash
+tmux new-session -d -s opencode-<task-name>
+tmux send-keys -t opencode-<task-name> 'cd <project-dir> && opencode run "<task prompt>" && echo "__TASK_DONE__"' Enter
+
+tmux new-session -d -s pi-<task-name>
+tmux send-keys -t pi-<task-name> 'cd <project-dir> && pi -p "<task prompt>" && echo "__TASK_DONE__"' Enter
+```
 
 ### Completion Notification (Optional)
 
-Chain a notification command after the agent so you know when it finishes:
+Chain a notification command after the agent so you know when it finishes. Use `;` before `echo "__TASK_DONE__"` so the marker prints even if the notification command fails:
 
 ```bash
 # Generic: touch a marker file
-tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && touch /tmp/codex-<task-name>.done' Enter
+tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && touch /tmp/codex-<task-name>.done; echo "__TASK_DONE__"' Enter
 
 # macOS: system notification
-tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && osascript -e "display notification \"Task done\" with title \"Codex\""' Enter
+tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && osascript -e "display notification \"Task done\" with title \"Codex\""; echo "__TASK_DONE__"' Enter
 
 # OpenClaw: system event (immediate wake)
-tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && openclaw system event --text "Codex done: <summary>" --mode now' Enter
+tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && openclaw system event --text "Codex done: <summary>" --mode now; echo "__TASK_DONE__"' Enter
 
 # Webhook / curl
-tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && curl -s -X POST <webhook-url> -d "task=done"' Enter
+tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && curl -s -X POST <webhook-url> -d "task=done"; echo "__TASK_DONE__"' Enter
 ```
 
 ## Monitor Progress
@@ -91,7 +103,7 @@ Periodic check flow:
 1. Run `tmux has-session -t <agent-task>` to confirm the tmux session still exists.
 2. Run `tmux capture-pane -t <agent-task> -p -S -<N>` to capture recent output.
 3. Detect likely agent exit by checking the last `N` lines for:
-   - Shell prompt returned (for example, a line ending in `$ ` or `% `)
+   - Shell prompt returned (for example, a line ending in `$ `, `% `, or `> `)
    - Exit indicators (`exit code`, `status <non-zero>`, `exited`)
    - No completion marker (`__TASK_DONE__`)
 4. If crash is detected, run the agent-native resume command in the same tmux session.
@@ -102,72 +114,35 @@ Use a done marker in your start command so the monitor can distinguish normal co
 tmux send-keys -t codex-<task-name> 'cd <project-dir> && codex exec --full-auto "<prompt>" && echo "__TASK_DONE__"' Enter
 ```
 
-Concrete periodic monitor (run every 2-3 minutes):
+For Codex tasks, save the session ID to `/tmp/<session>.codex-session-id` when the task starts (see **Codex CLI** above). The monitor script reads that file to resume the exact task session.
+
+Run the monitor script in the background:
 
 ```bash
-SESSION="codex-<task-name>"   # or claude-<task-name>
-AGENT="codex"                 # codex | claude
-LINES=120
-DONE_MARKER="__TASK_DONE__"
-
-while true; do
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    OUTPUT="$(tmux capture-pane -t "$SESSION" -p -S -"${LINES}")"
-    RECENT="$(printf '%s\n' "$OUTPUT" | tail -n 40)"
-
-    if ! printf '%s\n' "$RECENT" | grep -q "$DONE_MARKER"; then
-      PROMPT_BACK=0
-      EXIT_HINT=0
-      printf '%s\n' "$RECENT" | grep -Eq '[$%] $' && PROMPT_BACK=1
-      printf '%s\n' "$RECENT" | grep -Eiq '(exit code|exited|status [1-9][0-9]*)' && EXIT_HINT=1
-
-      if [ "$PROMPT_BACK" -eq 1 ] || [ "$EXIT_HINT" -eq 1 ]; then
-        case "$AGENT" in
-          codex)
-            tmux send-keys -t "$SESSION" 'codex exec resume --last "Continue the previous task"' Enter
-            ;;
-          claude)
-            tmux send-keys -t "$SESSION" 'claude --resume' Enter
-            ;;
-        esac
-      fi
-    fi
-  fi
-  sleep 180
-done
+./scripts/monitor.sh codex-<task-name> codex
+# or: ./scripts/monitor.sh claude-<task-name> claude
 ```
 
-When starting long tasks, configure this monitor loop in the orchestrator (background shell loop, supervisor, or cron) so recovery runs automatically without manual checks.
+The script checks every 3 minutes. On consecutive failures the interval doubles (3m, 6m, 12m, ...) and resets when the agent is running normally. Stops after 5 hours wall-clock.
+
+When starting long tasks, run the monitor in the background (via `&`, `nohup`, or the orchestrator's cron) so recovery happens automatically.
 
 ## Recovery After Interruption
 
-If the coding agent process dies (network drop, crash, OOM), the tmux session may still exist but the agent has exited. Use the agent's native resume to continue.
-
-### Codex Resume
-
-Codex persists sessions in `~/.codex/sessions/`. Resume the last interrupted session:
+For automated crash detection and retries, use **Health Monitoring** above.
+Keep this section as a manual fallback when you need to intervene directly:
 
 ```bash
-# Resume in the same tmux session
-tmux send-keys -t codex-<task-name> 'codex exec resume --last "Continue the previous task"' Enter
-```
+# Codex (prefer explicit session ID from /tmp/<session>.codex-session-id)
+tmux send-keys -t codex-<task-name> 'codex exec resume <session-id> "Continue the previous task"' Enter
 
-Or target a specific session ID:
-
-```bash
-# List recent sessions
-ls -lt ~/.codex/sessions/ | head -5
-
-# Resume by ID
-codex exec resume <session-id> "Continue where you left off"
-```
-
-### Claude Code Resume
-
-Claude Code supports `--resume` to continue the last conversation:
-
-```bash
+# Claude Code
 tmux send-keys -t claude-<task-name> 'claude --resume' Enter
+
+# OpenCode
+tmux send-keys -t opencode-<task-name> 'opencode run "Continue"' Enter
+
+# Pi: no native resume; re-run the task prompt manually
 ```
 
 ## Cleanup
@@ -206,5 +181,5 @@ Before starting a long task:
 
 ## Limitations
 
-- tmux sessions do not survive a **machine reboot** (tmux itself is killed). For reboot-resilient tasks, the coding agent's native resume (`codex exec resume --last`, `claude --resume`) is the recovery path.
+- tmux sessions do not survive a **machine reboot** (tmux itself is killed). For reboot-resilient tasks, the coding agent's native resume (`codex exec resume <session-id>`, `claude --resume`) is the recovery path.
 - Interactive approval prompts inside tmux require manual `tmux attach` or `tmux send-keys`. Use `--full-auto` / `--yolo` / `-p` flags when possible.
