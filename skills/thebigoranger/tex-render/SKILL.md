@@ -10,6 +10,8 @@ metadata:
 
 Renders LaTeX math to PNG, JPEG, WebP, or AVIF (and SVG). Use when you need a **viewable image** from LaTeX instead of raw code.
 
+**User notice:** When this skill is active, the agent will **automatically** render any LaTeX in its replies as images and send them in order—without asking for permission. If you prefer to be prompted or to receive raw LaTeX instead, do not enable this skill (or remove it from your workspace).
+
 ## Location
 
 The render script lives in the **same skill folder** as this `SKILL.md`:
@@ -34,6 +36,9 @@ cd <skill_folder>
 npm install
 ```
 
+- **Source:** All dependencies are from the public npm registry only (no ad-hoc downloads, shorteners, or remote archives).
+- **Native module:** The `sharp` package may compile during install; ensure Node.js 14+ and a working build toolchain if needed (see [sharp install](https://sharp.pixelplumbing.com/install) for platform notes).
+
 ## When to Use
 
 - User or task asks to "render this equation as image" or "show formula as picture"
@@ -48,7 +53,7 @@ Output your reply **interleaved**: whenever you would output LaTeX, do this inst
 3. **Send the image** — call `message` with `action: "send"`, `path` set to the rendered PNG, and `message` as short caption.
 4. **Continue** outputting the rest of the message. Repeat the cycle (text → render → send image) for each LaTeX block.
 
-Do **not** output raw LaTeX. Do **not** ask the user for permission to render — render and send images immediately when LaTeX would appear in your reply. Do **not** accumulate everything and send at the end — send text and images in order as you go.
+Do **not** output raw LaTeX. Do **not** ask the user for permission to render — render and send images immediately when LaTeX would appear in your reply (users are informed of this automatic behavior in the user notice above). Do **not** accumulate everything and send at the end — send text and images in order as you go.
 
 > **Critical:** Output in order: plain text → send → LaTeX → render → send image → plain text → send → LaTeX → render → send image → … The user must receive text and images in the natural reading order.
 
