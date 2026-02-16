@@ -3,11 +3,16 @@
   "slug": "thrd",
   "displayName": "Thrd Email",
   "latest": {
-    "version": "1.2.1",
-    "publishedAt": 1771074691058,
-    "commit": "https://github.com/openclaw/skills/commit/477083f4e5fab3078bc1fdfe2488f1b5a24d9284"
+    "version": "1.2.7",
+    "publishedAt": 1771195762349,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.1",
+      "publishedAt": 1771074691058,
+      "commit": "https://github.com/openclaw/skills/commit/477083f4e5fab3078bc1fdfe2488f1b5a24d9284"
+    },
     {
       "version": "1.1.0",
       "publishedAt": 1771068423055,
