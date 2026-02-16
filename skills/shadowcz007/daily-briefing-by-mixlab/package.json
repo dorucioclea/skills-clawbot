@@ -1,10 +1,10 @@
 {
-  "name": "daily-briefing",
-  "version": "1.0.0",
-  "type": "module",
-  "private": true,
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
-    "jsonrepair": "^3.13.2"
-  }
+    "name": "daily-briefing",
+    "version": "3.2.0",
+    "type": "module",
+    "private": true,
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.32.1",
+        "jsonrepair": "^3.13.2"
+    }
 }

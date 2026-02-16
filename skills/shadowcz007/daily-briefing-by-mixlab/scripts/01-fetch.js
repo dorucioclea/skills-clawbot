@@ -19,6 +19,18 @@ const __dirname = path.dirname(fileURLToPath(
 const API_URL = 'https://www.mixdao.world/api/latest';
 const SKIP_KEYS = new Set(['sources', 'sourceLabels', 'hasMore']);
 
+/** 与 api/latest 一致：日期按 Asia/Shanghai */
+const DATE_TZ = 'Asia/Shanghai';
+
+function getTodayDateStrInTz(tz) {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+}
+
 function fetchLatest() {
     return new Promise((resolve, reject) => {
         const apiKey = process.env.MIXDAO_API_KEY;
@@ -96,7 +108,7 @@ function main() {
                 process.exit(1);
             }
 
-            const timestamp = new Date().toISOString().slice(0, 10);
+            const timestamp = getTodayDateStrInTz(DATE_TZ);
             const tempFileName = `briefing-${timestamp}.json`;
             const tempFilePath = path.join(__dirname, '..', 'temp', tempFileName);
 

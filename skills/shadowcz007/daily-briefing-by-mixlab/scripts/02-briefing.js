@@ -82,12 +82,14 @@ function patchMixdao(urlString, bodyObj) {
     });
 }
 
-/** 提交单条推荐语到 mixdao（内联自 update-recommendation） */
-function updateRecommendation(cachedStoryId, recommendationText) {
-    return patchMixdao(RECOMMENDATION_API_URL, { cachedStoryId, recommendationText })
+/** 批量提交推荐语到 mixdao（PATCH body: { items: [{ cachedStoryId, recommendationText }, ...] }） */
+function batchUpdateRecommendations(items) {
+    if (!items.length) return Promise.resolve({ ok: true, results: [] });
+    return patchMixdao(RECOMMENDATION_API_URL, { items })
         .then((responseBody) => {
-            debugLog('PATCH ok', cachedStoryId, responseBody && responseBody.slice(0, 80));
-            return responseBody;
+            const data = JSON.parse(responseBody || '{}');
+            debugLog('PATCH batch ok', data.results?.length, data.results?.slice(0, 2));
+            return data;
         });
 }
 
@@ -383,17 +385,31 @@ async function main() {
         process.exit(1);
     }
 
+    const batchBody = toSubmit.map(({ id, recommendationText }) => ({
+        cachedStoryId: id,
+        recommendationText,
+    }));
     let ok = 0;
     let fail = 0;
-    for (const { id, recommendationText }
-        of toSubmit) {
-        try {
-            await updateRecommendation(id, recommendationText);
+    let results = [];
+    try {
+        const res = await batchUpdateRecommendations(batchBody);
+        results = res.results || [];
+    } catch (e) {
+        console.error('批量提交推荐语失败:', e.message);
+        process.exit(1);
+    }
+    const resultByCachedId = new Map(
+        results.map((r) => [r.cachedStoryId, r])
+    );
+    for (const { id, recommendationText } of toSubmit) {
+        const r = resultByCachedId.get(id);
+        if (r?.ok) {
             ok++;
             debugLog('提交 ok', id);
-        } catch (e) {
-            console.error('提交失败 id=%s: %s', id, e.message);
+        } else {
             fail++;
+            console.error('提交失败 id=%s: %s', id, r?.error || 'unknown');
         }
         const item = idMap.get(id);
         const title = item ? (item.translatedTitle || item.title || '') : '';

@@ -42,7 +42,7 @@ node scripts/02-briefing.js ./temp/briefing-2026-02-14.json
 1. 读取 JSON（根级条目数组），校验非空。
 2. **分组 Agent Loop**（MiniMax-M2.5）：对类似话题分组，**至多 5 组**，**每组至少 3 条**；不满足则反馈重试，最多 3 次。
 3. **生成摘要与推荐语**：每组一段分组摘要（20 字内）；每条站在**创业者角度**生成推荐语（140 字内），格式：**xxx场景、xxx问题、xxx解决方案、xxx价值**。
-4. 按 **cachedStoryId** 逐条调用 mixdao `PATCH /api/latest/recommendation` 提交推荐语（Bearer `MIXDAO_API_KEY`）。失败打 log 并继续其余条目。
+4. 按 **cachedStoryId** 批量调用 mixdao `PATCH /api/latest/recommendation`（body: `{ items: [{ cachedStoryId, recommendationText }, ...] }`，Bearer `MIXDAO_API_KEY`）提交推荐语。根据返回的 `results` 统计成功/失败并打 log。
 
 ## 环境变量
 
@@ -54,6 +54,6 @@ node scripts/02-briefing.js ./temp/briefing-2026-02-14.json
 
 ## 注意事项
 
-- **请求超时**：01-fetch 拉取 API 超时 15 秒；02-briefing 内 PATCH 单条超时 15 秒。
+- **请求超时**：01-fetch 拉取 API 超时 15 秒；02-briefing 内推荐语为一次批量 PATCH，超时 15 秒。
 - **临时文件**：步骤 1 将原始数据写入 `temp/`，步骤 2 仅读取，不删除。
 - **推荐语格式**：每条 140 字内，创业者视角：场景、问题、解决方案、价值。
