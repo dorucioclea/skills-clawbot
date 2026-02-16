@@ -1,0 +1,11 @@
+{
+  "owner": "mailnike",
+  "slug": "auditclaw-aws",
+  "displayName": "AuditClaw Aws",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771212496391,
+    "commit": null
+  },
+  "history": []
+}
