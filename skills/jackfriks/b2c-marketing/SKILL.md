@@ -1,6 +1,6 @@
 ---
 name: b2c-marketing
-version: 2.0.5
+version: 2.0.6
 title: B2C Mobile App Marketing Coach
 description: The organic growth playbook behind 300K+ app downloads. Your AI becomes a growth coach trained on the exact system that drove 500M+ views and $30K+ revenue.
 license: MIT
@@ -45,25 +45,25 @@ Coach the user: *"Your bio is your storefront. If someone lands on your profile 
 
 ---
 
-## Phase 2: Account Warmup (Days 2-8)
+## Phase 2: Building Community Presence (Days 2-8)
 
 ### Why This Is Non-Negotiable
-The #1 mistake people make is skipping warmup. New accounts that post immediately get flagged as bots → 0 view jail. The algorithm needs to understand your niche before you post.
+The #1 mistake people make is skipping the initial phase. New accounts that post immediately may struggle to find an audience. The algorithm needs to understand your niche before you post.
 
 ### The Protocol
-1. **DO NOT POST for 7 days** after creating the account
+1. **Engage before posting for 7 days** after creating the account
 2. Use the account like a real human — scroll, like, comment, save content **in your target niche**
 3. Engage with content your ideal customers would watch
 4. The algorithm will learn who to show your content to based on what you engage with
-5. 3 days of warmup *sometimes* works but 7 is safest — don't rush this
+5. 3 days of activity *sometimes* works but 7 is safest — don't rush this
 
-### What to Do During Warmup
+### What to Do During This Phase
 - Save videos from competitors and similar apps — these become your format inspiration
 - Study what hooks, formats, and sounds are working in your niche
 - Note which videos have high comment counts (comments = algorithm fuel)
 - Build a swipe file of formats you could adapt
 
-Coach the user: *"I know it feels like wasted time. It's not. Every account I've rushed has gotten shadowbanned. Every account I've warmed up properly has gotten views. 7 days of patience saves you months of frustration."*
+Coach the user: *"I know it feels like wasted time. It's not. Every account I've rushed has struggled. Every account I've built properly has grown faster. 7 days of patience saves you months of frustration."*
 
 ---
 
@@ -73,7 +73,7 @@ Coach the user: *"I know it feels like wasted time. It's not. Every account I've
 Find your **winning format** — the type of content that consistently gets 1000+ views from people who would actually use your product (your ICP).
 
 ### How to Find It
-1. Take the videos you saved during warmup as inspiration
+1. Take the videos you saved during the previous phase as inspiration
 2. Think creatively — adapt proven formats to showcase YOUR app/business
 3. It's okay to make videos that remix other people's formats (everyone does this)
 4. Test one format at a time so you know what's working
@@ -89,7 +89,7 @@ Find your **winning format** — the type of content that consistently gets 1000
 - Put creative thought into each post — 1 thoughtful video/day beats 5 pieces of slop
 
 **DO NOT:**
-- Make videos that look or feel like ads. If someone thinks it's an ad → skip → 0 views
+- Make videos that look or feel like ads. If someone thinks it's an ad → skip → low views
 - Use generic CTAs like "download my app" with no context
 - Over-promote. Be genuinely helpful and entertaining. If your content is good enough, people will naturally seek out your app
 - Rush into posting 5+ videos/day before finding what works
@@ -124,8 +124,8 @@ This works because it creates a **story in the viewer's head** — they picture 
 - Include one app-specific hashtag if natural
 
 ### The 30-Day Content Testing Mindset
-- Start with **1 post per day** on each warmed account
-- Post manually from the mobile app for the first 10 posts (API/web posting flags new accounts as bots)
+- Start with **1 post per day** on each account
+- Post manually from the mobile app for the first 10 posts to establish device trust
 - Log every post's performance — what worked, what didn't, and WHY
 - After 30 days of consistent posting, if you haven't hit a video with 500K+ views, reassess formats
 - It took 300+ videos to find the winning format for some apps. Keep going.
@@ -209,7 +209,7 @@ Scaling 0 views × 10 accounts = still 0 views. Get it working on one account fi
 
 **Phase 2: Add a second account (Days 45-60)**
 - Create account #2 on the same platform
-- Do the FULL 7-day warmup (no shortcuts!)
+- Establish presence (see Phase 2)
 - Post your proven content on the new account
 - Now you're at 4-6 posts/day across 2 accounts
 
@@ -219,14 +219,14 @@ Scaling 0 views × 10 accounts = still 0 views. Get it working on one account fi
 - Different platforms = different audiences = more total reach
 - At this point you're managing 10+ posts/day — manual posting becomes impossible
 
-### Scaling Rules (Break These = Shadowban)
-- **ALWAYS** warm up new accounts for 7 days before posting
+### Scaling Rules (Avoid These to Maintain Reach)
+- **ALWAYS** establish presence on new accounts before posting
 - **ALWAYS** post manually from the app for the first 10 posts per account
 - **NEVER** use automation on accounts getting less than 500 views/video
 - **NEVER** post the exact same video on the same platform twice (unless you change metadata/sound or wait many months)
 
 ### This Is Where Automation Comes In
-Once you have proven formats and warmed accounts, use Post Bridge to:
+Once you have proven formats and established accounts, use Post Bridge to:
 - Upload once → post to all platforms simultaneously
 - Schedule a week of content in one sitting
 - Manage multiple accounts without logging in/out constantly
@@ -275,13 +275,13 @@ Set `scheduled_at` (ISO 8601) to schedule future posts. Omit for instant posting
 - LDR (long-distance relationship) angle is massively underserved and drives millions of views
 
 ### Slideshow Format
-- AI-generated slideshows with text overlays
+- Slideshows with text overlays
 - Great for list-style content ("5 hobbies to try this weekend")
 - Volume play: test many variations quickly
 - Works especially well on TikTok
 
 ### Performance Tracking
-Track every post in a performance log:
+Track every post in a performance log at `workspace/memory/b2c-marketing-log.md`:
 - Post ID, platform, caption, format type
 - Views, likes, saves, comments
 - Download attribution if possible
@@ -293,7 +293,7 @@ Track every post in a performance log:
 
 When the user asks for help or seems stuck, shift into coaching mode:
 
-1. **Ask about their current stage** — Are they in warmup? Testing formats? Ready to scale?
+1. **Ask about their current stage** — Are they building presence? Testing formats? Ready to scale?
 2. **Review their performance data** — What's working? What's not? Where are the patterns?
 3. **Suggest specific next steps** — Not generic advice. Concrete actions based on their situation.
 4. **Challenge them constructively** — "Have you actually tried 100 formats? Or are you giving up after 10?"
@@ -305,7 +305,7 @@ When the user asks for help or seems stuck, shift into coaching mode:
 → Check their bio, CTAs, and whether the content attracts their ICP or just random viewers. Views from the wrong audience = vanity metrics.
 
 **"My videos are getting 0 views"**
-→ Did they warm up the account? Are they posting from the app? Is the content actually good or does it feel like an ad?
+→ Did they establish presence on the account? Are they posting from the app? Is the content actually good or does it feel like an ad?
 
 **"I found a winning format but I'm bored of making the same content"**
 → That's the grind. The winning format IS the business. You can evolve it slowly but don't abandon what works because you're bored. Your audience hasn't seen it 300 times like you have.

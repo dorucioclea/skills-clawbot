@@ -3,11 +3,16 @@
   "slug": "b2c-marketing",
   "displayName": "B2C Mobile App Marketing Coach",
   "latest": {
-    "version": "2.0.5",
-    "publishedAt": 1771176235920,
-    "commit": "https://github.com/openclaw/skills/commit/5f2e49465d8261820c676c362b7ab022ca99e0a1"
+    "version": "2.0.6",
+    "publishedAt": 1771176539690,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.0.5",
+      "publishedAt": 1771176235920,
+      "commit": "https://github.com/openclaw/skills/commit/5f2e49465d8261820c676c362b7ab022ca99e0a1"
+    },
     {
       "version": "2.0.0",
       "publishedAt": 1771174705929,
