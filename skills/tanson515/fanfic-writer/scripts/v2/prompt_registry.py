@@ -4,7 +4,7 @@ Manages prompt templates with versioning and audit trail
 """
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 
 from .atomic_io import atomic_write_json

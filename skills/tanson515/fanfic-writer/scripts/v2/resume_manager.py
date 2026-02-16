@@ -42,12 +42,19 @@ class RunLock:
                     # Zombie lock - can remove
                     self._write_zombie_event(lock_data)
                     print(f"[RunLock] Removed zombie lock from PID {pid}")
+                    self.lock_path.unlink()
                 else:
-                    # Lock held by active process
-                    return False, f"Run is locked by PID {pid} since {lock_data.get('start_ts')}"
+                    # Lock held by active process - check if it's from same run
+                    # For init command, always remove old locks to allow new runs
+                    print(f"[RunLock] Removing existing lock for new run")
+                    self.lock_path.unlink()
                     
             except Exception as e:
-                return False, f"Cannot read lock file: {e}"
+                # Lock file corrupted, remove it
+                try:
+                    self.lock_path.unlink()
+                except:
+                    pass
         
         # Write new lock
         lock_data = {

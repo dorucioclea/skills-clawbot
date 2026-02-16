@@ -11,7 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable, Union
 from contextlib import contextmanager
-import fcntl  # Unix file locking (Windows uses msvcrt)
+try:
+    import fcntl  # Unix file locking
+except ImportError:
+    fcntl = None  # Windows doesn't have fcntl
 
 
 # ============================================================================

@@ -20,16 +20,14 @@ from typing import Optional, Dict, Any, List, Tuple
 
 def get_timestamp_iso(tz_name: str = "Asia/Shanghai") -> str:
     """Get current timestamp in ISO8601 format with timezone"""
-    import zoneinfo
-    tz = zoneinfo.ZoneInfo(tz_name)
-    return datetime.now(tz).isoformat()
+    # Use fixed offset for Windows compatibility
+    return datetime.now().isoformat() + "+08:00"
 
 
 def get_timestamp_compact(tz_name: str = "Asia/Shanghai") -> str:
     """Get compact timestamp: YYYYMMDD_HHMMSS"""
-    import zoneinfo
-    tz = zoneinfo.ZoneInfo(tz_name)
-    return datetime.now(tz).strftime("%Y%m%d_%H%M%S")
+    # Use local time for Windows compatibility
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 # ============================================================================
@@ -111,7 +109,7 @@ def sanitize_filename(text: str, max_length: int = 80) -> str:
     Sanitize text for use in filenames (allows Chinese)
     Removes forbidden characters for Windows/Linux/macOS
     
-    Forbidden: \ / : * ? " < > | and control chars
+    Forbidden characters: backslash, forward slash, colon, asterisk, question mark, double quote, less than, greater than, pipe
     """
     if not text:
         return "untitled"

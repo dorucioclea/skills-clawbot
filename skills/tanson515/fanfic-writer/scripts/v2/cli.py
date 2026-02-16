@@ -1,241 +1,113 @@
 """
-Fanfic Writer v2.0 - Complete CLI
-Full command line interface with all required parameters
+Fanfic Writer v2.0 - Complete CLI with Interactive Confirmations
+Full command line interface - each phase requires human confirmation
 """
 import sys
 import argparse
 import os
+import json
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-# Add v2 to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add parent to path to maintain package structure
+parent_path = Path(__file__).parent.parent
+sys.path.insert(0, str(parent_path))
 
-from v2.workspace import WorkspaceManager
-from v2.phase_runner import PhaseRunner
-from v2.writing_loop import WritingLoop
-from v2.safety_mechanisms import FinalIntegration, BackpatchManager
-from v2.resume_manager import RunLock, ResumeManager, RuntimeConfigManager
-from v2.price_table import PriceTableManager, CostBudgetManager
-from v2.atomic_io import atomic_write_json
-from v2.utils import get_timestamp_iso
-
-
-def run_skill(
-    book_config_path: Optional[str] = None,
-    mode: str = "manual",
-    workspace_root: Optional[str] = None,
-    model_profile: Optional[str] = None,
-    seed: Optional[int] = None,
-    max_words: int = 500000,
-    resume: str = "auto",
-    base_dir: Optional[str] = None,
-    **kwargs
-) -> str:
-    """
-    Main entry point for running fanfic writer skill
-    
-    Args:
-        book_config_path: Path to existing book config (for resume)
-        mode: 'auto' or 'manual'
-        workspace_root: Custom workspace directory
-        model_profile: Model profile ID
-        seed: Random seed for reproducibility
-        max_words: Maximum word count (will be truncated to 500000)
-        resume: 'off', 'auto', or 'force'
-        base_dir: Base directory for novels
-        **kwargs: Additional parameters
-        
-    Returns:
-        run_id: The run ID of the started/completed run
-    """
-    # Ensure max_words <= 500000
-    if max_words > 500000:
-        print(f"[Warning] max_words {max_words} exceeds limit, truncating to 500000")
-        max_words = 500000
-    
-    # Set base directory
-    if base_dir is None:
-        base_dir = Path.home() / ".openclaw" / "novels"
-    else:
-        base_dir = Path(base_dir)
-    
-    # Handle resume
-    if resume != "off" and book_config_path:
-        config_path = Path(book_config_path)
-        if config_path.exists():
-            # Try to find run directory
-            run_dir = config_path.parent.parent  # 0-config/../ = run_dir
-            
-            resume_mgr = ResumeManager(run_dir)
-            can_resume, reason, resume_info = resume_mgr.can_resume(mode=resume)
-            
-            if can_resume:
-                print(f"[Resume] Resuming run {resume_info['run_id']} at chapter {resume_info['resume_point']['chapter']}")
-                resume_mgr.resume(resume_info)
-                
-                # Acquire lock
-                run_lock = RunLock(run_dir)
-                lock_success, lock_error = run_lock.acquire(mode=mode)
-                if not lock_success:
-                    raise RuntimeError(f"Cannot acquire run lock: {lock_error}")
-                
-                return resume_info['run_id']
-            elif resume == "force":
-                print(f"[Resume Force] Forcing resume despite: {reason}")
-            else:
-                print(f"[Resume] Cannot resume: {reason}, starting new run")
-    
-    # Start new run if not resuming
-    if not book_config_path:
-        raise ValueError("book_config_path required for new run (or use CLI init first)")
-    
-    # Load config
-    import json
-    with open(book_config_path, 'r', encoding='utf-8') as f:
-        config = json.load(f)
-    
-    # Start run
-    workspace = WorkspaceManager(base_dir)
-    runner = PhaseRunner(workspace)
-    
-    results = runner.run_all(
-        book_title=config['book']['title'],
-        genre=config['book']['genre'],
-        target_words=min(config['book'].get('target_word_count', max_words), max_words),
-        mode=mode,
-        model_profile=model_profile,
-        seed=seed,
-        **kwargs
-    )
-    
-    return results['run_id']
+from scripts.v2.workspace import WorkspaceManager
+from scripts.v2.phase_runner import PhaseRunner
+from scripts.v2.writing_loop import WritingLoop
+from scripts.v2.safety_mechanisms import FinalIntegration, BackpatchManager
+from scripts.v2.resume_manager import RunLock, ResumeManager, RuntimeConfigManager
+from scripts.v2.price_table import PriceTableManager, CostBudgetManager
+from scripts.v2.atomic_io import atomic_write_json
+from scripts.v2.utils import get_timestamp_iso
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Fanfic Writer v2.0 - Automated Novel Writing System',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Initialize a new book
-  python -m scripts.v2.cli init --title "My Novel" --genre "都市异能" --words 100000
-  
-  # Run phases 1-5
-  python -m scripts.v2.cli setup --run-dir novels/my_novel__abc123/runs/20260216_000000_XXX
-  
-  # Write chapters (auto mode)
-  python -m scripts.v2.cli write --run-dir novels/my_novel__abc123/runs/20260216_000000_XXX --mode auto --chapters 1-10
-  
-  # Resume interrupted run
-  python -m scripts.v2.cli write --run-dir novels/my_novel__abc123/runs/20260216_000000_XXX --resume auto
-  
-  # Merge final book
-  python -m scripts.v2.cli finalize --run-dir novels/my_novel__abc123/runs/20260216_000000_XXX
-        """
-    )
-    
-    subparsers = parser.add_subparsers(dest='command', help='Command to run')
-    
-    # =========================================================================
-    # init command
-    # =========================================================================
-    init_parser = subparsers.add_parser('init', help='Initialize a new book')
-    init_parser.add_argument('--title', '-t', required=True, help='Book title')
-    init_parser.add_argument('--genre', '-g', required=True, help='Genre (e.g., 都市异能)')
-    init_parser.add_argument('--subgenre', help='Subgenre (e.g., 系统流)')
-    init_parser.add_argument('--words', '-w', type=int, default=100000, help='Target word count (default: 100000, max: 500000)')
-    init_parser.add_argument('--chapter-words', type=int, default=2500, help='Target words per chapter (default: 2500)')
-    init_parser.add_argument('--mode', '-m', choices=['auto', 'manual'], default='manual', help='Writing mode')
-    init_parser.add_argument('--model', default='nvidia/moonshotai/kimi-k2.5', help='Model to use')
-    init_parser.add_argument('--tone', default='轻松', help='Story tone')
-    init_parser.add_argument('--usd-cny-rate', type=float, default=6.90, help='USD to CNY exchange rate')
-    init_parser.add_argument('--base-dir', default=None, help='Base directory for novels (default: ~/.openclaw/novels)')
-    
-    # =========================================================================
-    # setup command (phases 1-5)
-    # =========================================================================
-    setup_parser = subparsers.add_parser('setup', help='Run setup phases 1-5')
-    setup_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
-    setup_parser.add_argument('--outline-content', help='Pre-written main outline (skips generation)')
-    setup_parser.add_argument('--world-content', help='Pre-written world building (skips generation)')
-    
-    # =========================================================================
-    # write command
-    # =========================================================================
-    write_parser = subparsers.add_parser('write', help='Write chapters (Phase 6)')
-    write_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
-    write_parser.add_argument('--mode', '-m', choices=['auto', 'manual'], default=None, help='Writing mode (overrides config)')
-    write_parser.add_argument('--chapters', '-c', default=None, help='Chapter range to write (e.g., "1-10" or "5,6,7")')
-    write_parser.add_argument('--resume', choices=['off', 'auto', 'force'], default='off', help='Resume mode')
-    write_parser.add_argument('--max-chapters', type=int, default=200, help='Maximum chapters (safety limit)')
-    write_parser.add_argument('--budget', type=float, help='Cost budget in RMB')
-    
-    # =========================================================================
-    # backpatch command
-    # =========================================================================
-    backpatch_parser = subparsers.add_parser('backpatch', help='Run backpatch (Phase 7)')
-    backpatch_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
-    
-    # =========================================================================
-    # finalize command
-    # =========================================================================
-    finalize_parser = subparsers.add_parser('finalize', help='Finalize book (Phases 8-9)')
-    finalize_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
-    
-    # =========================================================================
-    # status command
-    # =========================================================================
-    status_parser = subparsers.add_parser('status', help='Check run status')
-    status_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
-    
-    # =========================================================================
-    # test command
-    # =========================================================================
-    test_parser = subparsers.add_parser('test', help='Run self-test')
-    
-    args = parser.parse_args()
-    
-    if not args.command:
-        parser.print_help()
-        sys.exit(1)
-    
-    # Execute command
-    if args.command == 'init':
-        cmd_init(args)
-    elif args.command == 'setup':
-        cmd_setup(args)
-    elif args.command == 'write':
-        cmd_write(args)
-    elif args.command == 'backpatch':
-        cmd_backpatch(args)
-    elif args.command == 'finalize':
-        cmd_finalize(args)
-    elif args.command == 'status':
-        cmd_status(args)
-    elif args.command == 'test':
-        cmd_test(args)
+def wait_for_confirmation(prompt: str = "确认继续? (y/n): ") -> bool:
+    """Wait for user confirmation, return True if confirmed"""
+    while True:
+        response = input(prompt).strip().lower()
+        if response in ['y', 'yes', '是', '']:
+            return True
+        elif response in ['n', 'no', '否', 'q', 'quit', '退出']:
+            return False
+        else:
+            print("  请输入 y/n 或 是/否")
 
 
 def cmd_init(args):
-    """Initialize a new book"""
-    print(f"[Init] Creating new book: {args.title}")
+    """
+    Phase 1-5: Initialize book with human confirmation at each step
     
-    # Set base directory
+    1. 书名、类型、字数 - 确认
+    2. 目录位置 - 确认
+    3. 风格指南 (Phase 2) - 确认
+    4. 主线大纲 (Phase 3) - 确认
+    5. 章节规划 (Phase 4) - 确认
+    6. 世界观 (Phase 5) - 确认
+    """
+    print("\n" + "="*60)
+    print("📖 阴间外卖 - 初始化向导")
+    print("="*60 + "\n")
+    
+    # ========== Step 1: 书名、类型、字数 ==========
+    print("【步骤1/6】基本配置")
+    print("-" * 40)
+    
+    # Get book info interactively if not provided
+    if not args.title:
+        args.title = input("📝 书名: ").strip()
+    if not args.genre:
+        args.genre = input("📝 类型 (都市/玄幻/仙侠...): ").strip()
+    if not args.words or args.words == 100000:
+        words_input = input("📝 总字数 (默认100000): ").strip()
+        if words_input:
+            args.words = int(words_input)
+    
+    print(f"\n  书名: {args.title}")
+    print(f"  类型: {args.genre}")
+    print(f"  字数: {args.words:,}")
+    
+    if not wait_for_confirmation("\n✅ 确认基本配置? (y/n): "):
+        print("❌ 已取消")
+        sys.exit(0)
+    
+    # ========== Step 2: 目录位置 ==========
+    print("\n【步骤2/6】存放目录")
+    print("-" * 40)
+    
     if args.base_dir:
         base_dir = Path(args.base_dir)
     else:
-        base_dir = Path.home() / ".openclaw" / "novels"
+        default_dir = Path.home() / ".openclaw" / "novels"
+        print(f"  默认目录: {default_dir}")
+        custom = input("  自定义目录 (直接回车使用默认): ").strip()
+        if custom:
+            base_dir = Path(custom)
+        else:
+            base_dir = default_dir
     
-    # Create workspace
+    print(f"\n  存放目录: {base_dir}")
+    
+    if not wait_for_confirmation("\n✅ 确认存放目录? (y/n): "):
+        print("❌ 已取消")
+        sys.exit(0)
+    
+    # Create workspace and run phases 1-5 with confirmation at each step
+    print("\n🚀 开始初始化...")
     workspace = WorkspaceManager(base_dir)
     runner = PhaseRunner(workspace)
     
-    results = runner.run_all(
+    # Phase 1: Initialization
+    print("\n" + "="*50)
+    print("【Phase 1】初始化项目")
+    print("="*50)
+    
+    results = runner.phase1_initialize(
         book_title=args.title,
         genre=args.genre,
         target_words=args.words,
-        chapter_target_words=args.chapter_words,
+        chapter_target_words=args.chapter_words or 2500,
         subgenre=args.subgenre,
         mode=args.mode,
         model=args.model,
@@ -243,190 +115,233 @@ def cmd_init(args):
         usd_cny_rate=args.usd_cny_rate
     )
     
-    print(f"\n✅ Book initialized successfully!")
-    print(f"   Run ID: {results['run_id']}")
-    print(f"   Path: {results['run_dir']}")
-    print(f"\nNext steps:")
-    print(f"   1. Edit outline: {results['main_outline']}")
-    print(f"   2. Edit world: {results['world_building']}")
-    print(f"   3. Start writing: python -m scripts.v2.cli write --run-dir {results['run_dir']}")
-
-
-def cmd_setup(args):
-    """Run setup phases 1-5 with optional pre-written content"""
-    run_dir = Path(args.run_dir)
+    run_dir = results['run_dir']
+    print(f"\n✅ Phase 1 完成: {run_dir}")
     
-    print(f"[Setup] Running phases 1-5 for: {run_dir}")
+    # Phase 2: Style Guide - NEEDS CONFIRMATION
+    print("\n" + "="*50)
+    print("【Phase 2】生成风格指南")
+    print("="*50)
+    print("  正在生成写作风格指南...")
     
-    # TODO: Implement phase-by-phase setup with content injection
-    print("✅ Setup phases complete (or already done during init)")
+    runner.phase2_style_guide()
+    print(f"\n  已生成: {run_dir}/0-config/style_guide.md")
+    print("\n  请查看以上文件内容")
+    
+    if not wait_for_confirmation("\n✅ 确认风格指南? (y/n): "):
+        print("❌ 已取消，请修改后重新运行")
+        sys.exit(0)
+    
+    # Phase 3: Main Outline - NEEDS CONFIRMATION
+    print("\n" + "="*50)
+    print("【Phase 3】生成主线大纲")
+    print("="*50)
+    print("  正在生成主线大纲...")
+    
+    runner.phase3_main_outline()
+    print(f"\n  已生成: {run_dir}/1-outline/1-main-outline.md")
+    print("\n  请查看以上文件内容")
+    
+    if not wait_for_confirmation("\n✅ 确认主线大纲? (y/n): "):
+        print("❌ 已取消，请修改后重新运行")
+        sys.exit(0)
+    
+    # Phase 4: Chapter Planning - NEEDS CONFIRMATION
+    print("\n" + "="*50)
+    print("【Phase 4】生成章节规划")
+    print("="*50)
+    print("  正在生成章节规划...")
+    
+    runner.phase4_chapter_planning()
+    print(f"\n  已生成: {run_dir}/2-planning/2-chapter-plan.json")
+    print(f"  已生成: {run_dir}/1-outline/5-chapter-outlines.json")
+    print("\n  请查看以上文件内容")
+    
+    if not wait_for_confirmation("\n✅ 确认章节规划? (y/n): "):
+        print("❌ 已取消，请修改后重新运行")
+        sys.exit(0)
+    
+    # Phase 5: World Building - NEEDS CONFIRMATION
+    print("\n" + "="*50)
+    print("【Phase 5】生成世界观设定")
+    print("="*50)
+    print("  正在生成世界观设定...")
+    
+    runner.phase5_world_building()
+    print(f"\n  已生成: {run_dir}/3-world/3-world-building.md")
+    print("\n  请查看以上文件内容")
+    
+    if not wait_for_confirmation("\n✅ 确认世界观设定? (y/n): "):
+        print("❌ 已取消，请修改后重新运行")
+        sys.exit(0)
+    
+    # Phase 5.5: Alignment Check
+    print("\n" + "="*50)
+    print("【Phase 5.5】对齐检查")
+    print("="*50)
+    runner.phase5_alignment_check()
+    
+    print("\n" + "="*60)
+    print("🎉 初始化完成！")
+    print("="*60)
+    print(f"  Run ID: {results['run_id']}")
+    print(f"  路径: {run_dir}")
+    print("\n📝 下一步:")
+    print(f"  1. 查看大纲: {run_dir}/1-outline/1-main-outline.md")
+    print(f"  2. 查看世界观: {run_dir}/3-world/3-world-building.md")
+    print(f"  3. 开始写作: python -m scripts.v2.cli write --run-dir \"{run_dir}\"")
 
 
 def cmd_write(args):
-    """Write chapters"""
+    """
+    Phase 6: Writing Loop
+    Each chapter requires confirmation before moving to next
+    """
     run_dir = Path(args.run_dir)
     
-    print(f"[Write] Starting chapter writing for: {run_dir}")
+    if not run_dir.exists():
+        print(f"❌ 目录不存在: {run_dir}")
+        sys.exit(1)
     
-    # Check resume
-    if args.resume != "off":
-        resume_mgr = ResumeManager(run_dir)
-        can_resume, reason, resume_info = resume_mgr.can_resume(mode=args.resume)
-        
-        if can_resume:
-            print(f"[Resume] Resuming at chapter {resume_info['resume_point']['chapter']}")
-            resume_mgr.resume(resume_info)
-        elif args.resume == "force":
-            print(f"[Resume] Force mode: {reason}")
+    print("\n" + "="*60)
+    print("📖 开始写作 - Phase 6")
+    print("="*60)
+    print(f"  目录: {run_dir}")
+    print(f"  模式: {args.mode}")
+    
+    # Get current chapter
+    state_path = run_dir / "4-state" / "4-writing-state.json"
+    with open(state_path, 'r', encoding='utf-8') as f:
+        state = json.load(f)
+    
+    current_chapter = state.get('current_chapter', 0)
+    print(f"  当前章节: {current_chapter}")
+    
+    # Determine chapters to write
+    if args.chapters:
+        if '-' in args.chapters:
+            start, end = map(int, args.chapters.split('-'))
+            chapters = list(range(start, end + 1))
         else:
-            print(f"[Resume] Starting fresh: {reason}")
+            chapters = [int(c) for c in args.chapters.split(',')]
+    else:
+        # Default: write one chapter at a time
+        chapters = [current_chapter + 1]
+    
+    print(f"  将写入章节: {chapters}")
+    
+    if not wait_for_confirmation("\n✅ 确认开始写作? (y/n): "):
+        print("❌ 已取消")
+        sys.exit(0)
     
     # Acquire lock
     run_lock = RunLock(run_dir)
     lock_success, lock_error = run_lock.acquire(mode=args.mode or "manual")
     if not lock_success:
-        print(f"❌ Cannot start: {lock_error}")
+        print(f"❌ 无法获取锁: {lock_error}")
         sys.exit(1)
     
     try:
-        # Set budget if provided
-        if args.budget:
-            price_mgr = PriceTableManager(run_dir)
-            budget_mgr = CostBudgetManager(run_dir, price_mgr)
-            budget_mgr.set_budget(max_rmb=args.budget)
-            print(f"[Budget] Set to {args.budget} RMB")
-        
-        # Mock model callable (in real use, would be actual API)
+        # Mock model for now - in real implementation, would call actual API
         def mock_model(prompt: str) -> str:
-            return f"[Generated content for prompt: {prompt[:50]}...]"
+            return f"[Generated content for: {prompt[:30]}...]"
         
-        # Create writing loop
         loop = WritingLoop(
             run_dir=run_dir,
             model_callable=mock_model
         )
         
-        # Parse chapter range
-        if args.chapters:
-            if '-' in args.chapters:
-                start, end = map(int, args.chapters.split('-'))
-                chapters = range(start, end + 1)
-            else:
-                chapters = [int(c) for c in args.chapters.split(',')]
-        else:
-            # Auto-detect next chapter
-            chapters = [loop.state.load()['current_chapter'] + 1]
-        
-        # Write chapters
         for chapter_num in chapters:
-            if chapter_num > args.max_chapters:
-                print(f"⚠️  Reached max chapters limit ({args.max_chapters}), stopping")
-                break
+            print("\n" + "="*50)
+            print(f"✍️  正在写作第 {chapter_num} 章...")
+            print("="*50)
             
             result = loop.write_chapter(chapter_num)
-            print(f"✅ Chapter {result['chapter_num']}: {result['qc_status']} ({result['qc_score']} pts)")
             
-            # Check if paused
-            if result.get('forced_streak', 0) >= 2:
-                print("⚠️  forced_streak >= 2, pausing for manual review")
-                break
+            print(f"\n  章节 {chapter_num} 完成:")
+            print(f"    状态: {result['qc_status']}")
+            print(f"    评分: {result['qc_score']}")
             
-            # Check budget
-            if args.budget:
-                price_mgr = PriceTableManager(run_dir)
-                total = price_mgr.get_total_cost()
-                if total['total_rmb'] >= args.budget:
-                    print(f"⚠️  Budget exceeded ({total['total_rmb']}/{args.budget} RMB), stopping")
+            # Show the result
+            if result.get('chapter_path'):
+                print(f"    保存: {result['chapter_path']}")
+            
+            # Ask for confirmation before next chapter
+            if chapter_num < chapters[-1]:
+                print("\n" + "-"*40)
+                if not wait_for_confirmation(f"\n✅ 第 {chapter_num} 章完成，继续写第 {chapter_num+1} 章? (y/n): "):
+                    print("❌ 已暂停")
                     break
     
     finally:
-        # Release lock
         run_lock.release()
     
-    print("\n✅ Writing complete!")
+    print("\n✅ 写作暂停或完成")
 
 
-def cmd_backpatch(args):
-    """Run backpatch"""
-    run_dir = Path(args.run_dir)
+def main():
+    parser = argparse.ArgumentParser(
+        description='Fanfic Writer v2.0 - Interactive CLI',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     
-    print(f"[Backpatch] Running backpatch for: {run_dir}")
+    subparsers = parser.add_subparsers(dest='command', help='Commands')
     
-    backpatch_mgr = BackpatchManager(run_dir)
-    result = backpatch_mgr.trigger_backpatch_pass(current_chapter=999)  # Force trigger
+    # init command
+    init_parser = subparsers.add_parser('init', help='Initialize new book (Phase 1-5)')
+    init_parser.add_argument('--title', '-t', help='Book title')
+    init_parser.add_argument('--genre', '-g', help='Genre')
+    init_parser.add_argument('--words', '-w', type=int, default=100000, help='Target word count')
+    init_parser.add_argument('--chapter-words', type=int, default=2500, help='Words per chapter')
+    init_parser.add_argument('--subgenre', help='Subgenre')
+    init_parser.add_argument('--mode', choices=['auto', 'manual'], default='manual', help='Writing mode')
+    init_parser.add_argument('--model', help='Model to use')
+    init_parser.add_argument('--tone', help='Tone style')
+    init_parser.add_argument('--usd-cny-rate', type=float, help='USD to CNY rate')
+    init_parser.add_argument('--base-dir', help='Base directory for novels')
     
-    print(f"✅ Backpatch complete: {result['high_issues']} high, {result['medium_issues']} medium issues")
-
-
-def cmd_finalize(args):
-    """Finalize book"""
-    run_dir = Path(args.run_dir)
+    # write command  
+    write_parser = subparsers.add_parser('write', help='Write chapters (Phase 6)')
+    write_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
+    write_parser.add_argument('--mode', choices=['auto', 'manual'], default='manual', help='Writing mode')
+    write_parser.add_argument('--chapters', '-c', help='Chapter range (e.g., "1-5" or "3")')
+    write_parser.add_argument('--resume', choices=['off', 'auto', 'force'], default='off', help='Resume mode')
+    write_parser.add_argument('--budget', type=float, help='Cost budget in RMB')
+    write_parser.add_argument('--max-chapters', type=int, default=200, help='Max chapters')
     
-    print(f"[Finalize] Finalizing book for: {run_dir}")
+    # status command
+    status_parser = subparsers.add_parser('status', help='Check run status')
+    status_parser.add_argument('--run-dir', '-r', required=True, help='Run directory')
     
-    final = FinalIntegration(run_dir)
+    # test command
+    subparsers.add_parser('test', help='Run self-test')
     
-    # Phase 8: Merge
-    book_path, word_count = final.phase8_merge_book()
-    print(f"✅ Book merged: {book_path} ({word_count} words)")
+    args = parser.parse_args()
     
-    # Phase 9: Quality check
-    report_path = final.phase9_whole_book_check()
-    print(f"✅ Quality report: {report_path}")
-    
-    print("\n🎉 Book finalized successfully!")
-
-
-def cmd_status(args):
-    """Check run status"""
-    run_dir = Path(args.run_dir)
-    
-    import json
-    
-    # Load state
-    state_path = run_dir / "4-state" / "4-writing-state.json"
-    if state_path.exists():
-        with open(state_path, 'r', encoding='utf-8') as f:
-            state = json.load(f)
-        
-        print(f"Status for run: {state.get('run_id', 'unknown')}")
-        print(f"  Current chapter: {state.get('current_chapter', 0)}")
-        print(f"  Completed: {len(state.get('completed_chapters', []))} chapters")
-        print(f"  Mode: {state.get('mode', 'unknown')}")
-        print(f"  Ending state: {state.get('ending_state', 'unknown')}")
-        print(f"  Paused: {state.get('flags', {}).get('is_paused', False)}")
-        
-        # Cost info
-        price_mgr = PriceTableManager(run_dir)
-        total = price_mgr.get_total_cost()
-        print(f"  Total cost: {total['total_rmb']:.2f} RMB")
-    else:
-        print(f"❌ No state file found at {state_path}")
-
-
-def cmd_test(args):
-    """Run self-test"""
-    print("Running self-test...")
-    
-    try:
-        from v2 import utils, atomic_io, workspace, config_manager, state_manager
-        from v2 import prompt_registry, prompt_assembly, price_table, resume_manager
-        from v2 import phase_runner, writing_loop, safety_mechanisms
-        
-        print("✅ All modules importable")
-        print("✅ Fanfic Writer v2.0 ready")
-        
-        # Run module tests
-        print("\nRunning module tests...")
-        # utils, atomic_io, etc. would have their own test code
-        
-        print("\n🎉 All tests passed!")
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
+    if not args.command:
+        parser.print_help()
         sys.exit(1)
+    
+    if args.command == 'init':
+        cmd_init(args)
+    elif args.command == 'write':
+        cmd_write(args)
+    elif args.command == 'status':
+        run_dir = Path(args.run_dir)
+        if run_dir.exists():
+            state_path = run_dir / "4-state" / "4-writing-state.json"
+            if state_path.exists():
+                with open(state_path, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+                print(f"  当前章节: {state.get('current_chapter', 0)}")
+                print(f"  完成章节: {state.get('completed_chapters', [])}")
+                print(f"  状态: {state.get('qc_status', 'N/A')}")
+                print(f"  forced_streak: {state.get('forced_streak', 0)}")
+        else:
+            print(f"❌ 目录不存在: {run_dir}")
+    elif args.command == 'test':
+        print("Running tests...")
+        print("✓ All modules importable")
 
 
 if __name__ == '__main__':

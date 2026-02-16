@@ -8,17 +8,12 @@
 
 ### 环境要求 / Environment Requirements
 
-- **Python**: 3.9+
 - **OpenClaw**: 最新版本
-- **依赖**: 详见 `requirements.txt` (如需要)
+- **模型**: 由 OpenClaw 自动提供（skill 不硬编码模型）
 
-### 推荐的模型 / Recommended Models
+### 重要说明
 
-| 模型 Model | 场景 Scenario | 性价比 Cost-effectiveness |
-|-----------|--------------|-------------------------|
-| moonshot/kimi-k2.5 | 日常写作 | ⭐⭐⭐⭐⭐ |
-| nvidia/moonshotai/kimi-k2.5 | 高并发 | ⭐⭐⭐⭐⭐ |
-| anthropic/claude-3.5-sonnet | 质量优先 | ⭐⭐⭐⭐ |
+这个 skill **不包含任何模型配置**。当 OpenClaw 调用此 skill 时，自动使用 OpenClaw 当前配置的模型。
 
 ---
 

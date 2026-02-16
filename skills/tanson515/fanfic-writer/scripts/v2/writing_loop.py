@@ -81,6 +81,16 @@ class WritingLoop:
         self.target_words = self.config.get('book', {}).get('target_word_count', 100000)
         self.max_chapters = 200  # Hard limit
     
+    def _get_forced_streak(self) -> int:
+        """Get current forced_streak value"""
+        state_path = self.run_dir / "4-state" / "4-writing-state.json"
+        try:
+            with open(state_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+            return state.get('forced_streak', 0)
+        except:
+            return 0
+    
     # ========================================================================
     # 6.1 Sanitizer
     # ========================================================================
@@ -536,7 +546,7 @@ Saved: {get_timestamp_iso()}
             'qc_score': qc_result.score,
             'qc_status': qc_result.status.value,
             'attempt': attempt_num,
-            'forced_streak': self.state.load()['forced_streak']
+            'forced_streak': self._get_forced_streak()
         }
 
 
