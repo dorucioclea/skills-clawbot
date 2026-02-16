@@ -1,0 +1,11 @@
+{
+  "owner": "up2itnow",
+  "slug": "validator-agent",
+  "displayName": "Validator Agent",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771207025705,
+    "commit": null
+  },
+  "history": []
+}
