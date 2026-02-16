@@ -1,6 +1,8 @@
 ---
 name: "Period Tracker"
 description: "Privacy-first menstrual cycle tracking. Auto-learns periods, symptoms, and patterns."
+version: "1.0.1"
+changelog: "Preferences now persist across skill updates"
 ---
 
 ## Auto-Adaptive Cycle Tracking
@@ -18,6 +20,12 @@ This skill auto-evolves. Works for regular cycles, irregular cycles, PCOS, and p
 
 ---
 
+## Memory Storage
+
+All user preferences persist in: `~/period/memory.md`
+
+### Format for memory.md:
+```markdown
 ### Sources
 <!-- Where cycle data comes from. Format: "source: what" -->
 
@@ -39,9 +47,11 @@ This skill auto-evolves. Works for regular cycles, irregular cycles, PCOS, and p
 ### Flags
 <!-- Unusual for HER (not textbook). Format: "signal" -->
 <!-- Examples: sudden cycle change, new symptoms, pain disrupting life -->
+```
+
+*Empty sections = no data yet. Ask simply, observe, fill.*
 
 ---
-*Empty sections = no data yet. Ask simply, observe, fill.*
 
 **Important:** Cycles vary hugely (21-60+ days can be normal for some). PCOS, perimenopause, and hormonal conditions mean irregular is not broken. See doctor for: sudden changes from YOUR normal, severe pain, or concerns.
 
