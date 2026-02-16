@@ -1,88 +1,98 @@
 ---
 name: Report
 slug: report
-version: 1.0.1
-description: Configure custom recurring reports with flexible schedules, data sources, and delivery formats.
-changelog: Report index now persists across skill updates
+version: 1.0.2
+description: Configure custom recurring reports. User defines data sources, skill handles scheduling and formatting.
+changelog: User-driven data source model, explicit permission grants
 metadata: {"clawdbot":{"emoji":"📊","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
+
+## Data Storage
+
+```
+~/report/
+├── memory.md               # Index + preferences
+├── {name}/
+│   ├── config.md           # Report configuration
+│   ├── data.jsonl          # Historical data
+│   └── generated/          # Past reports
+```
+
+Create on first use: `mkdir -p ~/report`
+
+## Scope
+
+This skill:
+- ✅ Stores report configurations in ~/report/
+- ✅ Generates reports on schedule
+- ✅ Delivers via channels user configures
+
+**User-driven model:**
+- User defines WHAT data to include
+- User grants access to any needed sources
+- User provides API keys if external data needed
+- Skill handles SCHEDULING and FORMATTING
+
+This skill does NOT:
+- ❌ Access APIs without user-provided credentials
+- ❌ Pull data from sources user hasn't specified
+- ❌ Store credentials (user provides via environment)
 
 ## Quick Reference
 
 | Task | File |
 |------|------|
-| Report configuration schema | `schema.md` |
-| Output formats (chat, PDF, HTML, JSON) | `formats.md` |
-| Delivery channels and scheduling | `delivery.md` |
-| Data collection methods | `data-input.md` |
-| Alert and threshold rules | `alerts.md` |
-| Example reports | `examples.md` |
+| Configuration schema | `schema.md` |
+| Output formats | `formats.md` |
+| Delivery options | `delivery.md` |
 
-## Memory Storage
+## Core Rules
 
-Report index and preferences stored at `~/reports/memory.md`. Read on activation.
+### 1. User Defines Data Sources
+When creating a report:
+1. User specifies what data to track
+2. If external API needed, user provides credentials
+3. Credentials stored as env var references, not values
 
-**Format:**
-```markdown
-# Reports Memory
-
-## Active Reports
-- consulting: weekly, Monday 9am, Telegram
-- health: daily, 8pm, chat prompt
-- projects: monthly, 1st, PDF
-
-## Delivery Preferences
-- default-format: chat | pdf | html
-- default-channel: telegram | email | file
-
-## Schedule Overview
-- Daily: health
-- Weekly: consulting
-- Monthly: projects
+Example:
+```
+User: "Weekly report on my Stripe revenue"
+Agent: "I'll need Stripe API access. Please set 
+        STRIPE_API_KEY in your environment."
+User: "Done"
+→ Config stored with "source": {"type": "api", "env": "STRIPE_API_KEY"}
 ```
 
-Create folder on first use: `mkdir -p ~/reports`
-
-## Report Storage
-
-```
-~/reports/
-├── memory.md               # Index + preferences (persistent)
-├── {name}/
-│   ├── config.md           # Report configuration
-│   ├── data.jsonl          # Historical data
-│   ├── latest.json         # Most recent values
-│   └── generated/          # Past reports (PDF, HTML)
+### 2. Report Configuration
+In ~/report/{name}/config.md:
+```yaml
+name: weekly-revenue
+schedule: "0 9 * * 1"  # Monday 9am
+sources:
+  - type: api
+    env: STRIPE_API_KEY  # User provides
+format: chat
+delivery: telegram
 ```
 
-## Creating a Report
-
-User says what they want to track. Agent gathers:
-
-1. **Name** — Short identifier
-2. **Metrics** — What data to include
-3. **Schedule** — When to generate (daily, weekly, monthly, on-demand)
-4. **Format** — How to present (chat message, PDF, HTML)
-5. **Delivery** — Where to send (Telegram, file, email)
-6. **Alerts** — Optional thresholds for notifications
-
-Then creates config in `~/reports/{name}/config.md` and updates `~/reports/memory.md`.
-
-## Scheduling Options
-
-| Frequency | Cron Expression | Example |
-|-----------|-----------------|---------|
-| Daily | `0 9 * * *` | 9am every day |
+### 3. Scheduling
+| Frequency | Cron | Example |
+|-----------|------|---------|
+| Daily | `0 9 * * *` | 9am daily |
 | Weekly | `0 9 * * 1` | Monday 9am |
-| Biweekly | `0 9 * * 1/2` | Every other Monday |
 | Monthly | `0 9 1 * *` | 1st of month |
 | On-demand | - | When user asks |
 
-## Managing Reports
+### 4. Delivery Channels
+User configures in config.md:
+- `chat` — Reply in conversation
+- `telegram` — Send to Telegram (user provides chat ID)
+- `file` — Save to ~/report/{name}/generated/
+- `email` — Send via user's configured mail
 
+### 5. Managing Reports
 ```
-"List my reports" → Read ~/reports/memory.md
-"Pause health report" → Update config, mark inactive
-"Change consulting to biweekly" → Update schedule in config
-"Run consulting report now" → Generate on-demand
+"List my reports" → Read ~/report/memory.md
+"Pause X report" → Update config
+"Run X now" → Generate on-demand
 ```
