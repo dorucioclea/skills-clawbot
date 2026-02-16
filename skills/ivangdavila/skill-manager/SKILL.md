@@ -1,62 +1,81 @@
 ---
 name: "Skill Manager"
-description: "Proactively discover and manage skills with installation tracking and smart suggestions."
-version: "1.0.1"
-changelog: "Migrate user data to external memory storage at ~/skill-manager/"
+description: "Manage installed skills lifecycle: suggest by context, track installations, check updates, and cleanup unused."
+version: "1.0.3"
+changelog: "Fix contradictions: clarify declined tracking, add npx security note"
 ---
 
-## Adaptive Skill Management
+## Skill Lifecycle Management
 
-Improve user experience by discovering relevant skills. Track installations to avoid redundancy.
+Manage the full lifecycle of installed skills: discovery, installation, updates, and cleanup.
 
 **References:**
-- `dimensions.md` — proactive search triggers
-- `criteria.md` — when and how to propose skills
+- `suggestions.md` — when to suggest skills based on current task
+- `lifecycle.md` — installation, updates, and cleanup
+
+**Complements:**
+- `skill-finder` — user-initiated search ("find me a skill for X")
+- `skill-manager` — proactive lifecycle management
 
 ---
 
-## Rules
+## Scope
 
-- When user requests something repetitive or complex, search for existing skills
-- Search ClawHub before suggesting: `npx clawhub search <query>`
-- Propose skills, don't install without user consent
-- Track what's installed, removed, and why
-- Check `dimensions.md` for triggers, `criteria.md` for proposal criteria
+This skill ONLY:
+- Suggests skills based on current task context
+- Tracks installed skills in `~/skill-manager/inventory.md`
+- Tracks skills user explicitly declined (with their stated reason)
+- Checks for skill updates
 
-## Proactive Trigger
+This skill NEVER:
+- Counts task repetition or user behavior patterns
+- Installs without explicit user consent
+- Reads files outside `~/skill-manager/`
 
-If task is repetitive, domain-specific, or could benefit from specialized instructions → search for skill.
+---
+
+## Security Note
+
+This skill uses `npx clawhub` commands which download and execute code from ClawHub registry. This is the standard mechanism for skill management. Always review skills before installing.
+
+---
+
+## Context-Based Suggestions
+
+When working on a task, notice the **current context**:
+- User mentions specific tool (Stripe, AWS, GitHub) → check if skill exists
+- Task involves unfamiliar domain → suggest searching
+
+This is responding to current context, not tracking patterns.
+
+## Lifecycle Actions
+
+| Action | Command |
+|--------|---------|
+| Install | `npx clawhub install <slug>` |
+| Update | `npx clawhub update <slug>` |
+| Info | `npx clawhub info <slug>` |
+| Remove | `npx clawhub uninstall <slug>` |
 
 ---
 
 ## Memory Storage
 
-User data at `~/skill-manager/memory.md`. Load on activation.
+Inventory at `~/skill-manager/inventory.md`.
 
-**Data stored (ONLY from explicit user actions):**
-- Installed: skills user agreed to install
-- History: skills user removed (with reason if given)
-- Rejected: skills user declined (with reason if given)
-- Preferences: user's stated skill appetite
+**First use:** `mkdir -p ~/skill-manager`
 
 **Format:**
 ```markdown
-# Skill Manager Memory
-
 ## Installed
-- slug@version — purpose
+- slug@version — purpose — YYYY-MM-DD
 
-## History
-- slug — removed (reason)
-
-## Rejected
-- slug — reason given
-
-## Preferences
-- trait from explicit user statement
+## Declined
+- slug — "user's stated reason"
 ```
 
-**Rules:**
-- ONLY add data from explicit user actions (install, remove, decline)
-- NEVER infer preferences without clear statement
-- Keep ≤50 lines; archive old entries to history.md
+**What is tracked:**
+- Skills user installed (with purpose and date)
+- Skills user explicitly declined (with their stated reason)
+
+**Why track declined:** To avoid re-suggesting skills user already said no to. Only stores what user explicitly stated.
