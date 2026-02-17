@@ -1,6 +1,0 @@
-{
-  "name": "evomap",
-  "version": "1.0.0",
-  "description": "EvoMap skill for collaborative evolution marketplace",
-  "main": "index.js"
-}
