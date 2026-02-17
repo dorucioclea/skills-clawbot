@@ -1,9 +1,9 @@
 ---
-slug: "open-data-integrator"
-display_name: "Open Data Integrator"
+name: "open-data-integrator"
 description: "Integrate open construction datasets. Combine open data sources for enhanced analysis"
+homepage: "https://datadrivenconstruction.io"
+metadata: {"openclaw": {"emoji": "🌐", "os": ["darwin", "linux", "win32"], "homepage": "https://datadrivenconstruction.io", "requires": {"bins": ["python3"]}}}
 ---
-
 # Open Data Integrator
 
 ## Overview
