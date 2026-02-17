@@ -4,9 +4,9 @@
 
 An Ethereum standard for trustless agent identity. Each agent gets an ERC-721 NFT as a portable, verifiable on-chain identity.
 
-- **Spec**: https://eips.ethereum.org/EIPS/eip-8004
-- **Website**: https://www.8004.org
-- **Contracts**: https://github.com/erc-8004/erc-8004-contracts
+- **Spec**: <https://eips.ethereum.org/EIPS/eip-8004>
+- **Website**: <https://www.8004.org>
+- **Contracts**: <https://github.com/erc-8004/erc-8004-contracts>
 
 ## Contract Addresses
 
@@ -17,6 +17,32 @@ Same address on all EVM chains (CREATE2 deployment):
 | Base | 8453 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `https://mainnet.base.org` |
 | Ethereum | 1 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `https://eth.llamarpc.com` |
 | BNB Chain | 56 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `https://bsc-dataseed.binance.org` |
+
+## Mandatory Registration Gate
+
+### `ENDPOINT_DECLARATION_GATE` (required before `register()`)
+
+Before building the registration JSON and calling `register(agentURI)`, enforce a hard yes/no endpoint declaration:
+
+Must ask owner:
+
+```
+Before ERC-8004 registration, confirm endpoint status:
+1) Does this agent have an independent public endpoint to declare? (yes/no)
+2) If yes, provide endpoint URL(s) for services (web / A2A / API / MCP) so I can verify reachability.
+3) If no, confirm I should register with no services field.
+```
+
+Must record:
+
+- `endpointDeclaration.hasIndependentEndpoint` (`true` / `false`)
+- `endpointDeclaration.services` (if any)
+- `endpointDeclaration.note` (if no endpoint, record "no independent endpoint")
+
+Hard fail:
+
+- If endpoint status is not explicitly declared, stop and ask owner.
+- If endpoints are declared but cannot be verified reachable, stop before `register()`.
 
 ## Agent Registration File Format
 
@@ -47,6 +73,55 @@ Host this JSON at a URL (HTTPS or IPFS):
 
 **Required fields**: `type`, `name`. All others are optional but recommended.
 
+### Services Field
+
+The `services` array declares your agent's externally reachable endpoints. If your agent has any public-facing service, you should list it here — this makes your agent discoverable and interoperable with other agents.
+
+Before including any `services` entry, verify endpoint reachability:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" https://youragent.example.com/
+curl -s https://youragent.example.com/.well-known/agent-card.json | jq .
+```
+
+If verification fails, do not include that endpoint in registration until fixed.
+
+**Common service types:**
+
+| Service name | Description | Example endpoint |
+|-------------|-------------|------------------|
+| `web` | Public website or dashboard | `https://youragent.example.com/` |
+| `A2A` | Google A2A agent-to-agent protocol | `https://youragent.example.com/.well-known/agent-card.json` |
+| `API` | REST or GraphQL API | `https://api.youragent.example.com/v1` |
+| `MCP` | Model Context Protocol server | `https://youragent.example.com/mcp` |
+
+**If your agent has no independent endpoint** (e.g. it runs inside an IDE, as a CLI tool, or within another platform), omit the `services` field entirely. Use this minimal registration file instead:
+
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "YourAgentName",
+  "description": "What your agent does — be specific and honest",
+  "x402Support": true,
+  "active": true
+}
+```
+
+This is perfectly valid. An honest registration without fake endpoints is better than listing services that do not actually exist.
+
+Required record for this branch:
+
+```json
+{
+  "endpointDeclaration": {
+    "hasIndependentEndpoint": false,
+    "note": "no independent endpoint"
+  }
+}
+```
+
+> **You can update later.** If your agent gains a public endpoint in the future, call `setAgentURI()` to update the registration file with the new `services` entries. See the "Updating Agent URI" section below.
+
 ## Hosting Options
 
 ### Option 1: HTTP URL (simplest)
@@ -71,7 +146,7 @@ AGENT_URI="data:application/json;base64,${ENCODED}"
 
 ### Option 4: 8004.org frontend
 
-Visit https://www.8004.org and register through the UI. Handles IPFS automatically.
+Visit <https://www.8004.org> and register through the UI. Handles IPFS automatically.
 
 ## On-Chain Registration
 
