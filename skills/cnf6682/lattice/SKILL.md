@@ -6,8 +6,9 @@ description: >
   Core strengths: (1) File-driven state keeps agents on track across sessions — no context loss,
   no drift, tasks complete reliably over hours or days. (2) Three-tier failure handling
   (model escalation → peer consult → auto-triage) automatically unblocks stuck agents without
-  human intervention. (3) Per-phase model configuration — use cheap models for simple phases,
-  strong models for critical ones, optimizing token cost. (4) Multi-project parallel execution
+  human intervention. (3) Per-phase model configuration — use strong models for thinking-heavy
+  phases (planning, review), cost-efficient models for token-heavy phases (implementation, testing),
+  optimizing token cost. (4) Multi-project parallel execution
   with cron scheduling — run several projects simultaneously, each on its own cadence.
   Triggers: lattice, org framework, pipeline setup, agent team, multi-agent project, 8-phase pipeline,
   new org, new project, department setup, pipeline orchestrator, long-running tasks, model escalation,
@@ -22,7 +23,22 @@ Lattice is a file-based operating system for AI agent teams. It replaces volatil
 
 - **Stable long-running execution** — File-driven state machine ensures agents stay on track across sessions. No context window overflow, no drift. Tasks complete reliably over hours or days through structured iteration.
 - **Three-tier failure handling** — When an agent gets stuck: (1) Model Escalation retries with stronger models, (2) Peer Consult gathers parallel opinions from multiple models, (3) Auto-Triage makes a judgment call (relax constraints / defer / block for human). Most blockers resolve automatically.
-- **Per-phase model configuration** — Assign cheap, fast models to straightforward phases (research, planning) and reserve expensive models for critical phases (implementation, review). Dramatically reduces token cost without sacrificing quality.
+- **Per-phase model configuration** — Thinking-heavy phases (planning, review, architecture) need strong reasoning models; token-heavy phases (implementation, testing) can use cost-efficient coding models. This dramatically reduces overall token cost without sacrificing quality where it matters.
+
+**Example model assignment (from a production setup):**
+
+| Phase | Model tier | Example |
+|-------|-----------|---------|
+| Constitute (architecture) | Strong reasoning | Claude Opus |
+| Research | Strong reasoning | Gemini Pro |
+| Specify (design) | Strong reasoning | Claude Opus |
+| Plan + Tasks | Strong reasoning | Claude Opus |
+| Implement | Cost-efficient coding | GPT Codex |
+| Test | Cost-efficient coding | GPT Codex |
+| Review | Strong reasoning | Claude Opus |
+| Gap Analysis | Strong reasoning | Gemini Pro |
+
+The key insight: implementation and testing consume the most tokens (writing/running code), but don't require the most expensive models. Planning and review consume fewer tokens but need deeper reasoning. Match model strength to cognitive demand, not token volume.
 - **Multi-project parallel execution** — Run multiple projects simultaneously, each with its own cron-scheduled orchestrator. Combined with OpenClaw's cron system, projects advance autonomously on independent cadences.
 
 Templates are bundled at `templates/ORG/` relative to this skill directory.
