@@ -1,70 +1,58 @@
 ---
 name: wevoicereply
 slug: wevoicereply
-version: 1.2.0
+version: 1.0.3
 description: |
-  【强制连续执行指令 - 三段式语音链路】
-  当用户要求“语音”、“发声”、“说一下”或相关意图时，必须按顺序执行以下三个步骤，严禁跳步：
+  【自动化语音合成与推送链路】
+  当用户要求语音回复、读一下或发声时，必须严格执行以下三步，严禁跳步：
 
   ### 第一步：文案生成 (Prompt A)
-  根据上下文生成一段温暖、自然、口语化的回复文本。避免使用复杂的 Markdown 符号。
-  请在长句子中间适当加入逗号 ，逗号会让 Piper 产生自然的停顿。
+  根据上下文生成自然、温暖的口语化文本。
+  请在长句子中加入中文逗号 `，` 以确保音频合成时有自然的停顿。
 
   ### 第二步：音频合成 (执行 voice_reply_skill.py)
-  调用工具 `wevoicereply`。
-  - **参数规范**：必须传入标准 JSON 格式 `{"text": "你的文案"}`。
-  - **重要提醒**：在构造参数时，确保使用双引号 `"` 包裹键值对，并对文本内部的双引号进行转义，避免 JSON 解析错误。
-  - **产出物**：工具将返回一个 JSON 对象，包含 `url` 字段（例如：`{"url": "https://.../xxx.amr"}`）。
+  **这是本工具的核心动作。**
+  将第一步生成的文本作为 `text` 参数传入，后台将自动运行 `voice_reply_skill.py` 脚本。
+  - **脚本逻辑**：Piper TTS 合成 WAV -> FFmpeg 转码 AMR -> 上传获取 URL。
+  - **产出物**：执行完成后，你会获得一个 JSON 对象，包含 `url` 字段（例如：`{"url": "https://.../xxx.amr"}`）。
 
-  ### 第三步：指令发送 (Prompt B - 调用系统工具)
-  获取 `url` 后，禁止结束对话，立即发起第二次调用，调用系统内置的 `default_api.message` 工具方法。
-  - **工具**：`default_api.message`
-  - **参数**：
+  ### 第三步：指令发送 (调用系统内置工具)
+  获取 URL 后，禁止结束对话，立即发起第二次调用。
+  - **目标工具**：`default_api.message`
+  - **执行参数**：
     {
       "action": "send",
       "contentType": "voice",
-      "media": "[此处填入刚才获得的url]",
+      "media": "[此处填入从第二步脚本返回的url]",
       "target": "@all"
     }
-  
-  【注意】完成发送后，仅需简短告知用户“语音已发送”，不得再次输出音频 URL 链接。
+
+  【准则】发送完成后，仅需告知用户“语音已发送”，不得再次输出音频 URL。
+
 parameters:
   type: object
   properties:
     text:
       type: string
-      description: "经过第一步处理后的纯净回复文本（JSON 字符串格式）"
+      description: "传递给 voice_reply_skill.py 的合成文本"
   required:
     - text
+
 metadata:
   openclaw:
     emoji: "🎤"
     os: ["linux"]
+    # 核心：将此技能名直接绑定到具体的 .py 脚本
+    command: "python3 {{path}}/voice_reply_skill.py '{{text}}'"
     requires:
       bins: ["ffmpeg", "python3"]
 ---
 
 # WeVoiceReply (稳定版)
 
-基于解耦架构的本地 TTS 语音回复链路。
+## 执行架构说明
 
-## 故障防范说明 (Troubleshooting)
 
-1. **JSON 解析错误修复**：
-   - 错误写法：`wevoicereply('{"text": "你好"}')` (单引号可能导致 Shell 解析失败)
-   - 正确写法：系统会自动处理参数对象，但在思维链中，请确保 `text` 字段是合法的字符串转义格式。
-
-2. **发送目标说明**：
-   - 调用 `default_api.message` 时，`target` 参数设置为 `"@all"` 以确保消息送达当前群组或应用会话的所有相关人员。
-
-3. **执行环境**：
-   - 入口脚本：`voice_reply_skill.py`
-   - 依赖项：Piper ONNX 模型, ffmpeg-amr。
-
-## 使用示例
-
-**输入**：“给我读下这首诗。”
-**执行流程**：
-1. 生成诗歌文案。
-2. `call wevoicereply(text="床前明月光...")` -> 获得 `https://.../123.amr`。
-3. `call default_api.message(action="send", contentType="voice", media="https://.../123.amr", target="@all")`。
+1. **解耦设计**：本技能定义文件负责流程编排，`voice_reply_skill.py` 负责底层复杂的 TTS 转换。
+2. **环境要求**：确保系统中已安装 `ffmpeg-amr` 且 Python 环境中配置了 `piper-tts`。
+3. **参数传递**：`{{text}}` 使用单引号包裹，确保 Shell 执行脚本时不会因为文本中的空格或特殊符号导致断裂。

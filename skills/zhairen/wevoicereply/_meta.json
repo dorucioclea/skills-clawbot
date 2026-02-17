@@ -3,9 +3,15 @@
   "slug": "wevoicereply",
   "displayName": "wevoicereply",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771148625232,
-    "commit": "https://github.com/openclaw/skills/commit/ad23118c5457590f51afa009690884fcb34d5011"
+    "version": "1.0.3",
+    "publishedAt": 1771221842821,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771148625232,
+      "commit": "https://github.com/openclaw/skills/commit/ad23118c5457590f51afa009690884fcb34d5011"
+    }
+  ]
 }
