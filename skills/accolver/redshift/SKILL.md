@@ -15,11 +15,11 @@ metadata:
         "install":
           [
             {
-              "id": "curl",
+              "id": "bun-build",
               "kind": "shell",
-              "command": "curl -fsSL https://redshiftapp.com/install | sh",
+              "command": "cd /tmp && git clone https://github.com/accolver/redshift.git && cd redshift && bun install && bun build cli/src/main.ts --compile --outfile ~/.local/bin/redshift && rm -rf /tmp/redshift",
               "bins": ["redshift"],
-              "label": "Install Redshift CLI (curl)",
+              "label": "Build Redshift CLI from source (bun)",
             },
           ],
       },
