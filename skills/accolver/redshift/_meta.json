@@ -1,0 +1,11 @@
+{
+  "owner": "accolver",
+  "slug": "redshift",
+  "displayName": "Redshift",
+  "latest": {
+    "version": "0.1.1",
+    "publishedAt": 1771365690827,
+    "commit": null
+  },
+  "history": []
+}
