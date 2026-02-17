@@ -6,7 +6,7 @@ read_when:
   - Listing channel contents
   - Adding images/links to channels
   - Watching channels for changes
-metadata: {"clawdbot":{"emoji":"🪬","requires":{"bins":["curl","jq"]}}}
+metadata: {"clawdbot":{"emoji":"🪬","requires":{"bins":["curl","python3"]}}}
 allowed-tools: Bash(arena:*) - No file writes, no exec beyond curl
 ---
 
@@ -34,11 +34,27 @@ Simple, transparent CLI for are.na API. No AI. No automation. No hidden features
 ## Installation
 
 ```bash
-# Install locally
-git clone /Users/mika/.openclaw/workspace/skills/arena-claw ~/arena-claw
-chmod +x ~/arena-claw/arena
-export PATH="$HOME/arena-claw:$PATH"
+# Clone the repository
+git clone https://github.com/yourusername/arena-claw ~/arena-claw
+
+# Or copy just the arena script
+cp arena-claw/arena ~/bin/arena
+chmod +x ~/bin/arena
+
+# Add to PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="$HOME/bin:$PATH"
 ```
+
+## Source Code
+
+The CLI is a single Python script: `arena`
+
+It uses only:
+- `curl` for API calls
+- `python3` for parsing
+- Local files for token storage
+
+No dependencies, no external imports.
 
 ## Authentication
 

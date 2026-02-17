@@ -1,13 +1,14 @@
-# are.na CLI - Simple & Transparent
+# are.na CLI
 
-Simple CLI wrapper for are.na API. No AI. No automation.
+Simple CLI wrapper for the are.na API. No AI. No automation.
 
 ## Install
 
 ```bash
-git clone /path/to/arena-claw ~/arena-claw
-chmod +x ~/arena-claw/arena
-export PATH="$HOME/arena-claw:$PATH"
+git clone https://github.com/yourusername/arena-claw ~/arena-claw
+cp ~/arena-claw/arena ~/bin/arena
+chmod +x ~/bin/arena
+export PATH="$HOME/bin:$PATH"
 ```
 
 ## Quick Start
@@ -54,7 +55,7 @@ arena -a account2 channel shared
 
 ## Security
 
-- Tokens stored in `~/.arena_token` or `~/.openclaw/.arena_tokens`
+- Tokens in `~/.arena_token` or `~/.openclaw/.arena_tokens`
 - Only talks to `api.are.na`
 - No external calls
 - No data exfiltration
