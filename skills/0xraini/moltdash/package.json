@@ -1,8 +1,0 @@
-{
-  "name": "moltdash",
-  "version": "1.0.0",
-  "description": "Moltbook Analytics and Growth Dashboard for OpenClaw",
-  "main": "moltdash.js",
-  "type": "module",
-  "dependencies": {}
-}
