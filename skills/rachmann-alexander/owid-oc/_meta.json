@@ -1,0 +1,11 @@
+{
+  "owner": "rachmann-alexander",
+  "slug": "owid-oc",
+  "displayName": "Our world in data",
+  "latest": {
+    "version": "0.1.2",
+    "publishedAt": 1771322916704,
+    "commit": null
+  },
+  "history": []
+}
