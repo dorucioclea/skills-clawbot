@@ -1,0 +1,11 @@
+{
+  "owner": "uchibeke",
+  "slug": "aport-agent-guardrail",
+  "displayName": "Aport Agent Guardrail",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1771327391439,
+    "commit": null
+  },
+  "history": []
+}
