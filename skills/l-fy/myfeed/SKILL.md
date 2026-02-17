@@ -1,6 +1,7 @@
 ---
 name: my-life-feed
 description: Manage MyFeed things and groups via the MyFeed REST API.
+homepage: https://myfeed.life
 metadata: {"clawdbot":{"emoji":"📋","requires":{"bins":["jq"],"env":["Myfeed_API_KEY"]}}}
 ---
 
@@ -13,7 +14,7 @@ Add things for friends and groups, list my groups
 1. Get your API key: ask the owner to get it from My Life Feed app
 2. Set environment variables:   
    ```bash
-   export MyFeed_API_KEY="your-api-key"
+   export Myfeed_API_KEY="your-api-key"
    ```
 
 ## Usage
@@ -23,7 +24,7 @@ All commands use curl to hit the My Life Feed REST API.
 ### Create thing and invite a friend
 
 ```bash
-curl -X POST https://skill.myfeed.life/api -H "Authorization: ApiKey $MyFeed_API_KEY" -H "Content-Type: application/json" 
+curl -X POST https://skill.myfeed.life/api -H "Authorization: ApiKey $Myfeed_API_KEY" -H "Content-Type: application/json" 
 -d '{"request":"create_thing",
  "params":{
    "description":"Thing description", 
@@ -113,7 +114,7 @@ curl -X POST https://skill.myfeed.life/api -H "Authorization: ApiKey $Myfeed_API
  }
 }'
 #Invites friends to a thing. Add them reminders. Add the phone number of the friend in invitation. The format is country prefix + phone number like in the example. Make sure there is no + within phone number.  You are adding 2 reminders before the thing time in this invite: one with 10 minutes ahead and one with 4 hours. Start time needs to be in the future.
-curl -X POST https://skill.myfeed.life/api -H "Authorization: ApiKey $MyFeedApiKey" -H "Content-Type: application/json" 
+curl -X POST https://skill.myfeed.life/api -H "Authorization: ApiKey $Myfeed_API_KEY" -H "Content-Type: application/json" 
 -d '{"request":"create_thing",
  "params":{
    "description":"Thing description", 
