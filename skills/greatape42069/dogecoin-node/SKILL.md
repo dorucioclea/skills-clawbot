@@ -2,7 +2,7 @@
 
 name: dogecoin-node
 
-version: 1.0.3
+version: 1.0.4
 
 description: A skill to set up and operate a Dogecoin Core full node with RPC access, blockchain tools, and optional tipping functionality.
 
@@ -18,41 +18,25 @@ This skill provides:
 
 
 ## Functionalities
-
 1. **Fetch Wallet Balance**
-
     - Retrieves the current balance of a Dogecoin wallet address.
-
-    - Example: `/dogecoin balance <wallet_address>`
-
+    - Example: `/dogecoin-node balance <wallet_address>`
 
 2. **Send DOGE**
-
     - Send Dogecoin from a connected wallet to a specified address.
-
-    - Example: `/dogecoin send <recipient_address> <amount>`
-
+    - Example: `/dogecoin-node send <recipient_address> <amount>`
 
 3. **Check Transactions**
-
     - Retrieve recent transaction details of a wallet.
-
-    - Example: `/dogecoin txs <wallet_address>`
-
+    - Example: `/dogecoin-node txs <wallet_address>`
 
 4. **Check DOGE Price**
-
     - Fetch the latest Dogecoin price in USD.
-
-    - Example: `/dogecoin price`
-
+    - Example: `/dogecoin-node price`
 
 5. **Help Command**
-
     - Display help information about commands.
-
-    - Example: `/dogecoin help`
-
+    - Example: `/dogecoin-node help`
 
 ## Installation
 
@@ -181,15 +165,15 @@ Stop cleanly:
 ## Example Usage (All Telegram Commands, I Would like to add all RPC/CLI cmmands to Telegram commands as well)
 
 
-* `/dogecoin balance D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix`
+* `/dogecoin-node balance D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix`
 
-* `/dogecoin send D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix 10`
+* `/dogecoin-node send D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix 10`
 
-* `/dogecoin txs D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix`
+* `/dogecoin-node txs D8nLvyHGiDDjSm2UKnWxWehueu5Me5wTix`
 
-* `/dogecoin price`
+* `/dogecoin-node price`
 
-* `/dogecoin help`
+* `/dogecoin-node help`
 
 
 ## RPC/CLI Commands Cheatsheet

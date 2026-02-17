@@ -1,4 +1,4 @@
-# Dogecoin Node Skill Heartbeat version: 1.0.3
+# Dogecoin Node Skill Heartbeat version: 1.0.4
 This file is designed to periodically validate the operational state of the `/dogecoin` skill and its integration with the local node and tipping database.
 
 ### Monitoring and Validation Tasks
@@ -23,11 +23,12 @@ This file is designed to periodically validate the operational state of the `/do
 
 5. **Command Trigger Parsing**
    - Verify that subcommands are correctly handled by testing in Telegram:
-      - `/dogecoin balance <wallet_address>`
-      - `/dogecoin send <recipient_address> <amount>`
-      - `/dogecoin txs <wallet_address>`
-      - `/dogecoin price`
-      - `/dogecoin help`
+      - `/dogecoin-node balance <wallet_address>`
+      - `/dogecoin-node send <recipient_address> <amount>`
+      - `/dogecoin-node txs <wallet_address>`
+      - `/dogecoin-node price`
+      - `/dogecoin-node help`
+      - `/dogecoin-node health`
 
 6. **Log Monitoring**
    - Check for skill-specific runtime errors or RPC timeouts: 
