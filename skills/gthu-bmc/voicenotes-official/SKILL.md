@@ -9,6 +9,8 @@ metadata:
     requires:
       env:
         - VOICENOTES_API_KEY
+      bins:
+        - curl
     primaryEnv: VOICENOTES_API_KEY
 ---
 
@@ -229,3 +231,11 @@ Key fields:
 
 - Note IDs are UUIDs
 - Rate limit: ~3 requests/second average
+
+## Security & Guardrails
+
+- Only accesses `api.voicenotes.com` endpoints
+- No credential exfiltration or external data storage
+- No telemetry or analytics
+- No automatic code execution or file overwrites
+- Read/write limited to user's own Voicenotes data via authenticated API
