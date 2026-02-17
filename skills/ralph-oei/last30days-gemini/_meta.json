@@ -1,0 +1,11 @@
+{
+  "owner": "ralph-oei",
+  "slug": "last30days-gemini",
+  "displayName": "last30days (Gemini Synthesis)",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771322536006,
+    "commit": null
+  },
+  "history": []
+}
