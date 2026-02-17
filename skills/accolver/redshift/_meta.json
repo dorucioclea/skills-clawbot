@@ -3,11 +3,16 @@
   "slug": "redshift",
   "displayName": "Redshift",
   "latest": {
-    "version": "0.1.3",
-    "publishedAt": 1771365940163,
-    "commit": "https://github.com/openclaw/skills/commit/b6f4b7df19f723b32c1fcd55069d4211fbe4f370"
+    "version": "0.1.4",
+    "publishedAt": 1771365986311,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.1.3",
+      "publishedAt": 1771365940163,
+      "commit": "https://github.com/openclaw/skills/commit/b6f4b7df19f723b32c1fcd55069d4211fbe4f370"
+    },
     {
       "version": "0.1.1",
       "publishedAt": 1771365690827,

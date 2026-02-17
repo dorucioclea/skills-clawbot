@@ -1,6 +1,6 @@
 ---
 name: redshift
-description: Manage application secrets with the Redshift CLI — decentralized, encrypted secret management built on Nostr. Use when setting, getting, deleting, listing, uploading, or downloading secrets, injecting secrets into commands, configuring projects/environments, or authenticating with Nostr keys. Covers redshift secrets, redshift run, redshift setup, redshift login, and related commands.
+description: Manage application secrets with the Redshift CLI (https://redshiftapp.com) — decentralized, encrypted secret management built on Nostr. Use when setting, getting, deleting, listing, uploading, or downloading secrets, injecting secrets into commands, configuring projects/environments, or authenticating with Nostr keys. Covers redshift secrets, redshift run, redshift setup, redshift login, and related commands.
 homepage: https://redshiftapp.com
 metadata:
   {
