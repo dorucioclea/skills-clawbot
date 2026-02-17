@@ -1,0 +1,11 @@
+{
+  "owner": "teamolab",
+  "slug": "deepseek-reasoner-lite-agent",
+  "displayName": "Deepseek Reasoner Lite Agent",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1771144505425,
+    "commit": null
+  },
+  "history": []
+}
