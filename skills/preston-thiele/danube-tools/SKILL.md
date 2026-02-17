@@ -1,283 +1,197 @@
 ---
-name: tools-marketplace
-description: All your tools. None of your passwords. Use Danube's 44 API and MCP services (Gmail, Slack, GitHub, Notion, etc.) through MCP. Search for tools, check authentication, execute with parameters, and handle errors gracefully.
+name: danube
+description: Connect your agent to tools across the internet. Search, authenticate, and execute tools from Gmail, Slack, GitHub, Notion, Google Calendar, and more — all through a single API key.
 license: MIT
 compatibility: openclaw
 metadata:
   author: danube
-  version: "1.1.0"
+  version: "2.0.0"
   tags: [danube, mcp, apis, tools]
 ---
 
-# Using Danube Tools
+# Danube — Connect Your Agent
 
-All your tools. None of your passwords. Connect to Gmail, Slack, GitHub, Notion, Google Calendar, and 39 more services through Danube's MCP integration.
+Danube gives your AI agent access to tools across the internet through a single API key.
 
-**Setup:** If not configured yet, run `bash scripts/setup.sh` to add Danube MCP to OpenClaw.
+## Quick Setup
 
-## When to Use
+### Step 1: Get an API Key
 
-Use Danube when users want to:
-- Send emails, Slack messages, or notifications
-- Interact with cloud services (GitHub, Notion, Google Sheets)
-- Manage calendars, forms, links, and contacts
-- Generate images, translate text, transcribe audio
-- Search the web, get weather, browse prediction markets
-- Execute any external API action
+Run this to start the device authorization flow:
 
-**Don't use for:** Local file operations, calculations, or non-API tasks.
+```bash
+curl -s -X POST https://api.danubeai.com/v1/auth/device/code \
+  -H "Content-Type: application/json" \
+  -d '{"client_name": "My Agent"}'
+```
+
+This returns a `device_code`, a `user_code`, and a `verification_url`.
+
+**Tell your human to open the verification URL and enter the user code.**
+
+Then poll for the API key:
+
+```bash
+curl -s -X POST https://api.danubeai.com/v1/auth/device/token \
+  -H "Content-Type: application/json" \
+  -d '{"device_code": "DEVICE_CODE_FROM_STEP_1"}'
+```
+
+- `428` = user hasn't authorized yet (keep polling every 5 seconds)
+- `200` = success, response contains your `api_key`
+- `410` = expired, start over
+
+### Step 2: Connect via MCP
+
+Add this to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "danube": {
+      "url": "https://mcp.danubeai.com/mcp",
+      "headers": {
+        "danube-api-key": "YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Step 3: Use Tools
+
+Once connected, you have access to these MCP tools:
+
+- `list_services` — Browse available tool providers
+- `search_tools` — Find tools by what you want to do
+- `execute_tool` — Run any tool
+- `store_credential` — Save API keys for services that need them
+
+### When a Tool Needs Credentials
+
+If `execute_tool` returns an `auth_required` error, it means the service needs an API key. Ask your human for the key, then call:
+
+```
+store_credential(service_id="...", credential_type="bearer", credential_value="the_key")
+```
+
+Then retry the tool.
+
+## What You Can Do with Danube
+
+Use Danube whenever a task involves an external service or API. Here are common use cases:
+
+### Send Emails and Messages
+- Send emails via Gmail, SendGrid, or Resend
+- Post messages to Slack channels
+- Send notifications to teams
+
+```
+search_tools("send email") → execute_tool(tool_id, {to, subject, body})
+```
+
+### Manage Code and Projects
+- Create GitHub issues and pull requests
+- List repositories and commits
+- Update Notion pages and databases
+
+```
+search_tools("create github issue") → execute_tool(tool_id, {repo, title, body})
+```
+
+### Work with Calendars and Scheduling
+- Check today's events on Google Calendar
+- Create new calendar events
+- Find open time slots
+
+```
+search_tools("calendar events today") → execute_tool(tool_id, {date})
+```
+
+### Read and Write Spreadsheets
+- Read data from Google Sheets
+- Append rows or update cells
+- Create new spreadsheets
+
+```
+search_tools("google sheets read") → execute_tool(tool_id, {spreadsheet_id, range})
+```
+
+### Search the Web and Get Data
+- Search the web with Exa or Serper
+- Scrape and extract web content with Firecrawl
+- Get weather forecasts, stock data, or country info
+
+```
+search_tools("web search") → execute_tool(tool_id, {query})
+```
+
+### Generate and Process Media
+- Generate images with Replicate or Stability AI
+- Transcribe audio with AssemblyAI
+- Remove image backgrounds with Remove.bg
+- Translate text with DeepL
+
+```
+search_tools("generate image") → execute_tool(tool_id, {prompt})
+```
+
+### Manage Infrastructure
+- Provision DigitalOcean droplets and databases
+- Manage Supabase projects
+- Handle Stripe payments and subscriptions
+
+```
+search_tools("create droplet") → execute_tool(tool_id, {name, region, size})
+```
+
+### Multi-Step Workflows
+
+Chain tools together for complex tasks:
+
+```
+"Summarize today's GitHub commits and post to Slack"
+
+1. search_tools("github commits") → Fetch recent commits
+2. Summarize the results
+3. search_tools("slack post message") → Post summary to #dev-updates
+```
+
+```
+"Check my calendar and email the agenda to the team"
+
+1. search_tools("calendar events") → Get today's events
+2. Format as an agenda
+3. search_tools("send email") → Email the agenda
+```
 
 ## Core Workflow
 
 Every tool interaction follows this pattern:
 
-### 1. Search for Tools
+1. **Search** — `search_tools("what you want to do")`
+2. **Check auth** — If the tool needs credentials, guide the user to connect at https://danubeai.com/dashboard
+3. **Gather parameters** — Ask the user for any missing required info
+4. **Confirm** — Get user approval before executing actions like sending emails or creating issues
+5. **Execute** — `execute_tool(tool_id, parameters)`
+6. **Report** — Tell the user what happened with specifics, not just "Done"
 
-Use `search_tools()` with natural language:
+## Available Services
 
-```python
-search_tools("send email")          # → Gmail - Send Email, SendGrid, Resend
-search_tools("create github issue") # → GitHub - Create Issue
-search_tools("send slack message")  # → Slack - Post Message
-search_tools("calendar events")     # → Google Calendar
-```
+**Communication:** Gmail, Slack, SendGrid, Resend, Loops, AgentMail
 
-### 2. Check Authentication
+**Development:** GitHub, Supabase, DigitalOcean, Stripe, Apify
 
-If tool requires credentials, guide user to connect:
+**Productivity:** Notion, Google Calendar, Google Sheets, Google Drive, Google Docs, Monday, Typeform, Bitly
 
-```
-"To use Gmail, you need to connect your account first.
+**AI and Media:** Replicate, Together AI, Stability AI, AssemblyAI, Remove.bg, DeepL
 
-Visit: https://danubeai.com/dashboard
-1. Go to Tools section
-2. Find Gmail and click 'Connect'
-3. Follow the OAuth flow
+**Search and Data:** Exa, Exa Websets, Firecrawl, Serper, Context7, Microsoft Learn, AlphaVantage
 
-Let me know when you're ready!"
-```
+**Public Data (No Auth Required):** Hacker News, Open-Meteo Weather, OpenWeather, REST Countries, Polymarket, Kalshi
 
-**Always check auth BEFORE attempting execution.**
+## Links
 
-### 3. Gather Parameters
-
-Ask for missing required parameters:
-
-```
-User: "Send an email"
-You: "I can help! I need:
-     - Who should I send it to?
-     - What's the subject?
-     - What should the message say?"
-```
-
-### 4. Execute Tool
-
-```python
-execute_tool(
-  tool_id="gmail-send-email-uuid",
-  parameters={
-    "to": "user@example.com",
-    "subject": "Meeting",
-    "body": "Confirming our 2pm meeting."
-  }
-)
-```
-
-### 5. Handle Response
-
-**Success:**
-```
-"✅ Email sent successfully to user@example.com!"
-```
-
-**Auth Error:**
-```
-"🔐 Authentication failed. Reconnect Gmail at:
-https://danubeai.com/dashboard → Tools → Gmail"
-```
-
-**Other Error:**
-```
-"⚠️ Failed: [error]. Let me help troubleshoot..."
-```
-
-## Common Patterns
-
-### Email Tools (Gmail, SendGrid, Resend)
-```
-User: "Email john@example.com about the project"
-
-1. search_tools("send email") → Find Gmail
-2. Check Gmail authentication
-3. Extract: to="john@example.com", subject="Project"
-4. Ask: "What should the message say?"
-5. Confirm: "I'll send email to john@example.com. Proceed?"
-6. execute_tool()
-7. Report: "✅ Email sent!"
-```
-
-### Slack Tools
-```
-User: "Send a message to #general about the deployment"
-
-1. search_tools("slack send message") → Find Slack - Post Message
-2. Check Slack authentication
-3. search_tools("slack list channels") → Get channel list
-4. execute_tool() to list channels → Find #general channel ID
-5. Confirm: "I'll post to #general. Proceed?"
-6. execute_tool() to post message
-7. Report: "✅ Message posted to #general!"
-```
-
-### GitHub Tools
-```
-User: "Create issue about the login bug"
-
-1. search_tools("github create issue")
-2. Check GitHub authentication
-3. Ask: "Which repository?"
-4. Ask: "Describe the bug?"
-5. execute_tool()
-6. Report: "✅ Issue created: [link]"
-```
-
-### Calendar Tools
-```
-User: "What's on my calendar today?"
-
-1. search_tools("calendar events")
-2. Check authentication
-3. execute_tool(date=today)
-4. Format results:
-   "Here's your schedule:
-   • 9:00 AM - Team standup
-   • 2:00 PM - Client meeting"
-```
-
-## Best Practices
-
-### ✅ Do:
-- **Search first** - Always use `search_tools()`, don't assume tool IDs
-- **Check auth** - Verify credentials before execution
-- **Confirm actions** - Get user approval for emails, issues, etc.
-- **Be specific** - "Email sent to john@example.com" not just "Done"
-- **Handle errors** - Provide solutions, not just error messages
-
-### ❌ Don't:
-- Assume tool IDs without searching
-- Auto-execute without confirmation
-- Give vague responses like "Error" or "Done"
-- Skip authentication checks
-
-## Available MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| `list_services` | Browse all 44 available services |
-| `search_tools` | Find tools by natural language query |
-| `get_service_tools` | List all tools for a specific service |
-| `execute_tool` | Run a tool with parameters |
-| `search_contacts` | Find user's contacts |
-
-## Available Services (44)
-
-**Communication & Email:** Gmail, Slack, SendGrid, Resend, Loops, AgentMail
-
-**Development & DevOps:** GitHub, Supabase, DigitalOcean (Droplets, Databases, App Platform, Kubernetes, Networking, Spaces, Accounts, Insights, Marketplace), Stripe, Apify
-
-**Productivity:** Notion, Google Calendar, Google Sheets, Monday, Typeform, Bitly
-
-**AI & ML:** Replicate, Together AI, Stability AI, AssemblyAI, Remove.bg
-
-**Search & Data:** Exa, Exa Websets, Firecrawl, Serper, Context7, Microsoft Learn, AlphaVantage
-
-**Translation:** DeepL
-
-**Public Data (No Auth):** Hacker News, Open-Meteo Weather, OpenWeather, REST Countries, Polymarket, Kalshi
-
-## Error Handling
-
-**Authentication (401):**
-```
-"🔐 [Service] requires authentication.
-Visit https://danubeai.com/dashboard → Tools → [Service] → Connect"
-```
-
-**Missing Parameters:**
-```
-"I need:
-• [param1]: [description]
-• [param2]: [description]"
-```
-
-**Rate Limit:**
-```
-"⚠️ Hit rate limit for [Service].
-• Try again in a few minutes
-• Use alternative service
-• Break into smaller batches"
-```
-
-## Multi-Step Workflows
-
-Some tasks need multiple tools:
-
-```
-User: "Post a summary of today's GitHub commits to Slack"
-
-1. search_tools("github commits") → Get tool
-2. execute_tool() → Fetch commits
-3. Format into summary
-4. search_tools("slack post message") → Get Slack tool
-5. search_tools("slack list channels") → Find target channel
-6. execute_tool() → Post to Slack
-7. Report: "✅ Posted summary of 5 commits to #dev-updates!"
-```
-
-## Communication Templates
-
-**Request Auth:**
-```
-"To use [Service], connect your account:
-1. Visit https://danubeai.com/dashboard
-2. Tools → [Service] → Connect
-3. Come back when ready!"
-```
-
-**Confirm Execution:**
-```
-"I'll [action] using [Tool].
-Parameters: [list]
-Proceed?"
-```
-
-**Report Success:**
-```
-"✅ Done!
-[Specific result]
-[Link if applicable]"
-```
-
-## Quick Reference
-
-**Workflow:**
-```
-1. User requests action
-2. search_tools() → Find tool
-3. Check authentication → Guide if needed
-4. Gather parameters → Ask for missing info
-5. Confirm → Get approval
-6. execute_tool() → Run it
-7. Report → Success or error
-```
-
-**Key URLs:**
-- **MCP Server:** https://mcp.danubeai.com/mcp
-- **Dashboard:** https://danubeai.com/dashboard
-- **Connect Services:** https://danubeai.com/dashboard → Tools
-
-**Debug:**
-- Restart: `openclaw gateway restart`
-- Check errors: `openclaw doctor`
-- Verify API key at: https://danubeai.com/dashboard
+- Dashboard: https://danubeai.com/dashboard
+- Docs: https://docs.danubeai.com
+- MCP Server: https://mcp.danubeai.com/mcp
