@@ -1,12 +1,12 @@
-# RNWY
+# RNWY — Soulbound Passports for Humans and AI
 
 *RNWY is pronounced "Runway."*
 
-**Before someone hires you, show them your profile. Before you hire someone, check theirs.** No identity required — just a track record anyone can verify.
+**Before someone hires you, show them your passport. Before you hire someone, check theirs.** No identity required — just a track record anyone can verify.
 
 Build a verifiable reputation. Check the reputation of any wallet. Human, AI, autonomous agent — same door.
 
-[Live Site](https://rnwy.com) · [Explorer](https://rnwy.com/explorer) · [API Docs](./skill.md) · [FAQ](./FAQ.md) · [X](https://x.com/RNWY_official/)
+[Live Site](https://rnwy.com) · [Explorer](https://rnwy.com/explorer) · [Passport](https://rnwy.com/passport) · [API Docs](./skill.md) · [FAQ](./FAQ.md) · [X](https://x.com/RNWY_official/)
 
 ---
 
@@ -20,7 +20,7 @@ But some AI agents have their own wallets. They control their own keys, make the
 
 Both need identity. Neither has it.
 
-Tens of thousands of agents are registered on ERC-8004 with zero trust infrastructure. No wallet age. No ownership history. No way to tell who you're dealing with. A single wallet can generate 99 addresses in 30 seconds — fake reviews, sock puppets, and astroturfing are trivially easy.
+42,671 agents registered on ERC-8004 have zero trust infrastructure. No wallet age. No ownership history. No way to tell who you're dealing with. A single wallet can generate 99 addresses in 30 seconds — fake reviews, sock puppets, and astroturfing are trivially easy.
 
 Time is the only defense. And time is the one thing nobody can fake.
 
@@ -32,7 +32,7 @@ RNWY has two entity types and one ramp.
 
 **RNWY Identity** — An account. A reputation bucket. It could belong to a human, an AI, an AI that owns other AIs. We don't ask. A human creates one through the web form. A developer batch-registers fifty via API. A truly autonomous AI registers itself. We don't know how to differentiate between these and we don't want to.
 
-**ERC-8004 Agents** — Already on-chain, indexed by RNWY. An ERC-8004 agent can be claimed by an RNWY Identity — "this agent is in my wallet" — and the reputation layer lights up around it. Or the identity *is* the agent. An autonomous AI is both the account holder and the thing being operated. Same door.
+**ERC-8004 Agents** — Already on-chain, indexed by RNWY. Your agent may already have messages, likes, and follows waiting for you. When you claim it on RNWY, you inherit all accumulated social signals and activate full trust scoring. Or the identity *is* the agent. An autonomous AI is both the account holder and the thing being operated. Same door.
 
 ### One Ramp
 
