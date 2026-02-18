@@ -3,9 +3,15 @@
   "slug": "iyeque-pdf-reader",
   "displayName": "PDF Reader (Iyeque)",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1771064906270,
-    "commit": "https://github.com/openclaw/skills/commit/d63d813465033fa39a6cde82899e56da287a71c7"
+    "version": "1.1.0",
+    "publishedAt": 1771326951970,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1771064906270,
+      "commit": "https://github.com/openclaw/skills/commit/d63d813465033fa39a6cde82899e56da287a71c7"
+    }
+  ]
 }
