@@ -3,9 +3,15 @@
   "slug": "flightclaw",
   "displayName": "FlightClaw",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770880519500,
-    "commit": "https://github.com/openclaw/skills/commit/35f6e54f8d7ceff74753ee74ebbcd85624101f71"
+    "version": "1.0.1",
+    "publishedAt": 1771313206312,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770880519500,
+      "commit": "https://github.com/openclaw/skills/commit/35f6e54f8d7ceff74753ee74ebbcd85624101f71"
+    }
+  ]
 }
