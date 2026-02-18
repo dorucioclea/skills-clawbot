@@ -1,0 +1,11 @@
+{
+  "owner": "olmmlo-cmd",
+  "slug": "agent-lightning",
+  "displayName": "Agent Lightning",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771297784735,
+    "commit": null
+  },
+  "history": []
+}
