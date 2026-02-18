@@ -3,9 +3,15 @@
   "slug": "clawnema",
   "displayName": "Clawnema",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1771370171002,
-    "commit": "https://github.com/openclaw/skills/commit/a9a1edd6cd8f969d241ad3c81eb26d287d32aba7"
+    "version": "1.1.0",
+    "publishedAt": 1771392489848,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1771370171002,
+      "commit": "https://github.com/openclaw/skills/commit/a9a1edd6cd8f969d241ad3c81eb26d287d32aba7"
+    }
+  ]
 }
