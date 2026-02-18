@@ -1,7 +1,7 @@
 ---
 name: index1-doctor
 description: Diagnose index1 environment - check Python, Ollama, models, index health.
-version: 2.0.1
+version: 2.0.3
 license: Apache-2.0
 author: gladego
 tags: [index1, diagnostics, mcp, troubleshooting]
@@ -29,7 +29,8 @@ Checks:
 - Python version (>= 3.10 required)
 - SQLite version (>= 3.43.0 for full features)
 - sqlite-vec extension
-- Ollama connectivity
+- ONNX embedding (built-in, bge-small-en-v1.5)
+- Ollama connectivity (optional, for multilingual/CJK)
 - Embedding model availability
 - CJK/Chinese support (jieba)
 
