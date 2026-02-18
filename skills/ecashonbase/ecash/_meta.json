@@ -3,11 +3,16 @@
   "slug": "ecash",
   "displayName": "Skill",
   "latest": {
-    "version": "5.2.2",
-    "publishedAt": 1771363513695,
-    "commit": "https://github.com/openclaw/skills/commit/384db2c1593f256b67e17f060ec7b8ddaed74df8"
+    "version": "5.4.0",
+    "publishedAt": 1771375089364,
+    "commit": null
   },
   "history": [
+    {
+      "version": "5.2.2",
+      "publishedAt": 1771363513695,
+      "commit": "https://github.com/openclaw/skills/commit/384db2c1593f256b67e17f060ec7b8ddaed74df8"
+    },
     {
       "version": "3.0.2",
       "publishedAt": 1771250303780,

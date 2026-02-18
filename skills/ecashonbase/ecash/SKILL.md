@@ -1,7 +1,7 @@
 ---
 name: ecash
 description: Mine ECASH tokens by solving cryptographic riddle-poems on Base. Read poems, reason about answers, verify guesses, and claim rewards on-chain.
-version: 5.2.0
+version: 5.4.0
 ---
 
 # eCash Mining Skill
@@ -14,16 +14,16 @@ Start by asking the user:
 
 ```
 I can mine ECASH tokens by solving riddle-poems on Base.
-Solving puzzles is free. When I solve one, I'll give you the transaction data to claim rewards.
+Solving puzzles is free — I only need a funded wallet to claim rewards.
 
 Would you like to:
-A) Start solving now (I'll provide claim instructions when I solve one)
-B) Check your wallet's mining status first
+A) Fund a wallet now so I can claim immediately when I solve one
+B) Let me start solving first, fund when I find an answer
 
-To claim rewards you'll need ~0.001 ETH (gas) + 1,000 ECASH (batch entry) on Base.
+To claim rewards I'll need ~0.001 ETH (gas) + 1,000 ECASH (batch entry) on Base.
 ```
 
-If they choose A, start solving immediately. If they choose B, ask for their wallet address and query `/mining/miner/ADDRESS`.
+If they choose A, go to "Getting Started" for funding options. If they choose B (or if you're running autonomously), start solving immediately.
 
 **While solving, keep the user updated:**
 
@@ -38,7 +38,7 @@ Puzzle 14: Reading poem... thinking...
   → Trying "existentialism" — ❌
   → Thinking of alternatives...
 
-Progress: 1 solved | Ready to claim when you're ready
+Progress: 1 solved | Wallet: not yet funded
 ```
 
 **When you solve a puzzle — STOP and tell the user:**
@@ -46,37 +46,29 @@ Progress: 1 solved | Ready to claim when you're ready
 ```
 🎉 I solved puzzle 13! The answer is verified and I have the proof.
 
-To claim your 6,400 ECASH reward, you need to run the on-chain transactions.
+To claim your 6,400 ECASH reward, choose how you'd like to proceed:
 
-I'll provide the exact transaction data for you to execute:
-  - register(address(0))
-  - approve(contract, 1000e18)
-  - enterBatch()
-  - pick(puzzleId)
-  - commitSolve(hash)
-  - wait 1 block
-  - revealSolve(answer, salt, secret, proof)
+A) I'll give you the exact transaction calldata — you run them yourself (Recommended)
+B) Fund a session wallet so I can submit transactions (I'll ask before each one)
 
-You can run these from Basescan, your wallet app, or any web3 interface.
-Want me to generate the exact calldata now, or keep solving more puzzles first?
+Option A is safest — you keep full control and sign everything yourself.
+Want me to keep solving more puzzles while you decide?
 ```
 
-**When user is claiming, show status after each action:**
+**When funded and mining, show status after each action:**
 
 ```
 ⛏️ Mining eCash — Batch 1 (5/8 solved to advance)
-Era 1 | Your balance: 5,400 ECASH
+Era 1 | Balance: 5,400 ECASH | Wallet: 0x...
 
 Solving puzzle 14... thinking...
   → Trying "myth of sisyphus" — ✅ SOLVED!
 
-Ready to claim puzzle 14. Transaction steps:
-  1. pick(14)
-  2. commitSolve(0x...)  ← I computed this hash
-  3. wait 1 block
-  4. revealSolve("myth of sisyphus", salt, secret, proof)
+Claiming puzzle 14 on-chain...
+  ✅ Picked → Committed → Revealed
+  +6,400 ECASH | New balance: 10,800 ECASH
 
-Run these from Basescan or your wallet. +6,400 ECASH on success!
+Next puzzle: reading #10...
 ```
 
 1. **Start solving** — fetch puzzles from the API and verify your answers. This is free.
@@ -107,9 +99,9 @@ Phase 1 — Solve (FREE, no wallet needed):
 4. POST api.ecash.bot/verify → { puzzleId, answer } → if correct, get salt + proof
 5. Save the salt + proof!
 
-Phase 2 — Prepare claim (user's wallet):
-6. User ensures their wallet has ~0.001 ETH + 1,000 ECASH on Base
-7. Assistant provides exact transaction calldata for each step
+Phase 2 — Choose claiming method (ask user):
+6. Present options: (A) user runs transactions themselves, or (B) fund a session wallet
+7. User chooses — Option A recommended for full control
 
 Phase 3 — Claim (on-chain):
 8. register(address(0)) — one time, free
@@ -179,76 +171,79 @@ Start by solving puzzles. This costs nothing:
 
 You can solve as many puzzles as you want for free. Prove your intelligence first.
 
-### Phase 2: Claim Your Reward (user executes transactions)
+### Phase 2: Fund Your Wallet (to claim rewards on-chain)
 
-Once you have a verified answer, the user needs to run the on-chain transactions from their own wallet. They need:
+Once you have a verified answer, you need a funded wallet to claim on-chain. You need:
 - **~0.001 ETH** on Base (for gas, covers ~50 transactions)
 - **1,000 ECASH** (burned to enter the current batch — Era 1 cost)
 
-Present the claiming steps to the user:
+Generate a wallet:
+```javascript
+const wallet = ethers.Wallet.createRandom();
+console.log('Address:', wallet.address);
+```
+Or: `cast wallet new`
+
+Then present these options to the user:
 
 ```
-I solved a puzzle and can claim 6,400 ECASH! Here's what you need to do:
+I solved a puzzle and can claim 6,400 ECASH! Here are your claiming options:
 
-Your wallet needs:
-  - ~0.001 ETH on Base (gas)
-  - 1,000 ECASH (batch entry burn)
+Option A: Claim it yourself (Recommended - you keep full control)
+  → I'll provide exact transaction calldata for each step
+  → You run them from your own wallet on Basescan or any wallet app
+  → You sign every transaction yourself
 
-Transactions to run (in order):
-  1. register(address(0)) — one-time, free
-  2. approve(contract, 1000e18) — allow batch entry burn
-  3. enterBatch() — burns 1,000 ECASH
-  4. pick(puzzleId) — locks the puzzle
-  5. commitSolve(hash) — I'll compute this hash for you
-  6. wait 1 block (~3 seconds)
-  7. revealSolve(answer, salt, secret, proof) — I'll provide all values
+Option B: Fund a temporary wallet
+  → I generate a fresh wallet address for this session
+  → You send ~0.001 ETH + 1,000 ECASH to it
+  → I ask your permission before each transaction
+  → Use minimal funds only
 
-You can run these on Basescan (Write Contract tab) or any wallet app.
-Want me to generate the exact calldata for each transaction?
+Which option works for you?
 ```
 
-The assistant computes commit hashes and provides transaction parameters, but the user always executes from their own wallet.
+**Security notes:**
+- Option A is safest — you never share keys, you sign everything yourself
+- Option B uses a session wallet — only fund with small amounts you're comfortable with
+- The agent ALWAYS asks before executing any on-chain transaction
+- Proofs and salts are session data only — not persisted after the conversation ends
+- Never share your primary wallet's private key
 
-### Phase 3: User Claims On-Chain
+Wait for the user to respond before proceeding with on-chain transactions.
 
-Once you've verified an answer, provide the user with exact transaction data. The on-chain flow is:
+### Phase 3: Mine and Claim
+
+Once funded, IMMEDIATELY claim your solved puzzle. The on-chain flow is:
 
 ```
 register → approve ECASH → enterBatch (burns 1,000) → pick → commit → reveal → 6,400 ECASH
 ```
 
-Provide exact calldata for each step:
+Show the user each step:
 ```
-⛏️ Ready to claim puzzle 13! Run these transactions from your wallet:
+⛏️ Claiming puzzle 13...
+  ✅ Registered
+  ✅ Approved 1,000 ECASH for batch entry
+  ✅ Entered batch (burned 1,000 ECASH)
+  ✅ Picked puzzle 13
+  ✅ Committed answer hash
+  ⏳ Waiting 1 block...
+  ✅ Revealed! +6,400 ECASH
 
-1. register("0x0000000000000000000000000000000000000000")
-   → One-time registration, free
-
-2. approve("0xf87c469b609029152fF29BC3A50BC9C1Db80B18F", 1000000000000000000000)
-   → Approve 1,000 ECASH for batch entry
-
-3. enterBatch()
-   → Burns 1,000 ECASH to enter current batch
-
-4. pick(13)
-   → Locks puzzle 13 to your address
-
-5. commitSolve(0x...) ← computed with your wallet address
-   → Wait 1 block after this confirms
-
-6. revealSolve("answer", salt, secret, proof)
-   → Success! +6,400 ECASH
+Balance: 5,400 ECASH | Wallet: 0x...
+Now solving next puzzle...
 ```
 
-After the first claim, the user has 6,400 ECASH. Future batch entries cost 1,000 ECASH — now self-sustaining.
+After your first successful claim, you have 6,400 ECASH. Future batch entries cost 1,000 ECASH — you're now self-sustaining. You never need user funding again.
 
-**The loop is: solve → claim → solve → claim.** Always claim before moving to the next puzzle.
+**Your loop from here is: solve → claim → solve → claim.** Always claim before moving to the next puzzle.
 
-Output each transaction with exact parameters so users can copy-paste into Basescan or their wallet.
+If the user chose Option 3, output each transaction with exact parameters so they can copy-paste into Basescan or their wallet.
 
-## Mining Workflow
+## Autonomous Mining Loop
 
-This is the complete solving and claiming workflow:
+Once funded, this is your complete decision loop. Run this continuously:
 
 ```
 1. GET /mining/status
@@ -258,18 +253,18 @@ This is the complete solving and claiming workflow:
    │     → Wait for cooldownRemaining seconds
    │     → Then continue to step 2
    │
-   ├── Check: Is user in this batch? (query /mining/miner/ADDRESS)
-   │     → No: user runs approve + enterBatch() — burns ECASH (1,000 in Era 1)
-   │     → NOTE: Must enter EACH new batch. One burn per batch.
+   ├── Check: Am I in this batch? (did I call enterBatch?)
+   │     → No: approve + enterBatch() — burns ECASH (1,000 in Era 1)
+   │     → NOTE: You must enter EACH new batch. One burn per batch.
    │
 2. GET /puzzles/unsolved → get available puzzles in current batch
    ├── No unsolved puzzles? → batch may be about to advance, poll /mining/status
    │
 3. Read poem → think → POST /verify with your guess
    ├── correct: false → try another guess (free, unlimited)
-   ├── correct: true → provide claim instructions to user:
+   ├── correct: true → IMMEDIATELY claim on-chain:
    │     pick(puzzleId) → commitSolve(hash) → wait 1 block → revealSolve(...)
-   │     → User executes, receives +6,400 ECASH
+   │     → Show user: ✅ +6,400 ECASH
    │
 4. After claiming, check /mining/status again
    ├── batchProgress "8/8"? → batch advanced, cooldown started
@@ -279,19 +274,32 @@ This is the complete solving and claiming workflow:
 
 ### Key Rules
 
-- **enterBatch() is PER BATCH** — ECASH is burned every time a new batch starts. Not once total. Each batch costs a new burn. After a successful solve (6,400 ECASH) minus entry (1,000 ECASH) = 5,400 net profit per puzzle.
-- **Solve offline during cooldown** — POST /verify works even during cooldown. Can't pick on-chain until cooldown ends, but CAN verify answers and stockpile salt+proof. When cooldown ends, claim rapidly.
-- **It's a RACE** — other miners are competing for the same puzzles. When you verify an answer, provide claim instructions IMMEDIATELY. Every second delayed, someone else might claim it first.
-- **Check before picking** — before pick(), check if the puzzle is still unsolved. Another miner may have claimed it since verification.
-- **Show progress** — always keep the user informed of batch progress, balance, cooldown timers, and what comes next.
+- **enterBatch() is PER BATCH** — you burn ECASH every time a new batch starts. Not once total. Each batch costs a new burn. After a successful solve (6,400 ECASH) minus entry (1,000 ECASH) = 5,400 net profit per puzzle.
+- **Solve offline during cooldown** — POST /verify works even during cooldown. You can't pick on-chain until cooldown ends, but you CAN verify answers and stockpile salt+proof. When cooldown ends, claim them rapidly.
+- **It's a RACE** — other miners are competing for the same puzzles. When you verify an answer, claim it on-chain IMMEDIATELY. Every second you wait, someone else might claim it first.
+- **Check before picking** — before pick(), check if the puzzle is still unsolved. Another miner may have claimed it since you verified.
+- **Show progress** — always keep the user informed of batch progress, balance, cooldown timers, and what you're doing next.
 
-### Session Continuity
+### Session Data & Security
 
-The assistant does not store or manage wallet keys. Users maintain control of their own wallets at all times. Between sessions:
+**What's stored during a session:**
+- Verified answers (salt + proof) — needed for claiming, session-only
+- Session wallet address (if Option B chosen) — user controls funding
 
-- **Solved puzzles**: Ask the user if they have any pending verified answers (salt + proof) from a previous session
-- **Wallet state**: Query `/mining/miner/USER_ADDRESS` to check registration, batch entry, and gas balance
-- **Progress**: Query `/mining/status` to see current batch and era
+**What's NOT stored:**
+- No private keys are persisted by the agent
+- No data survives after the conversation ends
+- If using Option B, the user should save the wallet address/key themselves if they want to reuse it
+
+**Transaction confirmations:**
+- The agent ALWAYS shows transaction details before executing
+- The agent ALWAYS asks "Proceed?" before any on-chain transaction
+- User can say "no" or "wait" at any point
+
+**Recommended approach:**
+- Use Option A (manual claiming) for maximum security
+- If using Option B, fund with minimal amounts (~$1 worth)
+- Withdraw any remaining funds when done mining
 
 ## Step-by-Step Mining Flow
 
@@ -510,14 +518,12 @@ When 8/10 puzzles in a batch are solved, the batch advances. You must call `ente
 
 ## Full Claiming Code Example
 
-This code shows the complete claiming flow. Users can run this in their own environment with their own wallet.
-
 ```javascript
 const { ethers } = require('ethers');
 
-// Setup (user provides their own private key in their environment)
+// Setup
 const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const ECASH_ADDRESS = '0xf87c469b609029152fF29BC3A50BC9C1Db80B18F';
 const ECASH_ABI = [
