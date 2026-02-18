@@ -1,8 +1,0 @@
-{
-  "name": "eyebot-cronbot",
-  "version": "1.0.0",
-  "description": "Task scheduler and automation engine",
-  "author": "ILL4NE",
-  "license": "MIT",
-  "keywords": ["eyebot", "cron", "scheduler", "automation", "crypto", "a2a"]
-}
