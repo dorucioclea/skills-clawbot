@@ -1,0 +1,11 @@
+{
+  "owner": "zuga-luga",
+  "slug": "zugashield",
+  "displayName": "ZugaShield Security Scanner",
+  "latest": {
+    "version": "0.1.1",
+    "publishedAt": 1771363722042,
+    "commit": null
+  },
+  "history": []
+}
