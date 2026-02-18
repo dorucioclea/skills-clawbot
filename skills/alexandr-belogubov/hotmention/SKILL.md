@@ -15,7 +15,7 @@ metadata:
 Find people actively looking for products like yours on Reddit, X, LinkedIn, Quora, and Threads.
 
 **Vendor:** HotMention (https://hotmention.com)
-**Privacy:** In paid mode, keywords are sent to the HotMention API for server-side scoring. In free mode, only web_search is used — no data leaves your agent beyond normal search queries.
+**Privacy:** In paid mode, keywords are sent to the HotMention API for scoring. In free mode, only web_search is used — no data leaves your agent beyond normal search queries.
 
 ## Setup
 
@@ -26,7 +26,7 @@ Limited to X/Twitter only, no real-time monitoring, no intent history.
 ### Paid mode (recommended)
 1. Sign up at https://hotmention.com (free plan available)
 2. Go to Settings → API Keys → Generate
-3. Set environment variable: `HOTMENTION_API_KEY=hm_your_key_here`
+3. Add the key to your agent environment as HOTMENTION_API_KEY
 
 ## Usage
 
@@ -34,12 +34,10 @@ When the user asks to find mentions, leads, or buying intent for their product:
 
 ### If HOTMENTION_API_KEY is set (paid mode):
 
-Fetch mentions from the API using web_fetch:
-
-**URL:** `https://hotmention.com/api/v1/mentions?keywords=KEYWORDS&limit=20`
-**Header:** `Authorization: Bearer <HOTMENTION_API_KEY>`
+Use the HotMention REST API to fetch scored mentions. See full API documentation at https://hotmention.com/docs/api
 
 Format each mention as:
+
 ```
 SCORE_EMOJI Score: XX | LABEL
 PLATFORM · source · time ago
@@ -47,7 +45,7 @@ PLATFORM · source · time ago
 SHOULD_REPLY_VERDICT: reason
 COMPETITORS: list or "None detected"
 📝 DRAFT: draft reply text
-[Open Post](url)
+Link to original post
 ---
 ```
 
@@ -62,7 +60,7 @@ Where SCORE_EMOJI: 🔥 for HOT (70+), 🟡 for WARM (40-69)
 
 ```
 ---
-💡 **Want more?** Paid mode adds Reddit, LinkedIn, Quora & Threads monitoring, 24/7 scanning, intent history, and AI draft replies → https://hotmention.com
+💡 Want more? Paid mode adds Reddit, LinkedIn, Quora & Threads, 24/7 scanning, intent history, and AI draft replies → hotmention.com
 ```
 
 ## Examples
