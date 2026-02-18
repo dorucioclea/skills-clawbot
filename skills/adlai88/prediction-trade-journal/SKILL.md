@@ -5,7 +5,7 @@ description: Auto-log trades with context, track outcomes, generate calibration 
 metadata: {"clawdbot":{"emoji":"📓","requires":{"env":["SIMMER_API_KEY"]},"cron":null,"autostart":false}}
 authors:
   - Simmer (@simmer_markets)
-version: "1.1.2"
+version: "1.1.4"
 published: true
 ---
 
@@ -66,7 +66,6 @@ python tradejournal.py --export trades.csv
 | Setting | Environment Variable | Default |
 |---------|---------------------|---------|
 | API Key | `SIMMER_API_KEY` | (required) |
-| API URL | `SIMMER_API_URL` | `https://api.simmer.markets` |
 
 ## Storage
 
